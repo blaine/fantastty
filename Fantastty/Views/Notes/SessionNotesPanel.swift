@@ -1,42 +1,11 @@
 import SwiftUI
 
-/// A collapsible panel showing session notes as a timestamped log stream.
-struct SessionNotesPanel: View {
+/// The always-visible header bar for the notes panel.
+struct SessionNotesHeader: View {
     @ObservedObject var session: Session
     @Binding var isExpanded: Bool
 
-    @State private var newNoteText = ""
-    @State private var scrollToBottom = false
-
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    private let fullDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Header bar (always visible)
-            headerBar
-
-            // Expandable content
-            if isExpanded {
-                Divider()
-                contentView
-            }
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private var headerBar: some View {
         HStack {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -72,6 +41,35 @@ struct SessionNotesPanel: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+}
+
+/// The expanded notes content panel, shown as an overlay.
+struct SessionNotesPanel: View {
+    @ObservedObject var session: Session
+    @Binding var isExpanded: Bool
+
+    @State private var newNoteText = ""
+
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    private let fullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    var body: some View {
+        contentView
+            .background(.regularMaterial, in: UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10))
+            .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 
     private var contentView: some View {
@@ -123,6 +121,7 @@ struct SessionNotesPanel: View {
                                     .id(entry.id)
                             }
                         }
+                        .textSelection(.enabled)
                     }
                     .frame(minHeight: 60, maxHeight: 200)
                     .onChange(of: session.noteEntries.count) {
@@ -248,7 +247,6 @@ struct NoteEntryRow: View {
             Text(entry.content)
                 .font(.callout)
                 .foregroundStyle(.primary)
-                .textSelection(.enabled)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)

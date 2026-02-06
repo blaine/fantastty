@@ -21,8 +21,8 @@ struct SessionDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Notes panel (collapsible)
-            SessionNotesPanel(session: session, isExpanded: $notesExpanded)
+            // Notes header (in layout flow)
+            SessionNotesHeader(session: session, isExpanded: $notesExpanded)
             Divider()
 
             // Main content area with optional thumbnail panel
@@ -50,6 +50,12 @@ struct SessionDetailView: View {
                 if session.tabs.count > 1 && showThumbnails && !tabsInSidebar {
                     Divider()
                     TabThumbnailPanel(session: session)
+                }
+            }
+            .overlay(alignment: .top) {
+                // Expanded notes content overlays the terminal
+                if notesExpanded {
+                    SessionNotesPanel(session: session, isExpanded: $notesExpanded)
                 }
             }
         }
