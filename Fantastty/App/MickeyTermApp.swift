@@ -13,5 +13,9 @@ struct FantasttyApp: App {
         .commands {
             AppCommands(sessionManager: appDelegate.sessionManager)
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }

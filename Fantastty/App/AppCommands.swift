@@ -6,10 +6,12 @@ struct AppCommands: Commands {
     @AppStorage("tabsInSidebar") var tabsInSidebar = false
 
     var body: some Commands {
-        // View menu toggle for tabs in sidebar
+        // Quick toggle for tabs in sidebar (setting lives in Settings)
         CommandGroup(before: .toolbar) {
-            Toggle("Show Tabs in Sidebar", isOn: $tabsInSidebar)
-                .keyboardShortcut("t", modifiers: [.command, .option])
+            Button(tabsInSidebar ? "Hide Tabs in Sidebar" : "Show Tabs in Sidebar") {
+                tabsInSidebar.toggle()
+            }
+            .keyboardShortcut("t", modifiers: [.command, .option])
         }
 
         // Replace the default "New Window" command
