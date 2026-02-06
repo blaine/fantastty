@@ -20,7 +20,7 @@ struct SessionDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
             // Main content area with optional thumbnail panel
             HStack(spacing: 0) {
                 // Terminal content
@@ -48,8 +48,8 @@ struct SessionDetailView: View {
                     TabThumbnailPanel(session: session)
                 }
             }
-        }
-        .overlay(alignment: .top) {
+
+            // Notes panel overlays from the top
             SessionNotesPanel(session: session, isExpanded: $notesExpanded)
         }
         .toolbar {
