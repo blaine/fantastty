@@ -1,0 +1,750 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0DFAD349E4BF46E263DFB5A5 /* FullscreenMode+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */; };
+		1884DE631C79ECB3F202F6C8 /* SurfaceView+Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FF2DE822A85FD96FD0DBEC /* SurfaceView+Image.swift */; };
+		1E87AA3043F57B80B2B4DBAE /* Ghostty.App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643BB302F69D3B8BC81BCC1A /* Ghostty.App.swift */; };
+		2060EC4E6EC93BB627DB0155 /* Ghostty.Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */; };
+		213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF09D816789200644A34F6 /* SessionMetadata.swift */; };
+		25C133A6066C09E29CF27024 /* fantastty.sh in Resources */ = {isa = PBXBuildFile; fileRef = 140C34BE75F8E35B9803CA1B /* fantastty.sh */; };
+		270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */; };
+		31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCE90FA0D374014602A3628 /* KeyboardLayout.swift */; };
+		32FAC9DD5A6997E3B393D04A /* EventModifiers+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE3D4FD18EDC4733E55361B /* EventModifiers+Extension.swift */; };
+		3D6FFCC3EC3CE2BC8E31C879 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C79CFA2D5C50E279ECF1E750 /* Carbon.framework */; };
+		3E5A66C5A098230DCA11C20C /* Ghostty.Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2675910C3625ED685E6C3D18 /* Ghostty.Event.swift */; };
+		3EE8CE3E886F22CE3D00087A /* Ghostty.Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB1D532EDE69EDC58BF91158 /* Ghostty.Error.swift */; };
+		4097CD783D2683366E049161 /* NSColor+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE52D3A18570B508FE63761 /* NSColor+Extension.swift */; };
+		4192ED72D868F2143B69D835 /* SurfaceGrabHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */; };
+		4223434CE7F0CB9F797654F9 /* SurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 482DB758E2BE4C3AD4389566 /* SurfaceView.swift */; };
+		427A07BBE45BB0DEC82D5C02 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE841348EE5474B5AB2322A1 /* main.swift */; };
+		442252375FE92C0781EE7F56 /* SessionType.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7614C13A5B0B575404F8D0 /* SessionType.swift */; };
+		4772E230F503EE8E223E0A39 /* CGS.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47B3F24C3964B77FF83FC42 /* CGS.swift */; };
+		47821B73E1E8A92CB69251A7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B297D7747AEDED8B243C380 /* Assets.xcassets */; };
+		47D5DF0E77A71E93A0338129 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C576F46E002ADD95360E83 /* TabBarView.swift */; };
+		51793B079D1382885FCFE514 /* Ghostty.Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1F62E4EC552622732B6159 /* Ghostty.Config.swift */; };
+		541547BBE23F440B723CDD8E /* MickeyTermApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902A1A3E8E0322EFCD2935A3 /* MickeyTermApp.swift */; };
+		557472C53DB00D2D8587D263 /* SurfaceProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87017B8990883C045D8CFF1A /* SurfaceProgressBar.swift */; };
+		58BE9BB13F2EF1EC78FD192C /* TerminalTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */; };
+		61D8239FC2C62A02C84A962B /* Optional+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = C838797D1D4164E37BF1A6FB /* Optional+Extension.swift */; };
+		61FFE79D665D951DEF99C7D2 /* NSImage+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD293FCABE3E0127AC62AE4 /* NSImage+Extension.swift */; };
+		66D8DE5DB1C49470CA0EDEC7 /* Cursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B77A79CB26271F6320B64C /* Cursor.swift */; };
+		6722435A060E46F00A350667 /* SurfaceView_AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */; };
+		736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A288EE4B731A40F8A2C9450 /* SessionManager.swift */; };
+		7706DB04E347DDA7F9099788 /* SurfaceDragSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */; };
+		78DAE20C2BA37EDA496DC829 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0CC6B051A5ABFD6B9981012 /* AppCommands.swift */; };
+		79C2315E7EE9A36D57402E51 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F7F74090AA0945771D3964A3 /* GhosttyKit.xcframework */; };
+		7C5DEE882BF9B5485FDD361B /* MetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78603084D81676AC053915B3 /* MetalView.swift */; };
+		7CFE92E6178B25652F1716A9 /* SplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5157848A4CCB892D4C76075E /* SplitView.swift */; };
+		7E78A52CCC4F8B345DCDFFF1 /* TerminalSplitTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */; };
+		7EE40FABEEB4720624206FA0 /* Ghostty.Command.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701BE60ABCA6530D10F1A401 /* Ghostty.Command.swift */; };
+		7F8D1260B39EC323DF372FAF /* Ghostty.Surface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FAF3C2532ED01AE5F93BC29 /* Ghostty.Surface.swift */; };
+		81EE90AA01128AE549CE3012 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405C060AA5909F6CA99AC835 /* AppDelegate.swift */; };
+		8B25F49E00595AB24C2EB6C6 /* Ghostty.Input.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F96F132170CA05F1F29696A /* Ghostty.Input.swift */; };
+		8BA5959833211B635C10C8E7 /* OSColor+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8598A326F65A137F1F2A6D /* OSColor+Extension.swift */; };
+		8DC11FD4D658BD50F45E94CA /* SplitView.Divider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */; };
+		8F303E0B77A654AA71F99098 /* Double+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB48187E648FF83678869E8C /* Double+Extension.swift */; };
+		9250F29A9F9701A55471D84F /* SidebarRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC27720BAEBA076458B8FC0E /* SidebarRowView.swift */; };
+		92C1A3B57CF9725999440AF2 /* NSAppearance+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B02E4572BA85ACBF338282 /* NSAppearance+Extension.swift */; };
+		94C1E6EAAE0F5503D45A05FA /* SecureInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3D40FE81067CF9B1DFAC08 /* SecureInput.swift */; };
+		9BF047548789E221114FD014 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E84612A640F2178E1C3922B /* AppInfo.swift */; };
+		A000CF83FE0A314CCD1284E8 /* VibrantLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = C665C8B1C5DE1A96F7551FEA /* VibrantLayer.m */; };
+		A17BC6AC3DABF4D7FCEB715A /* NSMenuItem+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */; };
+		A33574334905D9B61A851CD6 /* SecureInputOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7B00FE80794F99FE38F94B /* SecureInputOverlay.swift */; };
+		A58BD4EA26A93B02F0414384 /* Weak.swift in Sources */ = {isa = PBXBuildFile; fileRef = C687CCDD55BD703C1591317F /* Weak.swift */; };
+		A6BECDF92E74B14518A6F4B9 /* Backport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5F2F67928ACFE5120BA782 /* Backport.swift */; };
+		A7E343D6FF292BAEA5BD4305 /* UUID+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E9BEAAEEE081129B9DA55D /* UUID+Extension.swift */; };
+		A9F34CEEB77C0AA4EC5F839B /* SSHConnectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43F4F2AA796509D25A0202C /* SSHConnectionSheet.swift */; };
+		ADF7E6F6919033ABA6473F31 /* Ghostty.Inspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F87DDBE81BB19A02EA301A2 /* Ghostty.Inspector.swift */; };
+		BB98D303E99E1EA106BD2E42 /* NSPasteboard+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */; };
+		BC14E76875E00603E4B6E874 /* NSView+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F89AB559009B06C7920573 /* NSView+Extension.swift */; };
+		C0218530ACB954FF271E6D8D /* Fullscreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979CC9A96A66BA0B800EBFD9 /* Fullscreen.swift */; };
+		C1DFDC13F4DD6F2EDBBF47FF /* SplitTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E4986A3D30A9E9EAD3A6C93 /* SplitTree.swift */; };
+		C289639676F0C3C2A5367F85 /* Array+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D9B0B29EB99483941D80DA /* Array+Extension.swift */; };
+		C761878FED3416A183D53D85 /* GhosttyDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */; };
+		C86109E5CA51D8D1C236071C /* NSEvent+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */; };
+		C907BB7160482732FA45EF14 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC71494450F49AF3C3EF59D6 /* Session.swift */; };
+		C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */; };
+		D9DE9253074604BD02EEDE01 /* Ghostty.Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */; };
+		DA0A1994119A432E83D4BFDA /* NewSessionMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D308F8F4C24380795511065 /* NewSessionMenu.swift */; };
+		DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */; };
+		DBBAC03A50D025BF7A7BA4B8 /* NSWindow+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B7F7C3CC3EBC5CAD4B4E10 /* NSWindow+Extension.swift */; };
+		DD15CB9BF2B2A5BE901FA6B5 /* CrossKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6BA2B57EB90457ACEAB1E5E /* CrossKit.swift */; };
+		E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */; };
+		E0CA045544DCEF8FCE50789A /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6332C119C9B6B838364F2615 /* SidebarView.swift */; };
+		E1CDD864B8919A8B94B89048 /* SurfaceView+Transferable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1CBEA07E655200AF4652D7 /* SurfaceView+Transferable.swift */; };
+		E756741FF4E52996CC9497F2 /* UndoManager+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87311A665C7557D52D54A73 /* UndoManager+Extension.swift */; };
+		EA271502E8A6E3EA92410CDC /* Duration+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6670262CF1B809D2FE12DD3 /* Duration+Extension.swift */; };
+		EACB4F22EF57E850272BC17F /* View+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D7A1C18ABA131100C04F12 /* View+Extension.swift */; };
+		EB8BC4643B893A85F4D032D3 /* Transferable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67610B6A17254651BD368FEF /* Transferable+Extension.swift */; };
+		EBCB934F24446618BFB6AA06 /* macOS26Compat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426A650FBB33044205DB0628 /* macOS26Compat.swift */; };
+		EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B8AC7C303442AAFD418CCF /* SessionNotesPanel.swift */; };
+		F17E8B2AFD709633E40D2347 /* SurfaceScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34925F86E43A164C45263A32 /* SurfaceScrollView.swift */; };
+		FA5C11D8C21ECED7586C0B3D /* MickeyTermCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */; };
+		FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */; };
+		FBFA1E0675EF5FEE2AC0B318 /* Ghostty.Package.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
+		0480E075E87ECAB31B193046 /* VibrantLayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VibrantLayer.h; sourceTree = "<group>"; };
+		07DF09D816789200644A34F6 /* SessionMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMetadata.swift; sourceTree = "<group>"; };
+		0F1CBEA07E655200AF4652D7 /* SurfaceView+Transferable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SurfaceView+Transferable.swift"; sourceTree = "<group>"; };
+		129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceView_AppKit.swift; sourceTree = "<group>"; };
+		140C34BE75F8E35B9803CA1B /* fantastty.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = fantastty.sh; sourceTree = "<group>"; };
+		1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSMenuItem+Extension.swift"; sourceTree = "<group>"; };
+		183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extension.swift"; sourceTree = "<group>"; };
+		19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSEvent+Extension.swift"; sourceTree = "<group>"; };
+		1D5F2F67928ACFE5120BA782 /* Backport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backport.swift; sourceTree = "<group>"; };
+		1D8598A326F65A137F1F2A6D /* OSColor+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OSColor+Extension.swift"; sourceTree = "<group>"; };
+		1E84612A640F2178E1C3922B /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
+		2111E93090C4BEB02D66D875 /* Fantastty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fantastty.entitlements; sourceTree = "<group>"; };
+		2657C84B550AC9E3AAF5FB77 /* Fantastty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fantastty.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2675910C3625ED685E6C3D18 /* Ghostty.Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Event.swift; sourceTree = "<group>"; };
+		29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSplitTreeView.swift; sourceTree = "<group>"; };
+		29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.Divider.swift; sourceTree = "<group>"; };
+		2D308F8F4C24380795511065 /* NewSessionMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionMenu.swift; sourceTree = "<group>"; };
+		327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Package.swift; sourceTree = "<group>"; };
+		34925F86E43A164C45263A32 /* SurfaceScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceScrollView.swift; sourceTree = "<group>"; };
+		3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyDelegate.swift; sourceTree = "<group>"; };
+		3F87DDBE81BB19A02EA301A2 /* Ghostty.Inspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Inspector.swift; sourceTree = "<group>"; };
+		405C060AA5909F6CA99AC835 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		426A650FBB33044205DB0628 /* macOS26Compat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = macOS26Compat.swift; sourceTree = "<group>"; };
+		482DB758E2BE4C3AD4389566 /* SurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceView.swift; sourceTree = "<group>"; };
+		5157848A4CCB892D4C76075E /* SplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.swift; sourceTree = "<group>"; };
+		54F89AB559009B06C7920573 /* NSView+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSView+Extension.swift"; sourceTree = "<group>"; };
+		57C576F46E002ADD95360E83 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
+		5CCE90FA0D374014602A3628 /* KeyboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLayout.swift; sourceTree = "<group>"; };
+		5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Action.swift; sourceTree = "<group>"; };
+		5FAF3C2532ED01AE5F93BC29 /* Ghostty.Surface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Surface.swift; sourceTree = "<group>"; };
+		6332C119C9B6B838364F2615 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		643BB302F69D3B8BC81BCC1A /* Ghostty.App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.App.swift; sourceTree = "<group>"; };
+		67610B6A17254651BD368FEF /* Transferable+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Transferable+Extension.swift"; sourceTree = "<group>"; };
+		6A288EE4B731A40F8A2C9450 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
+		6B297D7747AEDED8B243C380 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6E4986A3D30A9E9EAD3A6C93 /* SplitTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitTree.swift; sourceTree = "<group>"; };
+		701BE60ABCA6530D10F1A401 /* Ghostty.Command.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Command.swift; sourceTree = "<group>"; };
+		78603084D81676AC053915B3 /* MetalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalView.swift; sourceTree = "<group>"; };
+		84B77A79CB26271F6320B64C /* Cursor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cursor.swift; sourceTree = "<group>"; };
+		86FF2DE822A85FD96FD0DBEC /* SurfaceView+Image.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SurfaceView+Image.swift"; sourceTree = "<group>"; };
+		87017B8990883C045D8CFF1A /* SurfaceProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceProgressBar.swift; sourceTree = "<group>"; };
+		89D7A1C18ABA131100C04F12 /* View+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extension.swift"; sourceTree = "<group>"; };
+		8F1F62E4EC552622732B6159 /* Ghostty.Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Config.swift; sourceTree = "<group>"; };
+		8F96F132170CA05F1F29696A /* Ghostty.Input.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Input.swift; sourceTree = "<group>"; };
+		902A1A3E8E0322EFCD2935A3 /* MickeyTermApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MickeyTermApp.swift; sourceTree = "<group>"; };
+		979CC9A96A66BA0B800EBFD9 /* Fullscreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fullscreen.swift; sourceTree = "<group>"; };
+		9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Extension.swift"; sourceTree = "<group>"; };
+		A0CC6B051A5ABFD6B9981012 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
+		A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabThumbnailPanel.swift; sourceTree = "<group>"; };
+		A518E4FB9A2186B6AD6B40E3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceGrabHandle.swift; sourceTree = "<group>"; };
+		B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FullscreenMode+Extension.swift"; sourceTree = "<group>"; };
+		B9B8AC7C303442AAFD418CCF /* SessionNotesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNotesPanel.swift; sourceTree = "<group>"; };
+		C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
+		C665C8B1C5DE1A96F7551FEA /* VibrantLayer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VibrantLayer.m; sourceTree = "<group>"; };
+		C6670262CF1B809D2FE12DD3 /* Duration+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Duration+Extension.swift"; sourceTree = "<group>"; };
+		C687CCDD55BD703C1591317F /* Weak.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Weak.swift; sourceTree = "<group>"; };
+		C6BA2B57EB90457ACEAB1E5E /* CrossKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossKit.swift; sourceTree = "<group>"; };
+		C79CFA2D5C50E279ECF1E750 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
+		C838797D1D4164E37BF1A6FB /* Optional+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Optional+Extension.swift"; sourceTree = "<group>"; };
+		CAE3D4FD18EDC4733E55361B /* EventModifiers+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EventModifiers+Extension.swift"; sourceTree = "<group>"; };
+		CB1D532EDE69EDC58BF91158 /* Ghostty.Error.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Error.swift; sourceTree = "<group>"; };
+		CC27720BAEBA076458B8FC0E /* SidebarRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRowView.swift; sourceTree = "<group>"; };
+		CE7614C13A5B0B575404F8D0 /* SessionType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionType.swift; sourceTree = "<group>"; };
+		CE841348EE5474B5AB2322A1 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		D3B7F7C3CC3EBC5CAD4B4E10 /* NSWindow+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSWindow+Extension.swift"; sourceTree = "<group>"; };
+		D3E9BEAAEEE081129B9DA55D /* UUID+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UUID+Extension.swift"; sourceTree = "<group>"; };
+		D43F4F2AA796509D25A0202C /* SSHConnectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHConnectionSheet.swift; sourceTree = "<group>"; };
+		D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceDragSource.swift; sourceTree = "<group>"; };
+		DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTab.swift; sourceTree = "<group>"; };
+		DC71494450F49AF3C3EF59D6 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardShortcut+Extension.swift"; sourceTree = "<group>"; };
+		E47B3F24C3964B77FF83FC42 /* CGS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGS.swift; sourceTree = "<group>"; };
+		E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Shell.swift; sourceTree = "<group>"; };
+		E6B02E4572BA85ACBF338282 /* NSAppearance+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSAppearance+Extension.swift"; sourceTree = "<group>"; };
+		E6D9B0B29EB99483941D80DA /* Array+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Array+Extension.swift"; sourceTree = "<group>"; };
+		E733A7231421048DC7308EC5 /* BridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BridgingHeader.h; sourceTree = "<group>"; };
+		EA7B00FE80794F99FE38F94B /* SecureInputOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputOverlay.swift; sourceTree = "<group>"; };
+		EAD293FCABE3E0127AC62AE4 /* NSImage+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Extension.swift"; sourceTree = "<group>"; };
+		EB3D40FE81067CF9B1DFAC08 /* SecureInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInput.swift; sourceTree = "<group>"; };
+		F7F74090AA0945771D3964A3 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = xcframework/GhosttyKit.xcframework; sourceTree = "<group>"; };
+		F87311A665C7557D52D54A73 /* UndoManager+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UndoManager+Extension.swift"; sourceTree = "<group>"; };
+		F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MickeyTermCompat.swift; sourceTree = "<group>"; };
+		FB48187E648FF83678869E8C /* Double+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Double+Extension.swift"; sourceTree = "<group>"; };
+		FBE52D3A18570B508FE63761 /* NSColor+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSColor+Extension.swift"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		43269C4EA8DC8B3A944AB7BF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				79C2315E7EE9A36D57402E51 /* GhosttyKit.xcframework in Frameworks */,
+				3D6FFCC3EC3CE2BC8E31C879 /* Carbon.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		17527B5BD7B51A297F1D40C0 /* shell-integration */ = {
+			isa = PBXGroup;
+			children = (
+				140C34BE75F8E35B9803CA1B /* fantastty.sh */,
+			);
+			path = "shell-integration";
+			sourceTree = "<group>";
+		};
+		2E46A21E389E5A68179E9553 = {
+			isa = PBXGroup;
+			children = (
+				5D4A8BF521222FCFA3270B19 /* Fantastty */,
+				4468854273099A95F2239C08 /* Frameworks */,
+				4D8DB826533E6550C81BAA91 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		338153001698F5C0EF1BBEA8 /* Notes */ = {
+			isa = PBXGroup;
+			children = (
+				B9B8AC7C303442AAFD418CCF /* SessionNotesPanel.swift */,
+			);
+			path = Notes;
+			sourceTree = "<group>";
+		};
+		426A8DB612702FFEB7EF4BF9 /* Splits */ = {
+			isa = PBXGroup;
+			children = (
+				6E4986A3D30A9E9EAD3A6C93 /* SplitTree.swift */,
+				29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */,
+				5157848A4CCB892D4C76075E /* SplitView.swift */,
+				29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */,
+			);
+			path = Splits;
+			sourceTree = "<group>";
+		};
+		4468854273099A95F2239C08 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C79CFA2D5C50E279ECF1E750 /* Carbon.framework */,
+				F7F74090AA0945771D3964A3 /* GhosttyKit.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		45158AA4C8059D62D1F22F87 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				DC71494450F49AF3C3EF59D6 /* Session.swift */,
+				6A288EE4B731A40F8A2C9450 /* SessionManager.swift */,
+				07DF09D816789200644A34F6 /* SessionMetadata.swift */,
+				CE7614C13A5B0B575404F8D0 /* SessionType.swift */,
+				DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4D8DB826533E6550C81BAA91 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2657C84B550AC9E3AAF5FB77 /* Fantastty.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5934BE01E53938A32FEE4ACA /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A0CC6B051A5ABFD6B9981012 /* AppCommands.swift */,
+				405C060AA5909F6CA99AC835 /* AppDelegate.swift */,
+				CE841348EE5474B5AB2322A1 /* main.swift */,
+				902A1A3E8E0322EFCD2935A3 /* MickeyTermApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5D4A8BF521222FCFA3270B19 /* Fantastty */ = {
+			isa = PBXGroup;
+			children = (
+				6B297D7747AEDED8B243C380 /* Assets.xcassets */,
+				E733A7231421048DC7308EC5 /* BridgingHeader.h */,
+				2111E93090C4BEB02D66D875 /* Fantastty.entitlements */,
+				A518E4FB9A2186B6AD6B40E3 /* Info.plist */,
+				5934BE01E53938A32FEE4ACA /* App */,
+				B7B501F12A229A70EB9AB4DD /* GhosttyBridge */,
+				45158AA4C8059D62D1F22F87 /* Models */,
+				7A6A8FF2B6057EE1391E00F9 /* Resources */,
+				426A8DB612702FFEB7EF4BF9 /* Splits */,
+				CD0E40F3BD1F2E6E568DA086 /* Views */,
+			);
+			path = Fantastty;
+			sourceTree = "<group>";
+		};
+		7A6A8FF2B6057EE1391E00F9 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				17527B5BD7B51A297F1D40C0 /* shell-integration */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		881F2D1687E86AE52961A2AE /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */,
+				57C576F46E002ADD95360E83 /* TabBarView.swift */,
+				A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
+		B461EE309C9505164D6B15AB /* SSH */ = {
+			isa = PBXGroup;
+			children = (
+				D43F4F2AA796509D25A0202C /* SSHConnectionSheet.swift */,
+			);
+			path = SSH;
+			sourceTree = "<group>";
+		};
+		B7B501F12A229A70EB9AB4DD /* GhosttyBridge */ = {
+			isa = PBXGroup;
+			children = (
+				1E84612A640F2178E1C3922B /* AppInfo.swift */,
+				E6D9B0B29EB99483941D80DA /* Array+Extension.swift */,
+				1D5F2F67928ACFE5120BA782 /* Backport.swift */,
+				E47B3F24C3964B77FF83FC42 /* CGS.swift */,
+				C6BA2B57EB90457ACEAB1E5E /* CrossKit.swift */,
+				84B77A79CB26271F6320B64C /* Cursor.swift */,
+				FB48187E648FF83678869E8C /* Double+Extension.swift */,
+				C6670262CF1B809D2FE12DD3 /* Duration+Extension.swift */,
+				CAE3D4FD18EDC4733E55361B /* EventModifiers+Extension.swift */,
+				979CC9A96A66BA0B800EBFD9 /* Fullscreen.swift */,
+				B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */,
+				5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */,
+				643BB302F69D3B8BC81BCC1A /* Ghostty.App.swift */,
+				701BE60ABCA6530D10F1A401 /* Ghostty.Command.swift */,
+				8F1F62E4EC552622732B6159 /* Ghostty.Config.swift */,
+				CB1D532EDE69EDC58BF91158 /* Ghostty.Error.swift */,
+				2675910C3625ED685E6C3D18 /* Ghostty.Event.swift */,
+				8F96F132170CA05F1F29696A /* Ghostty.Input.swift */,
+				3F87DDBE81BB19A02EA301A2 /* Ghostty.Inspector.swift */,
+				327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */,
+				E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */,
+				5FAF3C2532ED01AE5F93BC29 /* Ghostty.Surface.swift */,
+				3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */,
+				5CCE90FA0D374014602A3628 /* KeyboardLayout.swift */,
+				E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */,
+				426A650FBB33044205DB0628 /* macOS26Compat.swift */,
+				78603084D81676AC053915B3 /* MetalView.swift */,
+				F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */,
+				E6B02E4572BA85ACBF338282 /* NSAppearance+Extension.swift */,
+				FBE52D3A18570B508FE63761 /* NSColor+Extension.swift */,
+				19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */,
+				EAD293FCABE3E0127AC62AE4 /* NSImage+Extension.swift */,
+				1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */,
+				9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */,
+				54F89AB559009B06C7920573 /* NSView+Extension.swift */,
+				D3B7F7C3CC3EBC5CAD4B4E10 /* NSWindow+Extension.swift */,
+				C838797D1D4164E37BF1A6FB /* Optional+Extension.swift */,
+				1D8598A326F65A137F1F2A6D /* OSColor+Extension.swift */,
+				EB3D40FE81067CF9B1DFAC08 /* SecureInput.swift */,
+				EA7B00FE80794F99FE38F94B /* SecureInputOverlay.swift */,
+				183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */,
+				D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */,
+				AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */,
+				87017B8990883C045D8CFF1A /* SurfaceProgressBar.swift */,
+				34925F86E43A164C45263A32 /* SurfaceScrollView.swift */,
+				129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */,
+				482DB758E2BE4C3AD4389566 /* SurfaceView.swift */,
+				86FF2DE822A85FD96FD0DBEC /* SurfaceView+Image.swift */,
+				0F1CBEA07E655200AF4652D7 /* SurfaceView+Transferable.swift */,
+				67610B6A17254651BD368FEF /* Transferable+Extension.swift */,
+				F87311A665C7557D52D54A73 /* UndoManager+Extension.swift */,
+				D3E9BEAAEEE081129B9DA55D /* UUID+Extension.swift */,
+				0480E075E87ECAB31B193046 /* VibrantLayer.h */,
+				C665C8B1C5DE1A96F7551FEA /* VibrantLayer.m */,
+				89D7A1C18ABA131100C04F12 /* View+Extension.swift */,
+				C687CCDD55BD703C1591317F /* Weak.swift */,
+			);
+			path = GhosttyBridge;
+			sourceTree = "<group>";
+		};
+		CD0E40F3BD1F2E6E568DA086 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */,
+				338153001698F5C0EF1BBEA8 /* Notes */,
+				E7FE1DFDAE0F5594CAF024BA /* Sidebar */,
+				B461EE309C9505164D6B15AB /* SSH */,
+				881F2D1687E86AE52961A2AE /* Terminal */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		E7FE1DFDAE0F5594CAF024BA /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+				2D308F8F4C24380795511065 /* NewSessionMenu.swift */,
+				CC27720BAEBA076458B8FC0E /* SidebarRowView.swift */,
+				6332C119C9B6B838364F2615 /* SidebarView.swift */,
+			);
+			path = Sidebar;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CB5692159373E500BD905E3F /* Fantastty */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F3AD90E8C542E9F08B021C3 /* Build configuration list for PBXNativeTarget "Fantastty" */;
+			buildPhases = (
+				ED910C49EDEE49A83A2DFB84 /* Sources */,
+				00CD5A02C89039A1D181A32C /* Resources */,
+				43269C4EA8DC8B3A944AB7BF /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Fantastty;
+			packageProductDependencies = (
+			);
+			productName = Fantastty;
+			productReference = 2657C84B550AC9E3AAF5FB77 /* Fantastty.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		905EFD1D59D9230BA485D851 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = 808C813E5F8342B598C505FF /* Build configuration list for PBXProject "Fantastty" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2E46A21E389E5A68179E9553;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CB5692159373E500BD905E3F /* Fantastty */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		00CD5A02C89039A1D181A32C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				47821B73E1E8A92CB69251A7 /* Assets.xcassets in Resources */,
+				25C133A6066C09E29CF27024 /* fantastty.sh in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		ED910C49EDEE49A83A2DFB84 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78DAE20C2BA37EDA496DC829 /* AppCommands.swift in Sources */,
+				81EE90AA01128AE549CE3012 /* AppDelegate.swift in Sources */,
+				9BF047548789E221114FD014 /* AppInfo.swift in Sources */,
+				C289639676F0C3C2A5367F85 /* Array+Extension.swift in Sources */,
+				A6BECDF92E74B14518A6F4B9 /* Backport.swift in Sources */,
+				4772E230F503EE8E223E0A39 /* CGS.swift in Sources */,
+				DD15CB9BF2B2A5BE901FA6B5 /* CrossKit.swift in Sources */,
+				66D8DE5DB1C49470CA0EDEC7 /* Cursor.swift in Sources */,
+				8F303E0B77A654AA71F99098 /* Double+Extension.swift in Sources */,
+				EA271502E8A6E3EA92410CDC /* Duration+Extension.swift in Sources */,
+				32FAC9DD5A6997E3B393D04A /* EventModifiers+Extension.swift in Sources */,
+				C0218530ACB954FF271E6D8D /* Fullscreen.swift in Sources */,
+				0DFAD349E4BF46E263DFB5A5 /* FullscreenMode+Extension.swift in Sources */,
+				2060EC4E6EC93BB627DB0155 /* Ghostty.Action.swift in Sources */,
+				1E87AA3043F57B80B2B4DBAE /* Ghostty.App.swift in Sources */,
+				7EE40FABEEB4720624206FA0 /* Ghostty.Command.swift in Sources */,
+				51793B079D1382885FCFE514 /* Ghostty.Config.swift in Sources */,
+				3EE8CE3E886F22CE3D00087A /* Ghostty.Error.swift in Sources */,
+				3E5A66C5A098230DCA11C20C /* Ghostty.Event.swift in Sources */,
+				8B25F49E00595AB24C2EB6C6 /* Ghostty.Input.swift in Sources */,
+				ADF7E6F6919033ABA6473F31 /* Ghostty.Inspector.swift in Sources */,
+				FBFA1E0675EF5FEE2AC0B318 /* Ghostty.Package.swift in Sources */,
+				D9DE9253074604BD02EEDE01 /* Ghostty.Shell.swift in Sources */,
+				7F8D1260B39EC323DF372FAF /* Ghostty.Surface.swift in Sources */,
+				C761878FED3416A183D53D85 /* GhosttyDelegate.swift in Sources */,
+				31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */,
+				FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */,
+				C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */,
+				7C5DEE882BF9B5485FDD361B /* MetalView.swift in Sources */,
+				541547BBE23F440B723CDD8E /* MickeyTermApp.swift in Sources */,
+				FA5C11D8C21ECED7586C0B3D /* MickeyTermCompat.swift in Sources */,
+				92C1A3B57CF9725999440AF2 /* NSAppearance+Extension.swift in Sources */,
+				4097CD783D2683366E049161 /* NSColor+Extension.swift in Sources */,
+				C86109E5CA51D8D1C236071C /* NSEvent+Extension.swift in Sources */,
+				61FFE79D665D951DEF99C7D2 /* NSImage+Extension.swift in Sources */,
+				A17BC6AC3DABF4D7FCEB715A /* NSMenuItem+Extension.swift in Sources */,
+				BB98D303E99E1EA106BD2E42 /* NSPasteboard+Extension.swift in Sources */,
+				BC14E76875E00603E4B6E874 /* NSView+Extension.swift in Sources */,
+				DBBAC03A50D025BF7A7BA4B8 /* NSWindow+Extension.swift in Sources */,
+				DA0A1994119A432E83D4BFDA /* NewSessionMenu.swift in Sources */,
+				8BA5959833211B635C10C8E7 /* OSColor+Extension.swift in Sources */,
+				61D8239FC2C62A02C84A962B /* Optional+Extension.swift in Sources */,
+				A9F34CEEB77C0AA4EC5F839B /* SSHConnectionSheet.swift in Sources */,
+				94C1E6EAAE0F5503D45A05FA /* SecureInput.swift in Sources */,
+				A33574334905D9B61A851CD6 /* SecureInputOverlay.swift in Sources */,
+				C907BB7160482732FA45EF14 /* Session.swift in Sources */,
+				E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */,
+				736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */,
+				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
+				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
+				442252375FE92C0781EE7F56 /* SessionType.swift in Sources */,
+				9250F29A9F9701A55471D84F /* SidebarRowView.swift in Sources */,
+				E0CA045544DCEF8FCE50789A /* SidebarView.swift in Sources */,
+				C1DFDC13F4DD6F2EDBBF47FF /* SplitTree.swift in Sources */,
+				8DC11FD4D658BD50F45E94CA /* SplitView.Divider.swift in Sources */,
+				7CFE92E6178B25652F1716A9 /* SplitView.swift in Sources */,
+				270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */,
+				7706DB04E347DDA7F9099788 /* SurfaceDragSource.swift in Sources */,
+				4192ED72D868F2143B69D835 /* SurfaceGrabHandle.swift in Sources */,
+				557472C53DB00D2D8587D263 /* SurfaceProgressBar.swift in Sources */,
+				F17E8B2AFD709633E40D2347 /* SurfaceScrollView.swift in Sources */,
+				1884DE631C79ECB3F202F6C8 /* SurfaceView+Image.swift in Sources */,
+				E1CDD864B8919A8B94B89048 /* SurfaceView+Transferable.swift in Sources */,
+				4223434CE7F0CB9F797654F9 /* SurfaceView.swift in Sources */,
+				6722435A060E46F00A350667 /* SurfaceView_AppKit.swift in Sources */,
+				47D5DF0E77A71E93A0338129 /* TabBarView.swift in Sources */,
+				DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */,
+				7E78A52CCC4F8B345DCDFFF1 /* TerminalSplitTreeView.swift in Sources */,
+				58BE9BB13F2EF1EC78FD192C /* TerminalTab.swift in Sources */,
+				EB8BC4643B893A85F4D032D3 /* Transferable+Extension.swift in Sources */,
+				A7E343D6FF292BAEA5BD4305 /* UUID+Extension.swift in Sources */,
+				E756741FF4E52996CC9497F2 /* UndoManager+Extension.swift in Sources */,
+				A000CF83FE0A314CCD1284E8 /* VibrantLayer.m in Sources */,
+				EACB4F22EF57E850272BC17F /* View+Extension.swift in Sources */,
+				A58BD4EA26A93B02F0414384 /* Weak.swift in Sources */,
+				EBCB934F24446618BFB6AA06 /* macOS26Compat.swift in Sources */,
+				427A07BBE45BB0DEC82D5C02 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		02C00800D9D399D50238C7EA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5;
+			};
+			name = Release;
+		};
+		4EBB41A856637C3384778BE8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Fantastty/Fantastty.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/xcframework",
+					"\"xcframework\"",
+				);
+				INFOPLIST_FILE = Fantastty/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"-lstdc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.blainecook.fantastty;
+				PRODUCT_NAME = Fantastty;
+				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = Fantastty/BridgingHeader.h;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+			};
+			name = Release;
+		};
+		CC43CDD6BDB0E6DEB1AD3A76 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Fantastty/Fantastty.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/xcframework",
+					"\"xcframework\"",
+				);
+				INFOPLIST_FILE = Fantastty/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"-lstdc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.blainecook.fantastty;
+				PRODUCT_NAME = Fantastty;
+				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = Fantastty/BridgingHeader.h;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+			};
+			name = Debug;
+		};
+		EA78F2AEDAE4ACE277BEF02B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F3AD90E8C542E9F08B021C3 /* Build configuration list for PBXNativeTarget "Fantastty" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC43CDD6BDB0E6DEB1AD3A76 /* Debug */,
+				4EBB41A856637C3384778BE8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		808C813E5F8342B598C505FF /* Build configuration list for PBXProject "Fantastty" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EA78F2AEDAE4ACE277BEF02B /* Debug */,
+				02C00800D9D399D50238C7EA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 905EFD1D59D9230BA485D851 /* Project object */;
+}
