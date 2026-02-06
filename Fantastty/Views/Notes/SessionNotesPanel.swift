@@ -34,6 +34,8 @@ struct SessionNotesPanel: View {
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
+        .shadow(color: .black.opacity(isExpanded ? 0.2 : 0), radius: 4, y: 2)
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
     }
 
     private var headerBar: some View {
