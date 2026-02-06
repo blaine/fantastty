@@ -9,6 +9,10 @@ struct NewSessionMenu: View {
                 sessionManager.createSession()
             }
 
+            Button("New Browser Tab") {
+                sessionManager.createBrowserTab()
+            }
+
             Button("New SSH Session...") {
                 sessionManager.showSSHSheet = true
             }

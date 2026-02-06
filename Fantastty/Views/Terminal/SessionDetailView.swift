@@ -102,30 +102,37 @@ struct TabContentView: View {
     @EnvironmentObject var sessionManager: SessionManager
 
     var body: some View {
-        TerminalSplitTreeView(
-            tree: tab.surfaceTree,
-            action: handleSplitOperation
-        )
-        .onAppear {
-            // Restore focus to the previously focused surface
-            if let focused = tab.focusedSurface {
-                Ghostty.moveFocus(to: focused)
+        switch tab.kind {
+        case .terminal:
+            if let tree = tab.surfaceTree {
+                TerminalSplitTreeView(
+                    tree: tree,
+                    action: handleSplitOperation
+                )
+                .onAppear {
+                    if let focused = tab.focusedSurface {
+                        Ghostty.moveFocus(to: focused)
+                    }
+                }
             }
+
+        case .browser:
+            BrowserTabView(tab: tab)
         }
     }
 
     private func handleSplitOperation(_ operation: TerminalSplitOperation) {
+        guard var tree = tab.surfaceTree else { return }
+
         switch operation {
         case .resize(let resize):
-            // Update the split ratio on the target node
-            guard let root = tab.surfaceTree.root else { return }
+            guard let root = tree.root else { return }
             let newRoot = replaceNode(in: root, target: resize.node, with: resize.node.resizing(to: resize.ratio))
-            tab.surfaceTree = SplitTree(root: newRoot, zoomed: tab.surfaceTree.zoomed)
+            tab.surfaceTree = SplitTree(root: newRoot, zoomed: tree.zoomed)
 
         case .drop(let drop):
-            // Handle drag-and-drop reorder of split panes
-            guard let sourceNode = tab.surfaceTree.root?.node(view: drop.payload) else { return }
-            guard let newRoot = tab.surfaceTree.root?.remove(sourceNode) else { return }
+            guard let sourceNode = tree.root?.node(view: drop.payload) else { return }
+            guard let newRoot = tree.root?.remove(sourceNode) else { return }
 
             let direction: SplitTree<Ghostty.SurfaceView>.NewDirection = switch drop.zone {
             case .top: .up

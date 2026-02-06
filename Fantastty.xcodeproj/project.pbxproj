@@ -14,6 +14,7 @@
 		2060EC4E6EC93BB627DB0155 /* Ghostty.Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */; };
 		213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF09D816789200644A34F6 /* SessionMetadata.swift */; };
 		25C133A6066C09E29CF27024 /* fantastty.sh in Resources */ = {isa = PBXBuildFile; fileRef = 140C34BE75F8E35B9803CA1B /* fantastty.sh */; };
+		260BDF277FF320CC7296AD69 /* BrowserTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */; };
 		270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */; };
 		31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCE90FA0D374014602A3628 /* KeyboardLayout.swift */; };
 		32FAC9DD5A6997E3B393D04A /* EventModifiers+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE3D4FD18EDC4733E55361B /* EventModifiers+Extension.swift */; };
@@ -108,6 +109,7 @@
 		1D8598A326F65A137F1F2A6D /* OSColor+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OSColor+Extension.swift"; sourceTree = "<group>"; };
 		1E84612A640F2178E1C3922B /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
 		2111E93090C4BEB02D66D875 /* Fantastty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fantastty.entitlements; sourceTree = "<group>"; };
+		21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTabView.swift; sourceTree = "<group>"; };
 		2657C84B550AC9E3AAF5FB77 /* Fantastty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fantastty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2675910C3625ED685E6C3D18 /* Ghostty.Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Event.swift; sourceTree = "<group>"; };
 		29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSplitTreeView.swift; sourceTree = "<group>"; };
@@ -271,6 +273,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		56294893F8F6BF224D1B804D /* Browser */ = {
+			isa = PBXGroup;
+			children = (
+				21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */,
+			);
+			path = Browser;
+			sourceTree = "<group>";
+		};
 		5934BE01E53938A32FEE4ACA /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -393,6 +403,7 @@
 			isa = PBXGroup;
 			children = (
 				C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */,
+				56294893F8F6BF224D1B804D /* Browser */,
 				338153001698F5C0EF1BBEA8 /* Notes */,
 				2FD261F67A4C157477115AFF /* Settings */,
 				E7FE1DFDAE0F5594CAF024BA /* Sidebar */,
@@ -485,6 +496,7 @@
 				9BF047548789E221114FD014 /* AppInfo.swift in Sources */,
 				C289639676F0C3C2A5367F85 /* Array+Extension.swift in Sources */,
 				A6BECDF92E74B14518A6F4B9 /* Backport.swift in Sources */,
+				260BDF277FF320CC7296AD69 /* BrowserTabView.swift in Sources */,
 				4772E230F503EE8E223E0A39 /* CGS.swift in Sources */,
 				DD15CB9BF2B2A5BE901FA6B5 /* CrossKit.swift in Sources */,
 				66D8DE5DB1C49470CA0EDEC7 /* Cursor.swift in Sources */,
