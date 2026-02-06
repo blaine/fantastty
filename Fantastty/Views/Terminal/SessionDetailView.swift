@@ -20,7 +20,11 @@ struct SessionDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        VStack(spacing: 0) {
+            // Notes header (in layout flow)
+            SessionNotesHeader(session: session, isExpanded: $notesExpanded)
+            Divider()
+
             // Main content area with optional thumbnail panel
             HStack(spacing: 0) {
                 // Terminal content
@@ -48,9 +52,12 @@ struct SessionDetailView: View {
                     TabThumbnailPanel(session: session)
                 }
             }
-
-            // Notes panel overlays from the top
-            SessionNotesPanel(session: session, isExpanded: $notesExpanded)
+            .overlay(alignment: .top) {
+                // Expanded notes content overlays the terminal
+                if notesExpanded {
+                    SessionNotesPanel(session: session, isExpanded: $notesExpanded)
+                }
+            }
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
