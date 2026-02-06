@@ -8,7 +8,6 @@ struct SessionDetailView: View {
     @EnvironmentObject var sessionManager: SessionManager
 
     @State private var notesExpanded = false
-    @State private var showNotesPopover = false
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var showThumbnails = true
 
@@ -59,17 +58,6 @@ struct SessionDetailView: View {
                             .symbolVariant(showThumbnails ? .none : .slash)
                     }
                     .help(showThumbnails ? "Hide tab previews" : "Show tab previews")
-                }
-
-                // Notes button
-                Button {
-                    showNotesPopover = true
-                } label: {
-                    Image(systemName: "doc.text")
-                }
-                .help("Edit Notes")
-                .popover(isPresented: $showNotesPopover) {
-                    SessionNotesPopover(session: session)
                 }
 
                 // Attention toggle
