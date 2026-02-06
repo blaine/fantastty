@@ -31,7 +31,14 @@ struct SidebarView: View {
                         SidebarRowView(session: session)
                     }
                     .tag(session.id)
+                    .simultaneousGesture(TapGesture().onEnded {
+                        session.selectedTabID = nil
+                    })
                     .contextMenu {
+                        Button("Show Overview") {
+                            sessionManager.selectedSessionID = session.id
+                            session.selectedTabID = nil
+                        }
                         Button("Close Workspace") {
                             sessionManager.closeSession(id: session.id)
                         }
@@ -45,6 +52,10 @@ struct SidebarView: View {
                     SidebarRowView(session: session)
                         .tag(session.id)
                         .contextMenu {
+                            Button("Show Overview") {
+                                sessionManager.selectedSessionID = session.id
+                                session.selectedTabID = nil
+                            }
                             Button("Close Workspace") {
                                 sessionManager.closeSession(id: session.id)
                             }
