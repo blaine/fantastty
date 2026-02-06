@@ -90,6 +90,7 @@
 		FA5C11D8C21ECED7586C0B3D /* MickeyTermCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */; };
 		FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */; };
 		FBFA1E0675EF5FEE2AC0B318 /* Ghostty.Package.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */; };
+		FE61456B62F8148C9116B783 /* EditableToolbarTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEA9F76436655E1C37EC758 /* EditableToolbarTitle.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -149,6 +150,7 @@
 		AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceGrabHandle.swift; sourceTree = "<group>"; };
 		B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FullscreenMode+Extension.swift"; sourceTree = "<group>"; };
 		B9B8AC7C303442AAFD418CCF /* SessionNotesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNotesPanel.swift; sourceTree = "<group>"; };
+		BAEA9F76436655E1C37EC758 /* EditableToolbarTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableToolbarTitle.swift; sourceTree = "<group>"; };
 		C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		C665C8B1C5DE1A96F7551FEA /* VibrantLayer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VibrantLayer.m; sourceTree = "<group>"; };
 		C6670262CF1B809D2FE12DD3 /* Duration+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Duration+Extension.swift"; sourceTree = "<group>"; };
@@ -308,6 +310,7 @@
 		881F2D1687E86AE52961A2AE /* Terminal */ = {
 			isa = PBXGroup;
 			children = (
+				BAEA9F76436655E1C37EC758 /* EditableToolbarTitle.swift */,
 				0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */,
 				57C576F46E002ADD95360E83 /* TabBarView.swift */,
 				A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */,
@@ -487,6 +490,7 @@
 				66D8DE5DB1C49470CA0EDEC7 /* Cursor.swift in Sources */,
 				8F303E0B77A654AA71F99098 /* Double+Extension.swift in Sources */,
 				EA271502E8A6E3EA92410CDC /* Duration+Extension.swift in Sources */,
+				FE61456B62F8148C9116B783 /* EditableToolbarTitle.swift in Sources */,
 				32FAC9DD5A6997E3B393D04A /* EventModifiers+Extension.swift in Sources */,
 				C0218530ACB954FF271E6D8D /* Fullscreen.swift in Sources */,
 				0DFAD349E4BF46E263DFB5A5 /* FullscreenMode+Extension.swift in Sources */,

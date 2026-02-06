@@ -19,18 +19,10 @@ struct MainWindow: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .navigationTitle("")
         .frame(minWidth: 800, minHeight: 500)
-        .navigationTitle(windowTitle)
         .sheet(isPresented: $sessionManager.showSSHSheet) {
             SSHConnectionSheet()
         }
-    }
-
-    private var windowTitle: String {
-        if let selectedID = sessionManager.selectedSessionID,
-           let session = sessionManager.sessions.first(where: { $0.id == selectedID }) {
-            return session.title
-        }
-        return "Fantastty"
     }
 }

@@ -11,6 +11,14 @@ struct SessionDetailView: View {
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var showThumbnails = true
 
+    /// Binding for the editable toolbar title — reads session.title, writes session.name
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { session.title },
+            set: { session.name = $0 }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Notes panel (collapsible)
@@ -46,6 +54,12 @@ struct SessionDetailView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                EditableToolbarTitle(text: nameBinding)
+                    .frame(minWidth: 100, maxWidth: 300)
+                    .padding(.leading, 8)
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 // Thumbnail panel toggle (hidden when thumbnails shown in sidebar)
                 if session.tabs.count > 1 && !tabsInSidebar {
