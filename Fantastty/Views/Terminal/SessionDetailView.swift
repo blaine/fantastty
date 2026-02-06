@@ -35,10 +35,12 @@ struct SessionDetailView: View {
                         Divider()
                     }
 
-                    // Render the selected tab's content
+                    // Render the selected tab's content, or overview if none selected
                     if let tab = session.selectedTab {
                         TabContentView(tab: tab, session: session)
                             .id(tab.id) // Force recreation when tab changes
+                    } else if !session.tabs.isEmpty {
+                        WorkspaceOverviewView(session: session)
                     } else {
                         Text("No tab selected")
                             .foregroundStyle(.secondary)
@@ -67,6 +69,23 @@ struct SessionDetailView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
+                // Overview toggle
+                if session.tabs.count > 1 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            if session.selectedTabID == nil {
+                                // Exit overview — select first tab
+                                session.selectedTabID = session.tabs.first?.id
+                            } else {
+                                session.selectedTabID = nil
+                            }
+                        }
+                    } label: {
+                        Image(systemName: session.selectedTabID == nil ? "square.grid.2x2.fill" : "square.grid.2x2")
+                    }
+                    .help(session.selectedTabID == nil ? "Exit overview" : "Show workspace overview")
+                }
+
                 // Thumbnail panel toggle (hidden when thumbnails shown in sidebar)
                 if session.tabs.count > 1 && !tabsInSidebar {
                     Button {
