@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 import GhosttyKit
 
 /// A tab thumbnail for the sidebar that uses TimelineView for live updates.
@@ -10,13 +11,16 @@ struct SidebarThumbnailView: View {
     let onClose: () -> Void
 
     @State private var isHovered = false
+    @State private var browserSnapshot: NSImage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack {
                 // TimelineView drives periodic re-capture of the thumbnail
-                TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+                TimelineView(.periodic(from: .now, by: 0.5)) { context in
                     thumbnailImage
+                        .onAppear { captureBrowserSnapshot() }
+                        .onChange(of: context.date) { captureBrowserSnapshot() }
                 }
 
                 // Hover overlay with close button
@@ -66,23 +70,58 @@ struct SidebarThumbnailView: View {
 
     @ViewBuilder
     private var thumbnailImage: some View {
-        if let surface = firstSurface(in: tab.surfaceTree.root),
-           let image = surface.asImage {
-            Image(nsImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .background(Color.black)
-                .cornerRadius(4)
-        } else {
-            Rectangle()
-                .fill(Color.black.opacity(0.3))
-                .aspectRatio(16/10, contentMode: .fit)
-                .cornerRadius(4)
-                .overlay {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                }
+        switch tab.kind {
+        case .terminal:
+            if let surface = firstSurface(in: tab.surfaceTree?.root),
+               let image = surface.asImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black)
+                    .cornerRadius(4)
+            } else {
+                terminalPlaceholder
+            }
+        case .browser:
+            if let snapshot = browserSnapshot {
+                Image(nsImage: snapshot)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .cornerRadius(4)
+            } else {
+                Rectangle()
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .aspectRatio(16/10, contentMode: .fit)
+                    .cornerRadius(4)
+                    .overlay {
+                        Image(systemName: "globe")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                    }
+            }
+        }
+    }
+
+    private var terminalPlaceholder: some View {
+        Rectangle()
+            .fill(Color.black.opacity(0.3))
+            .aspectRatio(16/10, contentMode: .fit)
+            .cornerRadius(4)
+            .overlay {
+                ProgressView()
+                    .scaleEffect(0.5)
+            }
+    }
+
+    private func captureBrowserSnapshot() {
+        guard tab.kind == .browser, let webView = tab.webView else { return }
+        let config = WKSnapshotConfiguration()
+        webView.takeSnapshot(with: config) { image, _ in
+            if let image = image {
+                self.browserSnapshot = image
+            }
         }
     }
 
