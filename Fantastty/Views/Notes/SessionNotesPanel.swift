@@ -5,8 +5,6 @@ struct SessionNotesPanel: View {
     @ObservedObject var session: Session
     @Binding var isExpanded: Bool
 
-    @State private var editingName = false
-    @State private var draftName = ""
     @State private var newNoteText = ""
     @State private var scrollToBottom = false
 
@@ -71,14 +69,6 @@ struct SessionNotesPanel: View {
             .buttonStyle(.plain)
 
             Spacer()
-
-            if !session.name.isEmpty && !isExpanded {
-                Text(session.name)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -86,11 +76,6 @@ struct SessionNotesPanel: View {
 
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Name section
-            nameSection
-
-            Divider()
-
             // Notes log section
             notesLogSection
 
@@ -101,45 +86,6 @@ struct SessionNotesPanel: View {
             metadataSection
         }
         .padding(12)
-    }
-
-    private var nameSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Name")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Button(editingName ? "Done" : "Edit") {
-                    if editingName {
-                        session.name = draftName
-                    } else {
-                        draftName = session.name
-                    }
-                    editingName.toggle()
-                }
-                .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
-            }
-
-            if editingName {
-                TextField("Custom workspace name", text: $draftName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.callout)
-                    .onSubmit {
-                        session.name = draftName
-                        editingName = false
-                    }
-            } else {
-                Text(session.name.isEmpty ? session.title : session.name)
-                    .font(.callout)
-                    .foregroundStyle(session.name.isEmpty ? .tertiary : .primary)
-            }
-        }
     }
 
     private var notesLogSection: some View {
