@@ -3,7 +3,6 @@ import GhosttyKit
 
 struct AppCommands: Commands {
     @ObservedObject var sessionManager: SessionManager
-
     var body: some Commands {
         // Replace the default "New Window" command
         CommandGroup(replacing: .newItem) {

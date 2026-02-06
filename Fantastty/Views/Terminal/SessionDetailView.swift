@@ -9,6 +9,7 @@ struct SessionDetailView: View {
 
     @State private var notesExpanded = false
     @State private var showNotesPopover = false
+    @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var showThumbnails = true
 
     var body: some View {
@@ -38,8 +39,8 @@ struct SessionDetailView: View {
                     }
                 }
 
-                // Thumbnail panel (when multiple tabs and enabled)
-                if session.tabs.count > 1 && showThumbnails {
+                // Thumbnail panel (when multiple tabs, enabled, and not shown in sidebar)
+                if session.tabs.count > 1 && showThumbnails && !tabsInSidebar {
                     Divider()
                     TabThumbnailPanel(session: session)
                 }
@@ -47,8 +48,8 @@ struct SessionDetailView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                // Thumbnail panel toggle (only show when multiple tabs)
-                if session.tabs.count > 1 {
+                // Thumbnail panel toggle (hidden when thumbnails shown in sidebar)
+                if session.tabs.count > 1 && !tabsInSidebar {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showThumbnails.toggle()

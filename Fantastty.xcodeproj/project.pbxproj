@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0DFAD349E4BF46E263DFB5A5 /* FullscreenMode+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */; };
+		0E2E09180514E7EEEE0D6E11 /* SidebarThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */; };
 		1884DE631C79ECB3F202F6C8 /* SurfaceView+Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FF2DE822A85FD96FD0DBEC /* SurfaceView+Image.swift */; };
 		1E87AA3043F57B80B2B4DBAE /* Ghostty.App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643BB302F69D3B8BC81BCC1A /* Ghostty.App.swift */; };
 		2060EC4E6EC93BB627DB0155 /* Ghostty.Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */; };
@@ -78,6 +79,7 @@
 		E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */; };
 		E0CA045544DCEF8FCE50789A /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6332C119C9B6B838364F2615 /* SidebarView.swift */; };
 		E1CDD864B8919A8B94B89048 /* SurfaceView+Transferable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1CBEA07E655200AF4652D7 /* SurfaceView+Transferable.swift */; };
+		E4BF5F05D33D0F0F06511A36 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05FDE6EECD20438D68A96708 /* SettingsView.swift */; };
 		E756741FF4E52996CC9497F2 /* UndoManager+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87311A665C7557D52D54A73 /* UndoManager+Extension.swift */; };
 		EA271502E8A6E3EA92410CDC /* Duration+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6670262CF1B809D2FE12DD3 /* Duration+Extension.swift */; };
 		EACB4F22EF57E850272BC17F /* View+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D7A1C18ABA131100C04F12 /* View+Extension.swift */; };
@@ -93,6 +95,7 @@
 /* Begin PBXFileReference section */
 		0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		0480E075E87ECAB31B193046 /* VibrantLayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VibrantLayer.h; sourceTree = "<group>"; };
+		05FDE6EECD20438D68A96708 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		07DF09D816789200644A34F6 /* SessionMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMetadata.swift; sourceTree = "<group>"; };
 		0F1CBEA07E655200AF4652D7 /* SurfaceView+Transferable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SurfaceView+Transferable.swift"; sourceTree = "<group>"; };
 		129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceView_AppKit.swift; sourceTree = "<group>"; };
@@ -138,6 +141,7 @@
 		8F96F132170CA05F1F29696A /* Ghostty.Input.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Input.swift; sourceTree = "<group>"; };
 		902A1A3E8E0322EFCD2935A3 /* MickeyTermApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MickeyTermApp.swift; sourceTree = "<group>"; };
 		979CC9A96A66BA0B800EBFD9 /* Fullscreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fullscreen.swift; sourceTree = "<group>"; };
+		99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarThumbnailView.swift; sourceTree = "<group>"; };
 		9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Extension.swift"; sourceTree = "<group>"; };
 		A0CC6B051A5ABFD6B9981012 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
 		A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabThumbnailPanel.swift; sourceTree = "<group>"; };
@@ -207,6 +211,14 @@
 				4468854273099A95F2239C08 /* Frameworks */,
 				4D8DB826533E6550C81BAA91 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		2FD261F67A4C157477115AFF /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				05FDE6EECD20438D68A96708 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		338153001698F5C0EF1BBEA8 /* Notes */ = {
@@ -379,6 +391,7 @@
 			children = (
 				C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */,
 				338153001698F5C0EF1BBEA8 /* Notes */,
+				2FD261F67A4C157477115AFF /* Settings */,
 				E7FE1DFDAE0F5594CAF024BA /* Sidebar */,
 				B461EE309C9505164D6B15AB /* SSH */,
 				881F2D1687E86AE52961A2AE /* Terminal */,
@@ -391,6 +404,7 @@
 			children = (
 				2D308F8F4C24380795511065 /* NewSessionMenu.swift */,
 				CC27720BAEBA076458B8FC0E /* SidebarRowView.swift */,
+				99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */,
 				6332C119C9B6B838364F2615 /* SidebarView.swift */,
 			);
 			path = Sidebar;
@@ -514,7 +528,9 @@
 				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
 				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
 				442252375FE92C0781EE7F56 /* SessionType.swift in Sources */,
+				E4BF5F05D33D0F0F06511A36 /* SettingsView.swift in Sources */,
 				9250F29A9F9701A55471D84F /* SidebarRowView.swift in Sources */,
+				0E2E09180514E7EEEE0D6E11 /* SidebarThumbnailView.swift in Sources */,
 				E0CA045544DCEF8FCE50789A /* SidebarView.swift in Sources */,
 				C1DFDC13F4DD6F2EDBBF47FF /* SplitTree.swift in Sources */,
 				8DC11FD4D658BD50F45E94CA /* SplitView.Divider.swift in Sources */,

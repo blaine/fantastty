@@ -3,7 +3,10 @@ import SwiftUI
 struct SidebarRowView: View {
     @ObservedObject var session: Session
     @EnvironmentObject var sessionManager: SessionManager
+    @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var isHovering = false
+    @State private var isEditing = false
+    @State private var editingName = ""
 
     /// The primary session type (from the first tab) for display purposes
     private var primarySessionType: SessionType {
@@ -26,13 +29,29 @@ struct SidebarRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text(session.title)
+                    if isEditing {
+                        TextField("Workspace name", text: $editingName, onCommit: {
+                            session.name = editingName
+                            isEditing = false
+                        })
+                        .textFieldStyle(.plain)
                         .lineLimit(1)
-                        .truncationMode(.tail)
-                        .fontWeight(session.needsAttention ? .semibold : .regular)
+                        .onExitCommand {
+                            isEditing = false
+                        }
+                    } else {
+                        Text(session.title)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .fontWeight(session.needsAttention ? .semibold : .regular)
+                            .onTapGesture {
+                                editingName = session.name
+                                isEditing = true
+                            }
+                    }
 
-                    // Show tab count if multiple tabs
-                    if session.tabs.count > 1 {
+                    // Show tab count if multiple tabs (hidden when tabs shown in sidebar)
+                    if session.tabs.count > 1 && !tabsInSidebar {
                         Text("(\(session.tabs.count))")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
@@ -88,7 +107,8 @@ struct SidebarRowView: View {
         }
         .contextMenu {
             Button("Rename...") {
-                // Will be handled by a sheet
+                editingName = session.name
+                isEditing = true
             }
 
             Button("Edit Notes...") {
