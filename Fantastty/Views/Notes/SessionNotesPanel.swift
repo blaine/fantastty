@@ -250,8 +250,8 @@ struct NoteEntryRow: View {
             Text(entry.content)
                 .font(.callout)
                 .foregroundStyle(.primary)
-                .textSelection(.enabled)
         }
+        .textSelection(.enabled)
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
