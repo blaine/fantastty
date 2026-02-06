@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0DFAD349E4BF46E263DFB5A5 /* FullscreenMode+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */; };
+		0E2E09180514E7EEEE0D6E11 /* SidebarThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */; };
 		1884DE631C79ECB3F202F6C8 /* SurfaceView+Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FF2DE822A85FD96FD0DBEC /* SurfaceView+Image.swift */; };
 		1E87AA3043F57B80B2B4DBAE /* Ghostty.App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643BB302F69D3B8BC81BCC1A /* Ghostty.App.swift */; };
 		2060EC4E6EC93BB627DB0155 /* Ghostty.Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */; };
@@ -138,6 +139,7 @@
 		8F96F132170CA05F1F29696A /* Ghostty.Input.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Input.swift; sourceTree = "<group>"; };
 		902A1A3E8E0322EFCD2935A3 /* MickeyTermApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MickeyTermApp.swift; sourceTree = "<group>"; };
 		979CC9A96A66BA0B800EBFD9 /* Fullscreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fullscreen.swift; sourceTree = "<group>"; };
+		99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarThumbnailView.swift; sourceTree = "<group>"; };
 		9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Extension.swift"; sourceTree = "<group>"; };
 		A0CC6B051A5ABFD6B9981012 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
 		A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabThumbnailPanel.swift; sourceTree = "<group>"; };
@@ -391,6 +393,7 @@
 			children = (
 				2D308F8F4C24380795511065 /* NewSessionMenu.swift */,
 				CC27720BAEBA076458B8FC0E /* SidebarRowView.swift */,
+				99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */,
 				6332C119C9B6B838364F2615 /* SidebarView.swift */,
 			);
 			path = Sidebar;
@@ -515,6 +518,7 @@
 				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
 				442252375FE92C0781EE7F56 /* SessionType.swift in Sources */,
 				9250F29A9F9701A55471D84F /* SidebarRowView.swift in Sources */,
+				0E2E09180514E7EEEE0D6E11 /* SidebarThumbnailView.swift in Sources */,
 				E0CA045544DCEF8FCE50789A /* SidebarView.swift in Sources */,
 				C1DFDC13F4DD6F2EDBBF47FF /* SplitTree.swift in Sources */,
 				8DC11FD4D658BD50F45E94CA /* SplitView.Divider.swift in Sources */,

@@ -5,7 +5,7 @@ struct FantasttyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        WindowGroup {
+        Window("Fantastty", id: "main") {
             MainWindow()
                 .environmentObject(appDelegate.ghosttyApp)
                 .environmentObject(appDelegate.sessionManager)

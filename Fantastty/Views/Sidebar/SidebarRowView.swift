@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarRowView: View {
     @ObservedObject var session: Session
     @EnvironmentObject var sessionManager: SessionManager
+    @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var isHovering = false
 
     /// The primary session type (from the first tab) for display purposes
@@ -31,8 +32,8 @@ struct SidebarRowView: View {
                         .truncationMode(.tail)
                         .fontWeight(session.needsAttention ? .semibold : .regular)
 
-                    // Show tab count if multiple tabs
-                    if session.tabs.count > 1 {
+                    // Show tab count if multiple tabs (hidden when tabs shown in sidebar)
+                    if session.tabs.count > 1 && !tabsInSidebar {
                         Text("(\(session.tabs.count))")
                             .font(.caption)
                             .foregroundStyle(.tertiary)

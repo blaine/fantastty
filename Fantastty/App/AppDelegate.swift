@@ -44,6 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
         return .terminateNow
     }
 
+
     // MARK: - GhosttyAppDelegate
 
     func findSurface(forUUID uuid: UUID) -> Ghostty.SurfaceView? {

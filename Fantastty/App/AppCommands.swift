@@ -3,8 +3,15 @@ import GhosttyKit
 
 struct AppCommands: Commands {
     @ObservedObject var sessionManager: SessionManager
+    @AppStorage("tabsInSidebar") var tabsInSidebar = false
 
     var body: some Commands {
+        // View menu toggle for tabs in sidebar
+        CommandGroup(before: .toolbar) {
+            Toggle("Show Tabs in Sidebar", isOn: $tabsInSidebar)
+                .keyboardShortcut("t", modifiers: [.command, .option])
+        }
+
         // Replace the default "New Window" command
         CommandGroup(replacing: .newItem) {
             Button("New Tab") {
