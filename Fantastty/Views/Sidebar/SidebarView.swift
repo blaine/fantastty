@@ -57,6 +57,17 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .frame(minWidth: 180)
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                sessionManager.createSession()
+            } label: {
+                Label("New Workspace", systemImage: "plus")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 NewSessionMenu()
