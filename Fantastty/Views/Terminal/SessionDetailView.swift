@@ -8,14 +8,21 @@ struct SessionDetailView: View {
     @EnvironmentObject var sessionManager: SessionManager
 
     @State private var notesExpanded = false
-    @State private var showNotesPopover = false
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var showThumbnails = true
 
+    /// Binding for the editable toolbar title — reads session.title, writes session.name
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { session.title },
+            set: { session.name = $0 }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Notes panel (collapsible)
-            SessionNotesPanel(session: session, isExpanded: $notesExpanded)
+            // Notes header (in layout flow)
+            SessionNotesHeader(session: session, isExpanded: $notesExpanded)
             Divider()
 
             // Main content area with optional thumbnail panel
@@ -28,10 +35,12 @@ struct SessionDetailView: View {
                         Divider()
                     }
 
-                    // Render the selected tab's content
+                    // Render the selected tab's content, or overview if none selected
                     if let tab = session.selectedTab {
                         TabContentView(tab: tab, session: session)
                             .id(tab.id) // Force recreation when tab changes
+                    } else if !session.tabs.isEmpty {
+                        WorkspaceOverviewView(session: session)
                     } else {
                         Text("No tab selected")
                             .foregroundStyle(.secondary)
@@ -45,9 +54,38 @@ struct SessionDetailView: View {
                     TabThumbnailPanel(session: session)
                 }
             }
+            .overlay(alignment: .top) {
+                // Expanded notes content overlays the terminal
+                if notesExpanded {
+                    SessionNotesPanel(session: session, isExpanded: $notesExpanded)
+                }
+            }
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                EditableToolbarTitle(text: nameBinding)
+                    .frame(minWidth: 100, maxWidth: 300)
+                    .padding(.leading, 8)
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
+                // Overview toggle
+                if session.tabs.count > 1 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            if session.selectedTabID == nil {
+                                // Exit overview — select first tab
+                                session.selectedTabID = session.tabs.first?.id
+                            } else {
+                                session.selectedTabID = nil
+                            }
+                        }
+                    } label: {
+                        Image(systemName: session.selectedTabID == nil ? "square.grid.2x2.fill" : "square.grid.2x2")
+                    }
+                    .help(session.selectedTabID == nil ? "Exit overview" : "Show workspace overview")
+                }
+
                 // Thumbnail panel toggle (hidden when thumbnails shown in sidebar)
                 if session.tabs.count > 1 && !tabsInSidebar {
                     Button {
@@ -59,17 +97,6 @@ struct SessionDetailView: View {
                             .symbolVariant(showThumbnails ? .none : .slash)
                     }
                     .help(showThumbnails ? "Hide tab previews" : "Show tab previews")
-                }
-
-                // Notes button
-                Button {
-                    showNotesPopover = true
-                } label: {
-                    Image(systemName: "doc.text")
-                }
-                .help("Edit Notes")
-                .popover(isPresented: $showNotesPopover) {
-                    SessionNotesPopover(session: session)
                 }
 
                 // Attention toggle
@@ -94,30 +121,37 @@ struct TabContentView: View {
     @EnvironmentObject var sessionManager: SessionManager
 
     var body: some View {
-        TerminalSplitTreeView(
-            tree: tab.surfaceTree,
-            action: handleSplitOperation
-        )
-        .onAppear {
-            // Restore focus to the previously focused surface
-            if let focused = tab.focusedSurface {
-                Ghostty.moveFocus(to: focused)
+        switch tab.kind {
+        case .terminal:
+            if let tree = tab.surfaceTree {
+                TerminalSplitTreeView(
+                    tree: tree,
+                    action: handleSplitOperation
+                )
+                .onAppear {
+                    if let focused = tab.focusedSurface {
+                        Ghostty.moveFocus(to: focused)
+                    }
+                }
             }
+
+        case .browser:
+            BrowserTabView(tab: tab)
         }
     }
 
     private func handleSplitOperation(_ operation: TerminalSplitOperation) {
+        guard var tree = tab.surfaceTree else { return }
+
         switch operation {
         case .resize(let resize):
-            // Update the split ratio on the target node
-            guard let root = tab.surfaceTree.root else { return }
+            guard let root = tree.root else { return }
             let newRoot = replaceNode(in: root, target: resize.node, with: resize.node.resizing(to: resize.ratio))
-            tab.surfaceTree = SplitTree(root: newRoot, zoomed: tab.surfaceTree.zoomed)
+            tab.surfaceTree = SplitTree(root: newRoot, zoomed: tree.zoomed)
 
         case .drop(let drop):
-            // Handle drag-and-drop reorder of split panes
-            guard let sourceNode = tab.surfaceTree.root?.node(view: drop.payload) else { return }
-            guard let newRoot = tab.surfaceTree.root?.remove(sourceNode) else { return }
+            guard let sourceNode = tree.root?.node(view: drop.payload) else { return }
+            guard let newRoot = tree.root?.remove(sourceNode) else { return }
 
             let direction: SplitTree<Ghostty.SurfaceView>.NewDirection = switch drop.zone {
             case .top: .up

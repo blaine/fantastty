@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 import GhosttyKit
 
 /// A panel showing live thumbnails of non-focused tabs in the current session.
@@ -151,13 +152,21 @@ struct TabThumbnailView: View {
     }
 
     private func updateThumbnail() {
-        // Get the first surface from the tab's split tree
-        guard let surface = firstSurface(in: tab.surfaceTree.root) else { return }
-
-        // Capture snapshot on main thread
-        DispatchQueue.main.async {
-            if let image = surface.asImage {
-                self.thumbnail = image
+        switch tab.kind {
+        case .terminal:
+            guard let surface = firstSurface(in: tab.surfaceTree?.root) else { return }
+            DispatchQueue.main.async {
+                if let image = surface.asImage {
+                    self.thumbnail = image
+                }
+            }
+        case .browser:
+            guard let webView = tab.webView else { return }
+            let config = WKSnapshotConfiguration()
+            webView.takeSnapshot(with: config) { image, _ in
+                if let image = image {
+                    self.thumbnail = image
+                }
             }
         }
     }

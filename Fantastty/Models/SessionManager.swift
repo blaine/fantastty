@@ -163,6 +163,21 @@ class SessionManager: ObservableObject {
         return tab
     }
 
+    /// Create a new browser tab in the current session.
+    @discardableResult
+    func createBrowserTab(url: URL = URL(string: "https://www.google.com")!) -> TerminalTab? {
+        guard let session = selectedSession else {
+            Self.logger.error("Cannot create browser tab: no session")
+            return nil
+        }
+
+        let tab = TerminalTab(url: url)
+        session.addTab(tab)
+
+        Self.logger.info("Created browser tab \(tab.id) in session \(session.id)")
+        return tab
+    }
+
     /// Close a tab within its session. If last tab, closes the session.
     func closeTab(id: UUID) {
         guard let session = sessions.first(where: { $0.tabs.contains { $0.id == id } }) else { return }
@@ -193,7 +208,8 @@ class SessionManager: ObservableObject {
         let newSurface = Ghostty.SurfaceView(app, baseConfig: config)
 
         do {
-            tab.surfaceTree = try tab.surfaceTree.inserting(
+            guard let tree = tab.surfaceTree else { return }
+            tab.surfaceTree = try tree.inserting(
                 view: newSurface,
                 at: focusedSurface,
                 direction: direction
@@ -209,9 +225,9 @@ class SessionManager: ObservableObject {
     func closeSurface(_ surfaceView: Ghostty.SurfaceView) {
         guard let (session, tab) = findSessionAndTab(for: surfaceView) else { return }
 
-        guard let node = tab.surfaceTree.root?.node(view: surfaceView) else { return }
+        guard let node = tab.surfaceTree?.root?.node(view: surfaceView) else { return }
 
-        if let newRoot = tab.surfaceTree.root?.remove(node) {
+        if let newRoot = tab.surfaceTree?.root?.remove(node) {
             tab.surfaceTree = SplitTree(root: newRoot, zoomed: nil)
             // Focus the first leaf of the remaining tree
             if let firstView = firstLeafView(in: newRoot) {
@@ -232,7 +248,7 @@ class SessionManager: ObservableObject {
     func findSurface(forUUID uuid: UUID) -> Ghostty.SurfaceView? {
         for session in sessions {
             for tab in session.tabs {
-                if let node = tab.surfaceTree.root {
+                if let node = tab.surfaceTree?.root {
                     if let found = findSurface(in: node, uuid: uuid) {
                         return found
                     }
@@ -404,7 +420,8 @@ class SessionManager: ObservableObject {
         let newSurface = Ghostty.SurfaceView(app, baseConfig: config)
 
         do {
-            tab.surfaceTree = try tab.surfaceTree.inserting(
+            guard let tree = tab.surfaceTree else { return }
+            tab.surfaceTree = try tree.inserting(
                 view: newSurface,
                 at: surfaceView,
                 direction: direction
@@ -451,8 +468,8 @@ class SessionManager: ObservableObject {
 
         let focusDirection: SplitTree<Ghostty.SurfaceView>.FocusDirection = direction.toSplitTreeFocusDirection()
 
-        guard let currentNode = tab.surfaceTree.root?.node(view: surfaceView),
-              let targetView = tab.surfaceTree.focusTarget(for: focusDirection, from: currentNode) else { return }
+        guard let currentNode = tab.surfaceTree?.root?.node(view: surfaceView),
+              let targetView = tab.surfaceTree?.focusTarget(for: focusDirection, from: currentNode) else { return }
 
         tab.focusedSurface = targetView
         Ghostty.moveFocus(to: targetView, from: surfaceView)
@@ -461,7 +478,9 @@ class SessionManager: ObservableObject {
     @objc private func handleEqualizeSplits(_ notification: Foundation.Notification) {
         guard let surfaceView = notification.object as? Ghostty.SurfaceView,
               let (_, tab) = findSessionAndTab(for: surfaceView) else { return }
-        tab.surfaceTree = tab.surfaceTree.equalized()
+        if let tree = tab.surfaceTree {
+            tab.surfaceTree = tree.equalized()
+        }
     }
 
     @objc private func handleResizeSplit(_ notification: Foundation.Notification) {
@@ -583,7 +602,7 @@ class SessionManager: ObservableObject {
                 guard !newTitle.isEmpty else { return }
 
                 // Update tab title if this surface is focused (or only surface)
-                if tab.focusedSurface === surfaceView || !tab.surfaceTree.isSplit {
+                if tab.focusedSurface === surfaceView || !(tab.surfaceTree?.isSplit ?? false) {
                     tab.title = newTitle
                 }
             }

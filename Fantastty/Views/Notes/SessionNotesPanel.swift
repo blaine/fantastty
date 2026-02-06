@@ -1,44 +1,11 @@
 import SwiftUI
 
-/// A collapsible panel showing session notes as a timestamped log stream.
-struct SessionNotesPanel: View {
+/// The always-visible header bar for the notes panel.
+struct SessionNotesHeader: View {
     @ObservedObject var session: Session
     @Binding var isExpanded: Bool
 
-    @State private var editingName = false
-    @State private var draftName = ""
-    @State private var newNoteText = ""
-    @State private var scrollToBottom = false
-
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    private let fullDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Header bar (always visible)
-            headerBar
-
-            // Expandable content
-            if isExpanded {
-                Divider()
-                contentView
-            }
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private var headerBar: some View {
         HStack {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -71,26 +38,42 @@ struct SessionNotesPanel: View {
             .buttonStyle(.plain)
 
             Spacer()
-
-            if !session.name.isEmpty && !isExpanded {
-                Text(session.name)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+}
+
+/// The expanded notes content panel, shown as an overlay.
+struct SessionNotesPanel: View {
+    @ObservedObject var session: Session
+    @Binding var isExpanded: Bool
+
+    @State private var newNoteText = ""
+
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    private let fullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    var body: some View {
+        contentView
+            .background(.regularMaterial, in: UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10))
+            .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Name section
-            nameSection
-
-            Divider()
-
             // Notes log section
             notesLogSection
 
@@ -101,45 +84,6 @@ struct SessionNotesPanel: View {
             metadataSection
         }
         .padding(12)
-    }
-
-    private var nameSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Name")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Button(editingName ? "Done" : "Edit") {
-                    if editingName {
-                        session.name = draftName
-                    } else {
-                        draftName = session.name
-                    }
-                    editingName.toggle()
-                }
-                .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
-            }
-
-            if editingName {
-                TextField("Custom workspace name", text: $draftName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.callout)
-                    .onSubmit {
-                        session.name = draftName
-                        editingName = false
-                    }
-            } else {
-                Text(session.name.isEmpty ? session.title : session.name)
-                    .font(.callout)
-                    .foregroundStyle(session.name.isEmpty ? .tertiary : .primary)
-            }
-        }
     }
 
     private var notesLogSection: some View {
@@ -177,6 +121,7 @@ struct SessionNotesPanel: View {
                                     .id(entry.id)
                             }
                         }
+                        .textSelection(.enabled)
                     }
                     .frame(minHeight: 60, maxHeight: 200)
                     .onChange(of: session.noteEntries.count) {
@@ -302,7 +247,6 @@ struct NoteEntryRow: View {
             Text(entry.content)
                 .font(.callout)
                 .foregroundStyle(.primary)
-                .textSelection(.enabled)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)

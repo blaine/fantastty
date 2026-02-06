@@ -55,7 +55,7 @@ struct TabItemView: View {
     var body: some View {
         HStack(spacing: 6) {
             // Tab icon
-            Image(systemName: tab.sessionType.iconName)
+            Image(systemName: tab.iconName)
                 .font(.system(size: 11))
                 .foregroundColor(isSelected ? .primary : .secondary)
 
