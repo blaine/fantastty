@@ -132,7 +132,7 @@ class TmuxManager {
     func commandForLinkedTab(baseSessionName: String, tabSessionName: String) -> String {
         // Create a new session linked to the base session
         // This shares windows but allows independent window selection
-        return "\(tmuxPath) new-session -t '\(baseSessionName)' -s '\(tabSessionName)'"
+        return "\(tmuxPath) new-session -t '\(baseSessionName)' -s '\(tabSessionName)' \\; new-window"
     }
 
     /// Generate the command to attach to an existing session

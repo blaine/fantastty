@@ -558,6 +558,13 @@ class SessionManager: ObservableObject {
     func closeTab(id: UUID) {
         guard let session = sessions.first(where: { $0.tabs.contains { $0.id == id } }) else { return }
 
+        // Kill the tab's linked tmux session (skip base session — other tabs need it)
+        if let tab = session.tabs.first(where: { $0.id == id }),
+           let tabTmuxName = tab.tmuxSessionName,
+           tabTmuxName != session.tmuxSessionName {
+            tmuxManager.killSession(name: tabTmuxName)
+        }
+
         let shouldCloseSession = session.closeTab(id: id)
         if shouldCloseSession {
             closeSession(id: session.id)
@@ -599,7 +606,7 @@ class SessionManager: ObservableObject {
 
     /// Close a surface within a tab's split tree.
     func closeSurface(_ surfaceView: Ghostty.SurfaceView) {
-        guard let (session, tab) = findSessionAndTab(for: surfaceView) else { return }
+        guard let (_, tab) = findSessionAndTab(for: surfaceView) else { return }
 
         guard let node = tab.surfaceTree?.root?.node(view: surfaceView) else { return }
 
@@ -610,11 +617,8 @@ class SessionManager: ObservableObject {
                 tab.focusedSurface = firstView
             }
         } else {
-            // This was the last surface in the tab - close the tab
-            let shouldCloseSession = session.closeTab(id: tab.id)
-            if shouldCloseSession {
-                closeSession(id: session.id)
-            }
+            // This was the last surface in the tab — close via SessionManager for tmux cleanup
+            closeTab(id: tab.id)
         }
     }
 
