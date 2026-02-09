@@ -5,12 +5,18 @@ import GhosttyKit
 class Session: ObservableObject, Identifiable, Hashable {
     let id = UUID()
 
+    /// The session type (local or SSH with connection details)
+    let type: SessionType
+
+    /// Persistent workspace identity (short UUID prefix, keyed to metadata)
+    let workspaceID: String
+
     /// The default title (from session type), used when no custom name is set.
     private let defaultTitle: String
 
     /// The displayed title for the sidebar - uses custom name if set, otherwise default.
     var title: String {
-        let customName = metadata.name
+        let customName = metadata?.name ?? ""
         return customName.isEmpty ? defaultTitle : customName
     }
 
@@ -20,106 +26,132 @@ class Session: ObservableObject, Identifiable, Hashable {
     /// The currently selected tab ID.
     @Published var selectedTabID: UUID?
 
+    /// Tmux base session name for this workspace (when persistent sessions enabled)
+    var tmuxSessionName: String?
+
+    /// Counter for generating tab session names
+    var tmuxTabCounter: Int = 0
+
     /// Reference to metadata store for persistence
     private let metadataStore = SessionMetadataStore.shared
 
     /// Create a new session with an initial tab.
-    init(title: String, initialTab: TerminalTab, basePath: String? = nil) {
+    init(title: String, initialTab: TerminalTab, type: SessionType = .local,
+         workspaceID: String) {
+        self.type = type
+        self.workspaceID = workspaceID
         self.defaultTitle = title
         self.tabs = [initialTab]
         self.selectedTabID = initialTab.id
-
-        // Initialize metadata with base path if provided
-        if let basePath = basePath {
-            metadataStore.update(sessionID: id, basePath: basePath)
-        }
     }
 
     /// Convenience initializer for creating a session with a new surface.
-    convenience init(type: SessionType, surfaceView: Ghostty.SurfaceView, basePath: String? = nil) {
+    convenience init(type: SessionType, surfaceView: Ghostty.SurfaceView,
+                     workspaceID: String) {
         let tab = TerminalTab(type: type, surfaceView: surfaceView)
-        self.init(title: type.displayName, initialTab: tab, basePath: basePath)
-    }
-
-    deinit {
-        // Optionally clean up metadata when session is destroyed
-        // metadataStore.remove(sessionID: id)
+        self.init(title: type.displayName, initialTab: tab, type: type,
+                  workspaceID: workspaceID)
     }
 
     // MARK: - Metadata Accessors
 
-    /// The session's metadata (persistent)
-    var metadata: SessionMetadata {
-        metadataStore.getOrCreate(for: id)
+    /// The session's metadata (persistent, keyed by workspaceID)
+    var metadata: SessionMetadata? {
+        return metadataStore.getOrCreate(forKey: workspaceID)
     }
 
     /// Custom name for the workspace (overrides default title)
     var name: String {
-        get { metadata.name }
+        get { metadata?.name ?? "" }
         set {
-            metadataStore.update(sessionID: id, name: newValue)
+            metadataStore.update(forKey: workspaceID, name: newValue)
             objectWillChange.send()
         }
     }
 
     /// All note entries for this workspace (timestamped log)
     var noteEntries: [SessionNoteEntry] {
-        metadata.noteEntries
+        metadata?.noteEntries ?? []
     }
 
     /// Computed property for backwards compatibility - returns all notes joined
     var notes: String {
-        metadata.notes
+        metadata?.notes ?? ""
     }
 
     /// Add a new note entry to this session's log.
     func addNote(content: String, tags: [String] = [], source: NoteSource = .user) {
-        metadataStore.appendNote(sessionID: id, content: content, tags: tags, source: source)
+        metadataStore.appendNote(forKey: workspaceID, content: content, tags: tags, source: source)
+        objectWillChange.send()
+    }
+
+    /// Update the content of a specific note, saving a revision.
+    func updateNote(noteID: UUID, newContent: String) {
+        metadataStore.updateNoteContent(forKey: workspaceID, noteID: noteID, newContent: newContent)
+        objectWillChange.send()
+    }
+
+    /// Delete a specific note.
+    func deleteNote(noteID: UUID) {
+        metadataStore.deleteNote(forKey: workspaceID, noteID: noteID)
         objectWillChange.send()
     }
 
     /// Clear all notes for this session.
     func clearNotes() {
-        metadataStore.clearNotes(sessionID: id)
+        metadataStore.clearNotes(forKey: workspaceID)
         objectWillChange.send()
-    }
-
-    /// Base path associated with this workspace
-    var basePath: String? {
-        get { metadata.basePath }
-        set {
-            metadataStore.update(sessionID: id, basePath: newValue)
-            objectWillChange.send()
-        }
     }
 
     /// Whether this workspace needs attention
     var needsAttention: Bool {
-        get { metadata.needsAttention }
+        get { metadata?.needsAttention ?? false }
         set {
-            metadataStore.update(sessionID: id, needsAttention: newValue)
+            metadataStore.update(forKey: workspaceID, needsAttention: newValue)
+            objectWillChange.send()
+        }
+    }
+
+    /// Ticket/task URL for this workspace
+    var ticketURL: String? {
+        get { metadata?.ticketURL }
+        set {
+            var meta = metadataStore.getOrCreate(forKey: workspaceID)
+            meta.ticketURL = newValue
+            metadataStore.update(meta)
+            objectWillChange.send()
+        }
+    }
+
+    /// Pull request URL for this workspace
+    var pullRequestURL: String? {
+        get { metadata?.pullRequestURL }
+        set {
+            var meta = metadataStore.getOrCreate(forKey: workspaceID)
+            meta.pullRequestURL = newValue
+            metadataStore.update(meta)
             objectWillChange.send()
         }
     }
 
     /// Tags for this workspace
     var tags: [String] {
-        get { metadata.tags }
+        get { metadata?.tags ?? [] }
         set {
-            metadataStore.update(sessionID: id, tags: newValue)
+            metadataStore.update(forKey: workspaceID, tags: newValue)
             objectWillChange.send()
         }
     }
 
     /// Toggle the attention flag
     func toggleAttention() {
-        metadataStore.toggleAttention(sessionID: id)
+        metadataStore.toggleAttention(forKey: workspaceID)
         objectWillChange.send()
     }
 
     /// Clear the attention flag
     func clearAttention() {
-        metadataStore.clearAttention(sessionID: id)
+        metadataStore.clearAttention(forKey: workspaceID)
         objectWillChange.send()
     }
 

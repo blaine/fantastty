@@ -21,16 +21,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
         Self.logger.info("applicationDidFinishLaunching")
         ghosttyApp.delegate = self
 
+        // Install shell integration scripts (before session creation)
+        ShellIntegration.shared.ensureInstalled()
+
         // Set up notification observers for Ghostty actions
         sessionManager.ghosttyApp = ghosttyApp
         sessionManager.setupNotificationObservers()
 
-        // Create the initial session
+        // Create or restore sessions
         let readiness = self.ghosttyApp.readiness
         Self.logger.info("ghosttyApp.readiness = \(String(describing: readiness))")
         if ghosttyApp.readiness == .ready {
-            Self.logger.info("Creating initial session")
-            sessionManager.createSession()
+            // Try to restore tmux sessions first
+            let restored = sessionManager.restoreTmuxSessions()
+            if !restored {
+                // No sessions restored, create a new one
+                Self.logger.info("Creating initial session")
+                sessionManager.createSession()
+            }
         } else {
             Self.logger.warning("Ghostty not ready, cannot create session")
         }
@@ -41,6 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        sessionManager.saveLayout()
         return .terminateNow
     }
 
