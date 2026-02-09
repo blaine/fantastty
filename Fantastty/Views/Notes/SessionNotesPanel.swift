@@ -97,51 +97,17 @@ struct SessionNotesPanel: View {
 
     @ViewBuilder
     private var urlSection: some View {
-        let ticket = session.ticketURL
-        let pr = session.pullRequestURL
-        if (ticket != nil && !ticket!.isEmpty) || (pr != nil && !pr!.isEmpty) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let ticket = ticket, !ticket.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "ticket")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if let url = URL(string: ticket) {
-                            Link(ticket, destination: url)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        } else {
-                            Text(ticket)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                if let pr = pr, !pr.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.pull")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if let url = URL(string: pr) {
-                            Link(pr, destination: url)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        } else {
-                            Text(pr)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            Divider()
+        VStack(alignment: .leading, spacing: 4) {
+            URLFieldRow(icon: "ticket", label: "Ticket", value: Binding(
+                get: { session.ticketURL ?? "" },
+                set: { session.ticketURL = $0.isEmpty ? nil : $0 }
+            ))
+            URLFieldRow(icon: "arrow.triangle.pull", label: "PR", value: Binding(
+                get: { session.pullRequestURL ?? "" },
+                set: { session.pullRequestURL = $0.isEmpty ? nil : $0 }
+            ))
         }
+        Divider()
     }
 
     private var notesLogSection: some View {
@@ -566,5 +532,37 @@ struct SessionNotesPopover: View {
 
         session.addNote(content: content, source: .user)
         newNoteText = ""
+    }
+}
+
+/// An editable URL field row with an icon, inline text field, and open-link button.
+struct URLFieldRow: View {
+    let icon: String
+    let label: String
+    @Binding var value: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            TextField(label, text: $value, prompt: Text("No \(label.lowercased())"))
+                .font(.caption)
+                .textFieldStyle(.plain)
+                .lineLimit(1)
+
+            if let url = URL(string: value), !value.isEmpty {
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open in browser")
+            }
+        }
     }
 }
