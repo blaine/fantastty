@@ -510,20 +510,19 @@ class SessionManager: ObservableObject {
         var surfaceConfig = config ?? Ghostty.SurfaceConfiguration()
         var actualTabSessionName: String? = nil
 
-        // Use linked tmux session if base session exists
-        if let baseSession = session.tmuxSessionName,
+        // Use independent tmux session if persistent sessions are active
+        if session.tmuxSessionName != nil,
            tmuxManager.isTmuxAvailable {
             session.tmuxTabCounter += 1
             let tabSessionName = tmuxManager.tabSessionName(
                 workspaceID: session.workspaceID,
                 tabIndex: session.tmuxTabCounter
             )
-            surfaceConfig.command = tmuxManager.commandForLinkedTab(
-                baseSessionName: baseSession,
+            surfaceConfig.command = tmuxManager.commandForTabSession(
                 tabSessionName: tabSessionName
             )
             actualTabSessionName = tabSessionName
-            Self.logger.info("Using linked tmux session: \(tabSessionName)")
+            Self.logger.info("Using independent tmux session: \(tabSessionName)")
         } else if let command = type.command {
             surfaceConfig.command = command
         }

@@ -128,11 +128,18 @@ class TmuxManager {
         return cmd
     }
 
-    /// Generate the command to create a linked session (additional tabs)
-    func commandForLinkedTab(baseSessionName: String, tabSessionName: String) -> String {
-        // Create a new session linked to the base session
-        // This shares windows but allows independent window selection
-        return "\(tmuxPath) new-session -t '\(baseSessionName)' -s '\(tabSessionName)' \\; new-window"
+    /// Generate the command to create an independent session for an additional tab
+    func commandForTabSession(tabSessionName: String) -> String {
+        var cmd = "\(tmuxPath) new-session -s '\(tabSessionName)'"
+        if supportsPassthrough {
+            if ShellIntegration.shared.isAvailable {
+                let zdotdir = ShellIntegration.shared.zdotdirPath
+                let origZdotdir = ProcessInfo.processInfo.environment["ZDOTDIR"] ?? NSHomeDirectory()
+                cmd += " -e 'ZDOTDIR=\(zdotdir)' -e 'FANTASTTY_ORIGINAL_ZDOTDIR=\(origZdotdir)'"
+            }
+            cmd += " \\; set-option allow-passthrough on"
+        }
+        return cmd
     }
 
     /// Generate the command to attach to an existing session
@@ -241,11 +248,12 @@ class TmuxManager {
         }
     }
 
-    /// Kill all sessions for a workspace (base + all linked)
+    /// Kill all sessions for a workspace (base + all tab sessions)
     func killWorkspaceSessions(workspaceID: String) {
-        let baseName = baseSessionName(workspaceID: workspaceID)
-        // Killing the base session also kills all linked sessions
-        killSession(name: baseName)
+        let prefix = "\(Self.sessionPrefix)ws-\(workspaceID)"
+        for session in listFantasttySessions() where session.name.hasPrefix(prefix) {
+            killSession(name: session.name)
+        }
     }
 
     /// Check if a session exists
