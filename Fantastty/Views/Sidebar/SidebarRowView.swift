@@ -88,6 +88,11 @@ struct SidebarRowView: View {
             isHovering = hovering
         }
         .contextMenu {
+            Button("Show Overview") {
+                sessionManager.selectedSessionID = session.id
+                session.selectedTabID = nil
+            }
+
             Button("Edit Notes...") {
                 // Will be handled by a sheet
             }
@@ -96,6 +101,10 @@ struct SidebarRowView: View {
 
             Button(session.needsAttention ? "Clear Attention Flag" : "Flag for Attention") {
                 session.toggleAttention()
+            }
+
+            Button("Archive Workspace") {
+                sessionManager.archiveSession(id: session.id)
             }
 
             Divider()

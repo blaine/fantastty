@@ -2,8 +2,10 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject var sessionManager: SessionManager
+    @ObservedObject private var metadataStore = SessionMetadataStore.shared
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var expandedSessions: Set<UUID> = []
+    @State private var workspaceToDelete: String?
 
     var body: some View {
         List(selection: $sessionManager.selectedSessionID) {
@@ -34,15 +36,6 @@ struct SidebarView: View {
                     .simultaneousGesture(TapGesture().onEnded {
                         session.selectedTabID = nil
                     })
-                    .contextMenu {
-                        Button("Show Overview") {
-                            sessionManager.selectedSessionID = session.id
-                            session.selectedTabID = nil
-                        }
-                        Button("Close Workspace") {
-                            sessionManager.closeSession(id: session.id)
-                        }
-                    }
 
                     // Tab thumbnails (observed subview so tabs changes trigger re-render)
                     if expandedSessions.contains(session.id) {
@@ -51,19 +44,42 @@ struct SidebarView: View {
                 } else {
                     SidebarRowView(session: session)
                         .tag(session.id)
-                        .contextMenu {
-                            Button("Show Overview") {
-                                sessionManager.selectedSessionID = session.id
-                                session.selectedTabID = nil
-                            }
-                            Button("Close Workspace") {
-                                sessionManager.closeSession(id: session.id)
-                            }
-                        }
                 }
             }
             .onMove { source, destination in
                 sessionManager.sessions.move(fromOffsets: source, toOffset: destination)
+            }
+
+            // Archived workspaces section
+            if !metadataStore.archivedWorkspaces.isEmpty {
+                Section("Archived") {
+                    ForEach(metadataStore.archivedWorkspaces, id: \.workspaceID) { meta in
+                        HStack {
+                            Image(systemName: "archivebox")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 16)
+                            VStack(alignment: .leading) {
+                                Text(meta.name.isEmpty ? meta.workspaceID : meta.name)
+                                    .lineLimit(1)
+                                    .foregroundStyle(.secondary)
+                                if let archivedAt = meta.archivedAt {
+                                    Text(archivedAt, style: .relative)
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .contextMenu {
+                            Button("Unarchive") {
+                                sessionManager.unarchiveSession(workspaceID: meta.workspaceID)
+                            }
+                            Button("Delete Permanently", role: .destructive) {
+                                workspaceToDelete = meta.workspaceID
+                            }
+                        }
+                    }
+                }
             }
         }
         .listStyle(.sidebar)
@@ -83,6 +99,22 @@ struct SidebarView: View {
             ToolbarItem(placement: .primaryAction) {
                 NewSessionMenu()
             }
+        }
+        .alert("Delete Workspace?", isPresented: Binding(
+            get: { workspaceToDelete != nil },
+            set: { if !$0 { workspaceToDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) {
+                workspaceToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let id = workspaceToDelete {
+                    sessionManager.deleteArchivedWorkspace(workspaceID: id)
+                }
+                workspaceToDelete = nil
+            }
+        } message: {
+            Text("This will permanently delete all metadata, notes, and URLs for this workspace. This cannot be undone.")
         }
     }
 }
