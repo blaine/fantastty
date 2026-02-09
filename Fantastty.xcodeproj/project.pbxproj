@@ -16,6 +16,7 @@
 		25C133A6066C09E29CF27024 /* fantastty.sh in Resources */ = {isa = PBXBuildFile; fileRef = 140C34BE75F8E35B9803CA1B /* fantastty.sh */; };
 		260BDF277FF320CC7296AD69 /* BrowserTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */; };
 		270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */; };
+		2F4A8B1C3D9E7F0A12BC5E89 /* LayoutSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */; };
 		31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCE90FA0D374014602A3628 /* KeyboardLayout.swift */; };
 		32FAC9DD5A6997E3B393D04A /* EventModifiers+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE3D4FD18EDC4733E55361B /* EventModifiers+Extension.swift */; };
 		3BA1B6775DB786318C833725 /* WorkspaceOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E2DF833F359BF737FCCDE8 /* WorkspaceOverviewView.swift */; };
@@ -72,7 +73,9 @@
 		C761878FED3416A183D53D85 /* GhosttyDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */; };
 		C86109E5CA51D8D1C236071C /* NSEvent+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */; };
 		C907BB7160482732FA45EF14 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC71494450F49AF3C3EF59D6 /* Session.swift */; };
+		B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */; };
 		C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */; };
+		CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8161ED573E974F43EFDC11 /* TmuxManager.swift */; };
 		D9DE9253074604BD02EEDE01 /* Ghostty.Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */; };
 		DA0A1994119A432E83D4BFDA /* NewSessionMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D308F8F4C24380795511065 /* NewSessionMenu.swift */; };
 		DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */; };
@@ -105,6 +108,7 @@
 		129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceView_AppKit.swift; sourceTree = "<group>"; };
 		140C34BE75F8E35B9803CA1B /* fantastty.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = fantastty.sh; sourceTree = "<group>"; };
 		1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSMenuItem+Extension.swift"; sourceTree = "<group>"; };
+		1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutSnapshot.swift; sourceTree = "<group>"; };
 		183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extension.swift"; sourceTree = "<group>"; };
 		19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSEvent+Extension.swift"; sourceTree = "<group>"; };
 		1D5F2F67928ACFE5120BA782 /* Backport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backport.swift; sourceTree = "<group>"; };
@@ -117,6 +121,7 @@
 		29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSplitTreeView.swift; sourceTree = "<group>"; };
 		29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.Divider.swift; sourceTree = "<group>"; };
 		2D308F8F4C24380795511065 /* NewSessionMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionMenu.swift; sourceTree = "<group>"; };
+		2D8161ED573E974F43EFDC11 /* TmuxManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxManager.swift; sourceTree = "<group>"; };
 		327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Package.swift; sourceTree = "<group>"; };
 		34925F86E43A164C45263A32 /* SurfaceScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceScrollView.swift; sourceTree = "<group>"; };
 		3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyDelegate.swift; sourceTree = "<group>"; };
@@ -173,6 +178,7 @@
 		D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceDragSource.swift; sourceTree = "<group>"; };
 		DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTab.swift; sourceTree = "<group>"; };
 		DC71494450F49AF3C3EF59D6 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegration.swift; sourceTree = "<group>"; };
 		E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardShortcut+Extension.swift"; sourceTree = "<group>"; };
 		E47B3F24C3964B77FF83FC42 /* CGS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGS.swift; sourceTree = "<group>"; };
 		E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Shell.swift; sourceTree = "<group>"; };
@@ -258,11 +264,14 @@
 		45158AA4C8059D62D1F22F87 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */,
 				DC71494450F49AF3C3EF59D6 /* Session.swift */,
 				6A288EE4B731A40F8A2C9450 /* SessionManager.swift */,
 				07DF09D816789200644A34F6 /* SessionMetadata.swift */,
 				CE7614C13A5B0B575404F8D0 /* SessionType.swift */,
+				7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */,
 				DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */,
+				2D8161ED573E974F43EFDC11 /* TmuxManager.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -522,6 +531,7 @@
 				7F8D1260B39EC323DF372FAF /* Ghostty.Surface.swift in Sources */,
 				C761878FED3416A183D53D85 /* GhosttyDelegate.swift in Sources */,
 				31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */,
+				2F4A8B1C3D9E7F0A12BC5E89 /* LayoutSnapshot.swift in Sources */,
 				FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */,
 				C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */,
 				7C5DEE882BF9B5485FDD361B /* MetalView.swift in Sources */,
@@ -542,6 +552,7 @@
 				94C1E6EAAE0F5503D45A05FA /* SecureInput.swift in Sources */,
 				A33574334905D9B61A851CD6 /* SecureInputOverlay.swift in Sources */,
 				C907BB7160482732FA45EF14 /* Session.swift in Sources */,
+				B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */,
 				E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */,
 				736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */,
 				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
@@ -567,6 +578,7 @@
 				DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */,
 				7E78A52CCC4F8B345DCDFFF1 /* TerminalSplitTreeView.swift in Sources */,
 				58BE9BB13F2EF1EC78FD192C /* TerminalTab.swift in Sources */,
+				CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */,
 				EB8BC4643B893A85F4D032D3 /* Transferable+Extension.swift in Sources */,
 				A7E343D6FF292BAEA5BD4305 /* UUID+Extension.swift in Sources */,
 				E756741FF4E52996CC9497F2 /* UndoManager+Extension.swift in Sources */,

@@ -29,6 +29,9 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     /// The WKWebView instance for browser tabs. Nil for terminal tabs.
     var webView: WKWebView?
 
+    /// The tmux session name this tab is attached to (for layout serialization).
+    var tmuxSessionName: String?
+
     /// Icon name for the tab bar.
     var iconName: String {
         switch kind {

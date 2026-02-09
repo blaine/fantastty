@@ -46,4 +46,48 @@ enum SessionType: Equatable, Hashable {
             return cmd
         }
     }
+
+    /// The SSH command with -t (force TTY) for use inside tmux, or nil for local sessions.
+    var sshCommand: String? {
+        guard case .ssh(let host, let user, let port) = self else { return nil }
+        var cmd = "ssh -t"
+        if let port = port, port != 22 { cmd += " -p \(port)" }
+        if let user = user { cmd += " \(user)@\(host)" } else { cmd += " \(host)" }
+        return cmd
+    }
+}
+
+// MARK: - Codable
+
+extension SessionType: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case kind, host, user, port
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .local:
+            try container.encode("local", forKey: .kind)
+        case .ssh(let host, let user, let port):
+            try container.encode("ssh", forKey: .kind)
+            try container.encode(host, forKey: .host)
+            try container.encodeIfPresent(user, forKey: .user)
+            try container.encodeIfPresent(port, forKey: .port)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .kind)
+        switch kind {
+        case "ssh":
+            let host = try container.decode(String.self, forKey: .host)
+            let user = try container.decodeIfPresent(String.self, forKey: .user)
+            let port = try container.decodeIfPresent(Int.self, forKey: .port)
+            self = .ssh(host: host, user: user, port: port)
+        default:
+            self = .local
+        }
+    }
 }
