@@ -38,6 +38,12 @@ struct SessionNotesHeader: View {
             .buttonStyle(.plain)
 
             Spacer()
+
+            // Keyboard shortcut hint
+            Text("⌘.")
+                .font(.caption2)
+                .foregroundStyle(.quaternary)
+                .padding(.trailing, 4)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -74,16 +80,68 @@ struct SessionNotesPanel: View {
 
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // URL section (ticket, PR)
+            urlSection
+
             // Notes log section
             notesLogSection
 
             // Add note input
             addNoteSection
 
-            // Metadata
-            metadataSection
+            // Tags
+            tagsSection
         }
         .padding(12)
+    }
+
+    @ViewBuilder
+    private var urlSection: some View {
+        let ticket = session.ticketURL
+        let pr = session.pullRequestURL
+        if (ticket != nil && !ticket!.isEmpty) || (pr != nil && !pr!.isEmpty) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let ticket = ticket, !ticket.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "ticket")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if let url = URL(string: ticket) {
+                            Link(ticket, destination: url)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        } else {
+                            Text(ticket)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if let pr = pr, !pr.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.pull")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if let url = URL(string: pr) {
+                            Link(pr, destination: url)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        } else {
+                            Text(pr)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            Divider()
+        }
     }
 
     private var notesLogSection: some View {
@@ -117,8 +175,18 @@ struct SessionNotesPanel: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 8) {
                             ForEach(session.noteEntries) { entry in
-                                NoteEntryRow(entry: entry, dateFormatter: dateFormatter, fullDateFormatter: fullDateFormatter)
-                                    .id(entry.id)
+                                NoteEntryRow(
+                                    entry: entry,
+                                    dateFormatter: dateFormatter,
+                                    fullDateFormatter: fullDateFormatter,
+                                    onUpdate: { newContent in
+                                        session.updateNote(noteID: entry.id, newContent: newContent)
+                                    },
+                                    onDelete: {
+                                        session.deleteNote(noteID: entry.id)
+                                    }
+                                )
+                                .id(entry.id)
                             }
                         }
                         .textSelection(.enabled)
@@ -166,22 +234,9 @@ struct SessionNotesPanel: View {
     }
 
     @ViewBuilder
-    private var metadataSection: some View {
-        if let basePath = session.basePath, !basePath.isEmpty {
-            Divider()
-            HStack {
-                Text("Path:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(basePath)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-        }
-
+    private var tagsSection: some View {
         if !session.tags.isEmpty {
+            Divider()
             HStack {
                 Text("Tags:")
                     .font(.caption)
@@ -199,13 +254,19 @@ struct SessionNotesPanel: View {
     }
 }
 
-/// A single row in the notes log displaying a note entry.
+/// A single row in the notes log displaying an editable note entry.
 struct NoteEntryRow: View {
     let entry: SessionNoteEntry
     let dateFormatter: DateFormatter
     let fullDateFormatter: DateFormatter
+    var onUpdate: ((String) -> Void)?
+    var onDelete: (() -> Void)?
 
     @State private var isHovered = false
+    @State private var isEditing = false
+    @State private var editText = ""
+    @State private var showRevisions = false
+    @FocusState private var textFieldFocused: Bool
 
     private var sourceIcon: String {
         switch entry.source {
@@ -242,22 +303,131 @@ struct NoteEntryRow: View {
                             .foregroundColor(.accentColor.opacity(0.7))
                     }
                 }
+
+                // Revision indicator
+                if !entry.revisions.isEmpty {
+                    Button {
+                        showRevisions.toggle()
+                    } label: {
+                        HStack(spacing: 2) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("\(entry.revisions.count)")
+                        }
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .help("View \(entry.revisions.count) revision(s)")
+                }
+
+                Spacer()
+
+                // Edit and delete buttons on hover
+                if isHovered {
+                    HStack(spacing: 6) {
+                        if onUpdate != nil {
+                            Button {
+                                startEditing()
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Edit note")
+                        }
+
+                        if onDelete != nil {
+                            Button {
+                                onDelete?()
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption2)
+                                    .foregroundColor(.red.opacity(0.7))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Delete note")
+                        }
+                    }
+                }
             }
 
-            Text(entry.content)
-                .font(.callout)
-                .foregroundStyle(.primary)
+            // Editable content
+            if isEditing {
+                TextField("Note", text: $editText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.callout)
+                    .focused($textFieldFocused)
+                    .onSubmit {
+                        commitEdit()
+                    }
+                    .onExitCommand {
+                        cancelEdit()
+                    }
+                    .onChange(of: textFieldFocused) { _, focused in
+                        if !focused {
+                            commitEdit()
+                        }
+                    }
+            } else {
+                Text(entry.content)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .onTapGesture(count: 2) {
+                        startEditing()
+                    }
+            }
+
+            // Revision history (collapsible)
+            if showRevisions && !entry.revisions.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(entry.revisions.enumerated().reversed()), id: \.offset) { index, revision in
+                        HStack(spacing: 4) {
+                            Text(fullDateFormatter.string(from: revision.timestamp))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .monospacedDigit()
+                            Text(revision.content)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                        .padding(.leading, 16)
+                    }
+                }
+                .padding(.top, 4)
+            }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(isHovered ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.1) : Color.clear)
+                .fill(isEditing ? Color.accentColor.opacity(0.1) : (isHovered ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.1) : Color.clear))
         )
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+
+    private func startEditing() {
+        guard onUpdate != nil else { return }
+        editText = entry.content
+        isEditing = true
+        textFieldFocused = true
+    }
+
+    private func commitEdit() {
+        let trimmed = editText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty && trimmed != entry.content {
+            onUpdate?(trimmed)
+        }
+        isEditing = false
+    }
+
+    private func cancelEdit() {
+        isEditing = false
+        editText = entry.content
     }
 }
 
@@ -324,8 +494,18 @@ struct SessionNotesPopover: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 6) {
                                 ForEach(session.noteEntries) { entry in
-                                    NoteEntryRow(entry: entry, dateFormatter: dateFormatter, fullDateFormatter: dateFormatter)
-                                        .id(entry.id)
+                                    NoteEntryRow(
+                                        entry: entry,
+                                        dateFormatter: dateFormatter,
+                                        fullDateFormatter: dateFormatter,
+                                        onUpdate: { newContent in
+                                            session.updateNote(noteID: entry.id, newContent: newContent)
+                                        },
+                                        onDelete: {
+                                            session.deleteNote(noteID: entry.id)
+                                        }
+                                    )
+                                    .id(entry.id)
                                 }
                             }
                         }

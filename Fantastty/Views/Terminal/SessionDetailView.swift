@@ -69,6 +69,18 @@ struct SessionDetailView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
+                // Notes toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        notesExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: notesExpanded ? "doc.text.fill" : "doc.text")
+                        .foregroundColor(notesExpanded ? .accentColor : .primary)
+                }
+                .help("Toggle notes (⌘.)")
+                .keyboardShortcut(".", modifiers: .command)
+
                 // Overview toggle
                 if session.tabs.count > 1 {
                     Button {
