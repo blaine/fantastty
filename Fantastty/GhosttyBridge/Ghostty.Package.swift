@@ -431,6 +431,15 @@ extension Notification.Name {
 
     /// Fantastty session note received via terminal escape sequence
     static let fantasttySessionNote = Notification.Name("com.blainecook.fantastty.sessionNote")
+
+    /// Posted when a surface's working directory changes (for updating path-based metadata)
+    static let fantasttyPwdDidChange = Notification.Name("com.blainecook.fantastty.pwdDidChange")
+
+    /// Ticket/task URL received via terminal escape sequence
+    static let fantasttyTicketURL = Notification.Name("com.blainecook.fantastty.ticketURL")
+
+    /// Pull request URL received via terminal escape sequence
+    static let fantasttyPullRequestURL = Notification.Name("com.blainecook.fantastty.pullRequestURL")
 }
 
 // NOTE: I am moving all of these to Notification.Name extensions over time. This

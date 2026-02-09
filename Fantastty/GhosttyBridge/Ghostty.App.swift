@@ -1444,20 +1444,49 @@ extension Ghostty {
 
                 debugLog("DESKTOP_NOTIFICATION: title='\(title)' body='\(body)'")
 
-                // Check for Fantastty session note signal (OSC 9 with special prefix)
+                // Check for Fantastty signals (OSC 9 with special prefix)
                 // OSC 9 puts the message in the body field, not title
+
+                // Session note
                 let notePrefix = "fantastty:note;"
                 if body.hasPrefix(notePrefix) {
                     let noteContent = String(body.dropFirst(notePrefix.count))
                     debugLog("SESSION_NOTE: Intercepted note content='\(noteContent)'")
 
-                    // Post session note notification instead of desktop notification
                     NotificationCenter.default.post(
                         name: .fantasttySessionNote,
                         object: surfaceView,
                         userInfo: ["content": noteContent]
                     )
-                    return  // Don't show desktop notification for session notes
+                    return
+                }
+
+                // Ticket URL
+                let ticketPrefix = "fantastty:ticket;"
+                if body.hasPrefix(ticketPrefix) {
+                    let url = String(body.dropFirst(ticketPrefix.count))
+                    debugLog("TICKET_URL: Intercepted url='\(url)'")
+
+                    NotificationCenter.default.post(
+                        name: .fantasttyTicketURL,
+                        object: surfaceView,
+                        userInfo: ["url": url]
+                    )
+                    return
+                }
+
+                // Pull request URL
+                let prPrefix = "fantastty:pr;"
+                if body.hasPrefix(prPrefix) {
+                    let url = String(body.dropFirst(prPrefix.count))
+                    debugLog("PR_URL: Intercepted url='\(url)'")
+
+                    NotificationCenter.default.post(
+                        name: .fantasttyPullRequestURL,
+                        object: surfaceView,
+                        userInfo: ["url": url]
+                    )
+                    return
                 }
 
                 // Also trigger attention flag for the session
@@ -1666,6 +1695,13 @@ extension Ghostty {
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let pwd = String(cString: v.pwd!, encoding: .utf8) else { return }
                 surfaceView.pwd = pwd
+
+                // Notify observers that pwd changed (for path-based metadata updates)
+                NotificationCenter.default.post(
+                    name: .fantasttyPwdDidChange,
+                    object: surfaceView,
+                    userInfo: ["pwd": pwd]
+                )
 
             default:
                 assertionFailure()
