@@ -35,8 +35,6 @@ struct TabBarView: View {
                         .foregroundColor(.secondary)
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
-                } primaryAction: {
-                    sessionManager.createTab()
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
