@@ -14,7 +14,7 @@ struct AppCommands: Commands {
             Button("New Browser Tab") {
                 sessionManager.createBrowserTab()
             }
-            .keyboardShortcut("t", modifiers: [.command, .option])
+            .keyboardShortcut("b", modifiers: .command)
 
             Button("New Workspace") {
                 sessionManager.createSession()
