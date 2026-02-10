@@ -21,17 +21,26 @@ struct TabBarView: View {
                     )
                 }
 
-                // New tab button
-                Button(action: {
-                    sessionManager.createTab()
-                }) {
+                // New tab menu
+                Menu {
+                    Button("New Tab") {
+                        sessionManager.createTab()
+                    }
+                    Button("New Browser Tab") {
+                        sessionManager.createBrowserTab()
+                    }
+                } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
+                } primaryAction: {
+                    sessionManager.createTab()
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
                 .help("New Tab")
 
                 Spacer()

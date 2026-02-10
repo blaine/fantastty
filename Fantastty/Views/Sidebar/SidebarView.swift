@@ -95,11 +95,6 @@ struct SidebarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NewSessionMenu()
-            }
-        }
         .alert("Delete Workspace?", isPresented: Binding(
             get: { workspaceToDelete != nil },
             set: { if !$0 { workspaceToDelete = nil } }

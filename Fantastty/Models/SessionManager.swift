@@ -45,6 +45,9 @@ class SessionManager: ObservableObject {
     /// Whether to show the SSH connection sheet
     @Published var showSSHSheet: Bool = false
 
+    /// Whether the notes panel is expanded
+    @Published var notesExpanded: Bool = false
+
     /// Reference to the Ghostty app state
     var ghosttyApp: Ghostty.App?
 

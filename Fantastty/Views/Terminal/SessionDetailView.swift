@@ -7,7 +7,12 @@ struct SessionDetailView: View {
     @EnvironmentObject var ghosttyApp: Ghostty.App
     @EnvironmentObject var sessionManager: SessionManager
 
-    @State private var notesExpanded = false
+    private var notesExpanded: Binding<Bool> {
+        Binding(
+            get: { sessionManager.notesExpanded },
+            set: { sessionManager.notesExpanded = $0 }
+        )
+    }
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var showThumbnails = true
 
@@ -21,10 +26,6 @@ struct SessionDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Notes header (in layout flow)
-            SessionNotesHeader(session: session, isExpanded: $notesExpanded)
-            Divider()
-
             // Main content area with optional thumbnail panel
             HStack(spacing: 0) {
                 // Terminal content
@@ -56,8 +57,8 @@ struct SessionDetailView: View {
             }
             .overlay(alignment: .top) {
                 // Expanded notes content overlays the terminal
-                if notesExpanded {
-                    SessionNotesPanel(session: session, isExpanded: $notesExpanded)
+                if notesExpanded.wrappedValue {
+                    SessionNotesPanel(session: session, isExpanded: notesExpanded)
                 }
             }
         }
@@ -69,18 +70,6 @@ struct SessionDetailView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                // Notes toggle
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        notesExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: notesExpanded ? "doc.text.fill" : "doc.text")
-                        .foregroundColor(notesExpanded ? .accentColor : .primary)
-                }
-                .help("Toggle notes (⌘.)")
-                .keyboardShortcut(".", modifiers: .command)
-
                 // Overview toggle
                 if session.tabs.count > 1 {
                     Button {
@@ -111,18 +100,8 @@ struct SessionDetailView: View {
                     .help(showThumbnails ? "Hide tab previews" : "Show tab previews")
                 }
 
-                // Attention toggle
-                Button {
-                    session.toggleAttention()
-                } label: {
-                    Image(systemName: session.needsAttention ? "bell.fill" : "bell")
-                        .foregroundStyle(session.needsAttention ? .orange : .primary)
-                }
-                .help(session.needsAttention ? "Clear attention flag" : "Flag for attention")
             }
         }
-        // Don't auto-clear attention - let user manually clear it via toggle button
-        // This ensures the attention indicator is visible
     }
 }
 
