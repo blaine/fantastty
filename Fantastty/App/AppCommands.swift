@@ -16,7 +16,7 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
 
-            Button("New SSH Session...") {
+            Button("New SSH Workspace...") {
                 sessionManager.showSSHSheet = true
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])

@@ -10,7 +10,7 @@ struct SSHConnectionSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("New SSH Connection")
+            Text("New SSH Workspace")
                 .font(.headline)
 
             Form {

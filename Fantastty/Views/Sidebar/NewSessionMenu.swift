@@ -5,15 +5,11 @@ struct NewSessionMenu: View {
 
     var body: some View {
         Menu {
-            Button("New Local Tab") {
+            Button("New Workspace") {
                 sessionManager.createSession()
             }
 
-            Button("New Browser Tab") {
-                sessionManager.createBrowserTab()
-            }
-
-            Button("New SSH Session...") {
+            Button("New SSH Workspace...") {
                 sessionManager.showSSHSheet = true
             }
         } label: {
