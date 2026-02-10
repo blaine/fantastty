@@ -83,4 +83,4 @@ Workspace metadata (names, notes, URLs, tags) is persisted in `~/.fantastty/work
 
 ## License
 
-TBD
+[MIT](LICENSE)
