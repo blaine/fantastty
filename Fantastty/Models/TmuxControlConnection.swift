@@ -499,22 +499,16 @@ class TmuxControlConnection {
             if data[i] == esc, i + 1 < data.endIndex, data[i + 1] == k {
                 // Found ESC k — skip until ESC \ (ST)
                 var j = i + 2
-                var foundST = false
                 while j < data.endIndex {
                     if data[j] == esc, j + 1 < data.endIndex, data[j + 1] == backslash {
                         j += 2  // Skip the ST
-                        foundST = true
                         break
                     }
                     j += 1
                 }
-                if foundST {
-                    i = j
-                } else {
-                    // Incomplete sequence — keep data from ESC k onward
-                    result.append(contentsOf: data[i..<data.endIndex])
-                    i = data.endIndex
-                }
+                // If ST not found, j == endIndex — eat the incomplete sequence too,
+                // since passing through ESC k renders the title as visible garbage.
+                i = j
             } else {
                 result.append(data[i])
                 i += 1

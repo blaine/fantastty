@@ -56,9 +56,6 @@ class SessionManager: ObservableObject {
     /// Local event monitor for routing keystrokes to tmux in control mode
     private var keyEventMonitor: Any?
 
-    /// Debounce timer for window resize → tmux client size sync
-    private var resizeDebounceTimer: Timer?
-
     /// The currently selected session
     var selectedSession: Session? {
         guard let id = selectedSessionID else { return nil }
@@ -165,14 +162,14 @@ class SessionManager: ObservableObject {
 
     /// Restore sessions from existing tmux sessions.
     /// Call this on app launch before creating new sessions.
-    /// Uses a saved layout snapshot (if available) to preserve sidebar order,
-    /// tab order, and selections from the previous session.
+    /// Uses a saved layout snapshot (if available) to preserve sidebar order
+    /// and workspace selection. Control mode discovers all panes automatically.
     /// Returns true if any sessions were restored.
     @discardableResult
     func restoreTmuxSessions() -> Bool {
         let isPersistent = persistentSessionsEnabled
         let isTmuxAvailable = tmuxManager.isTmuxAvailable
-        guard isPersistent && isTmuxAvailable else {
+        guard isPersistent, isTmuxAvailable else {
             Self.logger.info("Tmux restoration skipped: persistentSessions=\(isPersistent), tmuxAvailable=\(isTmuxAvailable)")
             return false
         }
@@ -180,99 +177,38 @@ class SessionManager: ObservableObject {
         var liveWorkspaces = tmuxManager.groupSessionsByWorkspace()
         let layout = loadLayout()
         var restoredCount = 0
+        var restoredIDs = Set<String>()
 
+        // Phase 1: Restore workspaces in layout order (preserves sidebar ordering)
         if let layout = layout {
             Self.logger.info("Restoring with layout snapshot (\(layout.workspaces.count) workspaces)")
 
-            // Restore workspaces in layout order
             for wsLayout in layout.workspaces {
-                // Skip archived workspaces (tmux should already be dead, but be defensive)
-                if SessionMetadataStore.shared.getOrCreate(forKey: wsLayout.workspaceID).isArchived {
-                    Self.logger.info("Skipping archived workspace \(wsLayout.workspaceID)")
-                    liveWorkspaces.removeValue(forKey: wsLayout.workspaceID)
-                    continue
-                }
+                let workspaceID = wsLayout.workspaceID
 
-                guard let workspace = liveWorkspaces[wsLayout.workspaceID],
-                      workspace.isValid, let baseSession = workspace.baseSession else {
-                    Self.logger.info("Skipping stale workspace \(wsLayout.workspaceID)")
-                    continue
-                }
-
-                // Build a set of live tab session names for this workspace
-                let liveTabNames = Set(workspace.tabSessions.map { $0.name })
-                let sessionType = wsLayout.sessionType ?? .local
-
-                if let session = createSession(type: sessionType, tmuxSessionName: baseSession.name,
-                                               workspaceID: wsLayout.workspaceID) {
-                    // Restore tabs in layout order
-                    var tabCounter = 0
-                    for tabName in wsLayout.tabSessionNames {
-                        guard liveTabNames.contains(tabName) else {
-                            Self.logger.info("Skipping stale tab session \(tabName)")
-                            continue
-                        }
-                        tabCounter += 1
-                        if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabName) {
-                            session.tmuxTabCounter = max(session.tmuxTabCounter, tabCounter)
-                            Self.logger.info("Restored tab \(tab.id) with tmux session \(tabName)")
-                        }
-                    }
-
-                    // Append any live tabs not in the layout (new tabs created outside the app)
-                    for tabSession in workspace.tabSessions {
-                        if !wsLayout.tabSessionNames.contains(tabSession.name) {
-                            tabCounter += 1
-                            if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabSession.name) {
-                                session.tmuxTabCounter = max(session.tmuxTabCounter, tabCounter)
-                                Self.logger.info("Restored new tab \(tab.id) with tmux session \(tabSession.name)")
-                            }
-                        }
-                    }
-
-                    // Restore selected tab
-                    if let selectedIdx = wsLayout.selectedTabIndex,
-                       selectedIdx >= 0 && selectedIdx < session.tabs.count {
-                        session.selectedTabID = session.tabs[selectedIdx].id
-                    }
-
-                    restoredCount += 1
-                }
-
-                // Remove from live workspaces so we know what's left
-                liveWorkspaces.removeValue(forKey: wsLayout.workspaceID)
-            }
-
-            // Append any live workspaces not in the layout
-            for (workspaceID, workspace) in liveWorkspaces {
-                guard workspace.isValid, let baseSession = workspace.baseSession else { continue }
                 if SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).isArchived {
                     Self.logger.info("Skipping archived workspace \(workspaceID)")
                     continue
                 }
 
-                Self.logger.info("Restoring unlayouted workspace \(workspaceID)")
-                if let session = createSession(type: .local, tmuxSessionName: baseSession.name,
-                                               workspaceID: workspaceID) {
-                    for (index, tabSession) in workspace.tabSessions.enumerated() {
-                        if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabSession.name) {
-                            session.tmuxTabCounter = max(session.tmuxTabCounter, index + 1)
-                            Self.logger.info("Restored tab \(tab.id) with tmux session \(tabSession.name)")
-                        }
-                    }
+                let sessionType = wsLayout.sessionType ?? .local
 
+                if sessionType == .local {
+                    // Local: verify tmux session is still alive, then use control mode
+                    guard liveWorkspaces[workspaceID]?.isValid == true else {
+                        Self.logger.info("Skipping stale workspace \(workspaceID)")
+                        continue
+                    }
+                    if createSession(type: .local, workspaceID: workspaceID) != nil {
+                        restoredCount += 1
+                    }
+                } else if case .ssh = sessionType {
+                    // SSH: recreate (remote tmux may still be alive even if local is gone)
+                    createSession(type: sessionType, workspaceID: workspaceID)
                     restoredCount += 1
                 }
-            }
 
-            // Recreate orphaned SSH sessions (local tmux gone, remote tmux may still be alive)
-            for wsLayout in layout.workspaces {
-                guard let sessionType = wsLayout.sessionType,
-                      case .ssh = sessionType,
-                      liveWorkspaces[wsLayout.workspaceID] == nil else { continue }
-                // Use the same workspace ID so remote tmux session name matches
-                Self.logger.info("Recreating orphaned SSH workspace \(wsLayout.workspaceID)")
-                createSession(type: sessionType, workspaceID: wsLayout.workspaceID)
+                restoredIDs.insert(workspaceID)
             }
 
             // Restore selected workspace
@@ -280,55 +216,23 @@ class SessionManager: ObservableObject {
                let selectedSession = sessions.first(where: { $0.workspaceID == selectedWSID }) {
                 selectedSessionID = selectedSession.id
             }
-        } else {
-            // No layout snapshot - fall back to unordered restoration
-            Self.logger.info("No layout snapshot, restoring in discovery order")
+        }
 
-            for (workspaceID, workspace) in liveWorkspaces {
-                guard workspace.isValid, let baseSession = workspace.baseSession else { continue }
-                if SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).isArchived {
-                    Self.logger.info("Skipping archived workspace \(workspaceID)")
-                    continue
-                }
+        // Phase 2: Restore any live workspaces not already handled
+        for (workspaceID, workspace) in liveWorkspaces {
+            guard !restoredIDs.contains(workspaceID),
+                  workspace.isValid,
+                  !SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).isArchived else { continue }
 
-                Self.logger.info("Restoring workspace \(workspaceID) with \(workspace.tabSessions.count + 1) tabs")
-
-                if let session = createSession(type: .local, tmuxSessionName: baseSession.name,
-                                               workspaceID: workspaceID) {
-                    for (index, tabSession) in workspace.tabSessions.enumerated() {
-                        if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabSession.name) {
-                            session.tmuxTabCounter = max(session.tmuxTabCounter, index + 1)
-                            Self.logger.info("Restored tab \(tab.id) with tmux session \(tabSession.name)")
-                        }
-                    }
-
-                    restoredCount += 1
-                }
+            Self.logger.info("Restoring discovered workspace \(workspaceID)")
+            if createSession(type: .local, workspaceID: workspaceID) != nil {
+                restoredCount += 1
             }
         }
 
-        // Delete layout file after consumption
         deleteLayout()
-
         Self.logger.info("Restored \(restoredCount) workspaces from tmux")
         return restoredCount > 0
-    }
-
-    /// Restore a single tab by attaching to an existing tmux session.
-    private func restoreTabWithTmuxSession(session: Session, tmuxSessionName: String) -> TerminalTab? {
-        guard let app = ghosttyApp?.app else { return nil }
-
-        var surfaceConfig = Ghostty.SurfaceConfiguration()
-        surfaceConfig.command = tmuxManager.commandForAttach(sessionName: tmuxSessionName)
-
-        let surfaceView = Ghostty.SurfaceView(app, baseConfig: surfaceConfig)
-        let tab = TerminalTab(type: .local, surfaceView: surfaceView)
-        tab.tmuxSessionName = tmuxSessionName
-
-        session.addTab(tab)
-        setupTitleObserver(for: tab, surfaceView: surfaceView)
-
-        return tab
     }
 
     // MARK: - Session Management (Sidebar)
@@ -832,14 +736,6 @@ class SessionManager: ObservableObject {
             return self.handleControlModeKeyEvent(event)
         }
 
-        // Window resize observer — sync tmux client size when the window resizes
-        center.addObserver(
-            self,
-            selector: #selector(handleWindowResize(_:)),
-            name: NSWindow.didResizeNotification,
-            object: nil
-        )
-
         Self.debugLog("setupNotificationObservers: All observers registered")
     }
 
@@ -1078,20 +974,10 @@ class SessionManager: ObservableObject {
         Self.debugLog("PR_URL: Set '\(url)' for session \(session.id)")
     }
 
-    @objc private func handleWindowResize(_ notification: Foundation.Notification) {
-        // Debounce: avoid flooding tmux with refresh-client during live resize
-        resizeDebounceTimer?.invalidate()
-        resizeDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
-            guard let self = self,
-                  let session = self.selectedSession,
-                  session.controlConnection != nil else { return }
-            self.syncTmuxClientSize(session: session)
-        }
-    }
-
     // MARK: - Control Mode Helpers
 
     /// Create a control mode tab with an inert surface for a tmux pane.
+    @discardableResult
     private func createControlModeTab(
         session: Session,
         pane: TmuxPane,
@@ -1110,8 +996,40 @@ class SessionManager: ObservableObject {
         session.addTab(tab)
         session.paneTabMap[pane.paneId] = tab.id
         setupTitleObserver(for: tab, surfaceView: surfaceView)
+        setupResizeObserver(for: surfaceView, session: session)
 
         return tab
+    }
+
+    /// Observe a control mode surface's grid size and sync to tmux when it changes.
+    private func setupResizeObserver(for surfaceView: Ghostty.SurfaceView, session: Session) {
+        // Clear surface on first valid size — wipe stale content that arrived
+        // before tmux knew the correct dimensions.
+        surfaceView.$surfaceSize
+            .compactMap { $0 }
+            .filter { $0.columns > 0 && $0.rows > 0 }
+            .first()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak surfaceView] _ in
+                guard let self = self, let surfaceView = surfaceView else { return }
+                // ESC[2J = clear screen, ESC[H = cursor home
+                self.injectOutput(into: surfaceView, data: Data([0x1B, 0x5B, 0x32, 0x4A, 0x1B, 0x5B, 0x48]))
+            }
+            .store(in: &titleCancellables)
+
+        // Ongoing: sync tmux client size whenever the grid dimensions change.
+        surfaceView.$surfaceSize
+            .compactMap { $0 }
+            .removeDuplicates { $0.columns == $1.columns && $0.rows == $1.rows }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak session] size in
+                guard let session = session,
+                      let control = session.controlConnection,
+                      size.columns > 0, size.rows > 0 else { return }
+                control.send("refresh-client -C \(size.columns)x\(size.rows)")
+                Self.debugLog("CONTROL: surface resized → refresh-client \(size.columns)x\(size.rows)")
+            }
+            .store(in: &titleCancellables)
     }
 
     /// Inject raw output data into a surface via the Ghostty C API.
@@ -1135,19 +1053,6 @@ class SessionManager: ObservableObject {
         guard let control = session.controlConnection else { return }
         let hex = text.utf8.map { String(format: "%02x", $0) }.joined(separator: " ")
         control.send("send-keys -t %\(paneId) -H \(hex)")
-    }
-
-    /// Sync the tmux client size with the Ghostty surface dimensions.
-    private func syncTmuxClientSize(session: Session) {
-        guard let control = session.controlConnection,
-              let tab = session.selectedTab,
-              let surfaceView = tab.focusedSurface,
-              let surface = surfaceView.surface else { return }
-
-        let size = ghostty_surface_size(surface)
-        guard size.columns > 0, size.rows > 0 else { return }
-        control.send("refresh-client -C \(size.columns)x\(size.rows)")
-        Self.debugLog("CONTROL: synced tmux client size to \(size.columns)x\(size.rows)")
     }
 
     /// Handle a key event for control mode surfaces.
@@ -1318,16 +1223,6 @@ extension SessionManager: TmuxControlConnectionDelegate {
                     Self.debugLog("CONTROL: Created tab for pane %\(pane.paneId) window @\(pane.windowId)")
                     createdNewTabs = true
                 }
-            }
-        }
-
-        // Sync tmux client size with Ghostty surface dimensions after creating tabs.
-        // This ensures the tmux pane renders at the correct size.
-        if createdNewTabs {
-            // Delay briefly to let the surface initialize its size
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak session] in
-                guard let self = self, let session = session else { return }
-                self.syncTmuxClientSize(session: session)
             }
         }
 
