@@ -1,0 +1,93 @@
+diff --git a/include/ghostty.h b/include/ghostty.h
+index 3d3973084..9613917cf 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1079,6 +1079,7 @@ bool ghostty_surface_key_is_binding(ghostty_surface_t,
+                                     ghostty_binding_flags_e*);
+ void ghostty_surface_text(ghostty_surface_t, const char*, uintptr_t);
+ void ghostty_surface_preedit(ghostty_surface_t, const char*, uintptr_t);
++void ghostty_surface_inject_output(ghostty_surface_t, const char*, uintptr_t);
+ bool ghostty_surface_mouse_captured(ghostty_surface_t);
+ bool ghostty_surface_mouse_button(ghostty_surface_t,
+                                   ghostty_input_mouse_state_e,
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index dcf8a6357..db391f2e6 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1790,6 +1790,24 @@ pub const CAPI = struct {
+         surface.preeditCallback(if (len == 0) null else ptr[0..len]);
+     }
+ 
++    /// Inject output data into the surface's terminal as if it came
++    /// from the PTY. This is used for tmux control mode integration
++    /// where output is received over a control connection and needs
++    /// to be fed into the terminal emulator.
++    export fn ghostty_surface_inject_output(
++        surface: *Surface,
++        ptr: [*]const u8,
++        len: usize,
++    ) void {
++        const termio = @import("../termio.zig");
++        const core = &surface.core_surface;
++        const msg = termio.Message.injectReq(
++            core.alloc,
++            ptr[0..len],
++        ) catch return;
++        core.io.queueMessage(msg, .unlocked);
++    }
++
+     /// Returns true if the surface currently has mouse capturing
+     /// enabled.
+     export fn ghostty_surface_mouse_captured(surface: *Surface) bool {
+diff --git a/src/termio/Thread.zig b/src/termio/Thread.zig
+index 6aa5e1c26..928752f37 100644
+--- a/src/termio/Thread.zig
++++ b/src/termio/Thread.zig
+@@ -351,6 +351,11 @@ fn drainMailbox(
+                     self.flags.linefeed_mode,
+                 );
+             },
++            .inject_output_small => |v| io.processOutput(v.data[0..v.len]),
++            .inject_output_alloc => |v| {
++                defer v.alloc.free(v.data);
++                io.processOutput(v.data);
++            },
+         }
+     }
+ 
+diff --git a/src/termio/message.zig b/src/termio/message.zig
+index d7a59bf5e..a37a864f9 100644
+--- a/src/termio/message.zig
++++ b/src/termio/message.zig
+@@ -82,6 +82,14 @@ pub const Message = union(enum) {
+     /// Write where the data is allocated and must be freed.
+     write_alloc: WriteReq.Alloc,
+ 
++    /// Inject output where the data fits in the union. This feeds data
++    /// into processOutput as if it came from the PTY, without writing
++    /// to the actual PTY.
++    inject_output_small: WriteReq.Small,
++
++    /// Inject output where the data is allocated and must be freed.
++    inject_output_alloc: WriteReq.Alloc,
++
+     /// Return a write request for the given data. This will use
+     /// write_small if it fits or write_alloc otherwise. This should NOT
+     /// be used for stable pointers which can be manually set to write_stable.
+@@ -93,6 +101,16 @@ pub const Message = union(enum) {
+         };
+     }
+ 
++    /// Return an inject output request for the given data. This will use
++    /// inject_output_small if it fits or inject_output_alloc otherwise.
++    pub fn injectReq(alloc: Allocator, data: anytype) !Message {
++        return switch (try WriteReq.init(alloc, data)) {
++            .stable => unreachable,
++            .small => |v| Message{ .inject_output_small = v },
++            .alloc => |v| Message{ .inject_output_alloc = v },
++        };
++    }
++
+     /// The types of size reports that we support
+     pub const SizeReport = enum {
+         mode_2048,
