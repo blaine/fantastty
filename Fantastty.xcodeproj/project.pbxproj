@@ -76,6 +76,7 @@
 		B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */; };
 		C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */; };
 		CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8161ED573E974F43EFDC11 /* TmuxManager.swift */; };
+		F1A2B3C4D5E6F7081234ABCD /* TmuxControlConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607182345BCDE /* TmuxControlConnection.swift */; };
 		D9DE9253074604BD02EEDE01 /* Ghostty.Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */; };
 		DA0A1994119A432E83D4BFDA /* NewSessionMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D308F8F4C24380795511065 /* NewSessionMenu.swift */; };
 		DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */; };
@@ -122,6 +123,7 @@
 		29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.Divider.swift; sourceTree = "<group>"; };
 		2D308F8F4C24380795511065 /* NewSessionMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionMenu.swift; sourceTree = "<group>"; };
 		2D8161ED573E974F43EFDC11 /* TmuxManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxManager.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F607182345BCDE /* TmuxControlConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxControlConnection.swift; sourceTree = "<group>"; };
 		327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Package.swift; sourceTree = "<group>"; };
 		34925F86E43A164C45263A32 /* SurfaceScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceScrollView.swift; sourceTree = "<group>"; };
 		3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyDelegate.swift; sourceTree = "<group>"; };
@@ -272,6 +274,7 @@
 				7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */,
 				DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */,
 				2D8161ED573E974F43EFDC11 /* TmuxManager.swift */,
+				A1B2C3D4E5F607182345BCDE /* TmuxControlConnection.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -579,6 +582,7 @@
 				7E78A52CCC4F8B345DCDFFF1 /* TerminalSplitTreeView.swift in Sources */,
 				58BE9BB13F2EF1EC78FD192C /* TerminalTab.swift in Sources */,
 				CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */,
+				F1A2B3C4D5E6F7081234ABCD /* TmuxControlConnection.swift in Sources */,
 				EB8BC4643B893A85F4D032D3 /* Transferable+Extension.swift in Sources */,
 				A7E343D6FF292BAEA5BD4305 /* UUID+Extension.swift in Sources */,
 				E756741FF4E52996CC9497F2 /* UndoManager+Extension.swift in Sources */,

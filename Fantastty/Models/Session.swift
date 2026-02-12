@@ -32,6 +32,12 @@ class Session: ObservableObject, Identifiable, Hashable {
     /// Counter for generating tab session names
     var tmuxTabCounter: Int = 0
 
+    /// Tmux control mode connection (when using control mode)
+    var controlConnection: TmuxControlConnection?
+
+    /// Mapping from tmux pane ID to tab UUID (control mode)
+    var paneTabMap: [Int: UUID] = [:]
+
     /// Reference to metadata store for persistence
     private let metadataStore = SessionMetadataStore.shared
 
@@ -43,6 +49,16 @@ class Session: ObservableObject, Identifiable, Hashable {
         self.defaultTitle = title
         self.tabs = [initialTab]
         self.selectedTabID = initialTab.id
+    }
+
+    /// Create a control mode session with no initial tabs.
+    /// Tabs are added asynchronously as tmux reports panes.
+    init(type: SessionType, workspaceID: String) {
+        self.type = type
+        self.workspaceID = workspaceID
+        self.defaultTitle = type.displayName
+        self.tabs = []
+        self.selectedTabID = nil
     }
 
     /// Convenience initializer for creating a session with a new surface.

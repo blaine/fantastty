@@ -142,6 +142,12 @@ class TmuxManager {
         return cmd
     }
 
+    /// Generate the command arguments for control mode connection.
+    /// Returns the full path and arguments for `tmux -CC new-session -A -s <name>`.
+    func commandForControlMode(sessionName: String) -> (path: String, arguments: [String]) {
+        return (tmuxPath, ["-CC", "new-session", "-A", "-s", sessionName])
+    }
+
     /// Generate the command to attach to an existing session
     func commandForAttach(sessionName: String) -> String {
         var cmd = "\(tmuxPath) attach-session -t '\(sessionName)'"

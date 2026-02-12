@@ -53,6 +53,12 @@ class SessionManager: ObservableObject {
 
     private var titleCancellables = Set<AnyCancellable>()
 
+    /// Local event monitor for routing keystrokes to tmux in control mode
+    private var keyEventMonitor: Any?
+
+    /// Debounce timer for window resize → tmux client size sync
+    private var resizeDebounceTimer: Timer?
+
     /// The currently selected session
     var selectedSession: Session? {
         guard let id = selectedSessionID else { return nil }
@@ -342,7 +348,9 @@ class SessionManager: ObservableObject {
         var actualTmuxSessionName: String? = nil
 
         // Use tmux if enabled and available
-        if persistentSessionsEnabled && tmuxManager.isTmuxAvailable {
+        let useControlMode = persistentSessionsEnabled && tmuxManager.isTmuxAvailable && tmuxSessionName == nil && type == .local
+        Self.debugLog("createSession: persistent=\(persistentSessionsEnabled) tmuxAvailable=\(tmuxManager.isTmuxAvailable) tmuxSessionName=\(tmuxSessionName ?? "nil") type=\(type.displayName) useControlMode=\(useControlMode)")
+        if persistentSessionsEnabled && tmuxManager.isTmuxAvailable && !useControlMode {
             if let existingSession = tmuxSessionName {
                 // Reattaching to existing session
                 actualTmuxSessionName = existingSession
@@ -362,8 +370,40 @@ class SessionManager: ObservableObject {
                 )
             }
             Self.logger.info("Using tmux session: \(actualTmuxSessionName ?? "nil")")
-        } else if let command = type.command {
+        } else if !useControlMode, let command = type.command {
             surfaceConfig.command = command
+        }
+
+        if useControlMode {
+            // Control mode: create session with no tabs — tabs are created
+            // asynchronously when tmux reports panes via windowsChanged delegate.
+            let sessionName = tmuxManager.baseSessionName(workspaceID: workspaceID)
+            actualTmuxSessionName = sessionName
+
+            let session = Session(type: type, workspaceID: workspaceID)
+            session.tmuxSessionName = sessionName
+
+            // Auto-generate workspace name
+            let metadataStore = SessionMetadataStore.shared
+            let meta = metadataStore.getOrCreate(forKey: workspaceID)
+            if meta.name.isEmpty {
+                metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
+            }
+
+            sessions.append(session)
+            selectedSessionID = session.id
+
+            // Start control mode connection
+            let control = TmuxControlConnection(
+                tmuxPath: tmuxManager.tmuxPath,
+                sessionName: sessionName,
+                delegate: self
+            )
+            session.controlConnection = control
+
+            control.start()
+            Self.debugLog("CONTROL: Started control mode for workspace \(workspaceID) session=\(sessionName)")
+            return session
         }
 
         let surfaceView = Ghostty.SurfaceView(app, baseConfig: surfaceConfig)
@@ -404,6 +444,10 @@ class SessionManager: ObservableObject {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
 
         let session = sessions[index]
+
+        // Stop control connection if active
+        session.controlConnection?.stop()
+        session.controlConnection = nil
 
         // Kill tmux session if requested and session has one
         if killTmux {
@@ -510,6 +554,13 @@ class SessionManager: ObservableObject {
             return nil
         }
 
+        // In control mode, ask tmux to create a new window (tab appears via delegate)
+        if let control = session.controlConnection {
+            control.send("new-window")
+            Self.logger.info("Requested new tmux window via control mode")
+            return nil  // Tab created asynchronously via %window-add → windowsChanged
+        }
+
         var surfaceConfig = config ?? Ghostty.SurfaceConfiguration()
         var actualTabSessionName: String? = nil
 
@@ -559,6 +610,16 @@ class SessionManager: ObservableObject {
     /// Close a tab within its session. If last tab, closes the session.
     func closeTab(id: UUID) {
         guard let session = sessions.first(where: { $0.tabs.contains { $0.id == id } }) else { return }
+
+        // In control mode, ask tmux to kill the window instead of closing locally
+        if let control = session.controlConnection,
+           let tab = session.tabs.first(where: { $0.id == id }),
+           let windowId = tab.tmuxWindowId {
+            control.send("kill-window -t @\(windowId)")
+            Self.logger.info("Requested kill-window @\(windowId) via control mode")
+            // Tab removed via %window-close → windowClosed delegate callback
+            return
+        }
 
         // Kill the tab's linked tmux session (skip base session — other tabs need it)
         if let tab = session.tabs.first(where: { $0.id == id }),
@@ -762,6 +823,20 @@ class SessionManager: ObservableObject {
             self,
             selector: #selector(handlePullRequestURL(_:)),
             name: .fantasttyPullRequestURL,
+            object: nil
+        )
+
+        // Key event monitor for routing keystrokes to tmux in control mode
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return event }
+            return self.handleControlModeKeyEvent(event)
+        }
+
+        // Window resize observer — sync tmux client size when the window resizes
+        center.addObserver(
+            self,
+            selector: #selector(handleWindowResize(_:)),
+            name: NSWindow.didResizeNotification,
             object: nil
         )
 
@@ -1003,6 +1078,145 @@ class SessionManager: ObservableObject {
         Self.debugLog("PR_URL: Set '\(url)' for session \(session.id)")
     }
 
+    @objc private func handleWindowResize(_ notification: Foundation.Notification) {
+        // Debounce: avoid flooding tmux with refresh-client during live resize
+        resizeDebounceTimer?.invalidate()
+        resizeDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
+            guard let self = self,
+                  let session = self.selectedSession,
+                  session.controlConnection != nil else { return }
+            self.syncTmuxClientSize(session: session)
+        }
+    }
+
+    // MARK: - Control Mode Helpers
+
+    /// Create a control mode tab with an inert surface for a tmux pane.
+    private func createControlModeTab(
+        session: Session,
+        pane: TmuxPane,
+        app: ghostty_app_t
+    ) -> TerminalTab {
+        var config = Ghostty.SurfaceConfiguration()
+        // Inert subprocess: disable echo to prevent DSR responses from being echoed back
+        // as visible garbage, then exec tail to hold the PTY open.
+        config.command = "/bin/sh -c 'stty -echo 2>/dev/null; exec tail -f /dev/null'"
+
+        let surfaceView = Ghostty.SurfaceView(app, baseConfig: config)
+        let tab = TerminalTab(type: session.type, surfaceView: surfaceView)
+        tab.tmuxPaneId = pane.paneId
+        tab.tmuxWindowId = pane.windowId
+
+        session.addTab(tab)
+        session.paneTabMap[pane.paneId] = tab.id
+        setupTitleObserver(for: tab, surfaceView: surfaceView)
+
+        return tab
+    }
+
+    /// Inject raw output data into a surface via the Ghostty C API.
+    private func injectOutput(into surfaceView: Ghostty.SurfaceView, data: Data) {
+        guard let surface = surfaceView.surface else { return }
+        data.withUnsafeBytes { buffer in
+            guard let ptr = buffer.baseAddress?.assumingMemoryBound(to: CChar.self) else { return }
+            ghostty_surface_inject_output(surface, ptr, UInt(buffer.count))
+        }
+    }
+
+    /// Find the surface view for a given tmux pane ID within a session.
+    private func surfaceForPane(_ paneId: Int, in session: Session) -> Ghostty.SurfaceView? {
+        guard let tabId = session.paneTabMap[paneId],
+              let tab = session.tabs.first(where: { $0.id == tabId }) else { return nil }
+        return tab.focusedSurface
+    }
+
+    /// Route a keystroke from a control mode tab to tmux via send-keys.
+    func routeKeyToTmux(paneId: Int, text: String, session: Session) {
+        guard let control = session.controlConnection else { return }
+        let hex = text.utf8.map { String(format: "%02x", $0) }.joined(separator: " ")
+        control.send("send-keys -t %\(paneId) -H \(hex)")
+    }
+
+    /// Sync the tmux client size with the Ghostty surface dimensions.
+    private func syncTmuxClientSize(session: Session) {
+        guard let control = session.controlConnection,
+              let tab = session.selectedTab,
+              let surfaceView = tab.focusedSurface,
+              let surface = surfaceView.surface else { return }
+
+        let size = ghostty_surface_size(surface)
+        guard size.columns > 0, size.rows > 0 else { return }
+        control.send("refresh-client -C \(size.columns)x\(size.rows)")
+        Self.debugLog("CONTROL: synced tmux client size to \(size.columns)x\(size.rows)")
+    }
+
+    /// Handle a key event for control mode surfaces.
+    /// Returns nil to consume the event (prevent Ghostty from writing to the inert PTY,
+    /// which would cause double-echo). Returns the event for non-control-mode surfaces
+    /// and Cmd+ shortcuts.
+    private func handleControlModeKeyEvent(_ event: NSEvent) -> NSEvent? {
+        // Find the session/tab for the currently focused surface
+        guard let session = selectedSession,
+              let control = session.controlConnection,
+              let tab = session.selectedTab,
+              let paneId = tab.tmuxPaneId else {
+            return event
+        }
+
+        // Skip Cmd+key combinations (app shortcuts like Cmd+C, Cmd+V, Cmd+T)
+        if event.modifierFlags.contains(.command) {
+            return event
+        }
+
+        // Map special keys to tmux key names
+        if let tmuxKey = tmuxKeyName(for: event) {
+            control.send("send-keys -t %\(paneId) \(tmuxKey)")
+            return nil  // Consume event — tmux handles it
+        }
+
+        // For regular text input, hex-encode the characters
+        if let chars = event.characters, !chars.isEmpty {
+            let hex = chars.utf8.map { String(format: "%02x", $0) }.joined(separator: " ")
+            control.send("send-keys -t %\(paneId) -H \(hex)")
+            return nil  // Consume event — tmux handles it
+        }
+
+        return event
+    }
+
+    /// Map an NSEvent keyCode to a tmux key name for special keys.
+    /// Returns nil for regular text keys (handled via hex encoding).
+    private func tmuxKeyName(for event: NSEvent) -> String? {
+        switch event.keyCode {
+        case 0x24: return "Enter"       // Return
+        case 0x30: return "Tab"         // Tab
+        case 0x33: return "BSpace"      // Backspace
+        case 0x35: return "Escape"      // Escape
+        case 0x75: return "DC"          // Forward Delete
+        case 0x7E: return "Up"          // Up Arrow
+        case 0x7D: return "Down"        // Down Arrow
+        case 0x7B: return "Left"        // Left Arrow
+        case 0x7C: return "Right"       // Right Arrow
+        case 0x73: return "Home"        // Home
+        case 0x77: return "End"         // End
+        case 0x74: return "PageUp"      // Page Up (NPage in tmux)
+        case 0x79: return "PageDown"    // Page Down
+        case 0x7A: return "F1"
+        case 0x78: return "F2"
+        case 0x63: return "F3"
+        case 0x76: return "F4"
+        case 0x60: return "F5"
+        case 0x61: return "F6"
+        case 0x62: return "F7"
+        case 0x64: return "F8"
+        case 0x65: return "F9"
+        case 0x6D: return "F10"
+        case 0x67: return "F11"
+        case 0x6F: return "F12"
+        default: return nil
+        }
+    }
+
     // MARK: - Private Helpers
 
     private func setupTitleObserver(for tab: TerminalTab, surfaceView: Ghostty.SurfaceView) {
@@ -1062,5 +1276,104 @@ class SessionManager: ObservableObject {
         case .split(let split):
             return firstLeafView(in: split.left)
         }
+    }
+
+    /// Find the session that owns a given control connection.
+    private func session(for connection: TmuxControlConnection) -> Session? {
+        return sessions.first { $0.controlConnection === connection }
+    }
+}
+
+// MARK: - TmuxControlConnectionDelegate
+
+extension SessionManager: TmuxControlConnectionDelegate {
+    func controlConnection(_ connection: TmuxControlConnection, windowsChanged windows: [TmuxWindow]) {
+        guard let session = session(for: connection),
+              let app = ghosttyApp?.app else { return }
+
+        Self.debugLog("CONTROL: windowsChanged with \(windows.count) windows, \(windows.flatMap(\.panes).count) panes")
+
+        // Collect all pane IDs from the new window list
+        var newPaneIds = Set<Int>()
+        for window in windows {
+            for pane in window.panes {
+                newPaneIds.insert(pane.paneId)
+            }
+        }
+
+        // Remove tabs for panes that no longer exist
+        let existingPaneIds = Set(session.paneTabMap.keys)
+        for paneId in existingPaneIds where !newPaneIds.contains(paneId) {
+            if let tabId = session.paneTabMap.removeValue(forKey: paneId) {
+                session.closeTab(id: tabId)
+            }
+        }
+
+        // Add tabs for new panes
+        var createdNewTabs = false
+        for window in windows {
+            for pane in window.panes {
+                if session.paneTabMap[pane.paneId] == nil {
+                    createControlModeTab(session: session, pane: pane, app: app)
+                    Self.debugLog("CONTROL: Created tab for pane %\(pane.paneId) window @\(pane.windowId)")
+                    createdNewTabs = true
+                }
+            }
+        }
+
+        // Sync tmux client size with Ghostty surface dimensions after creating tabs.
+        // This ensures the tmux pane renders at the correct size.
+        if createdNewTabs {
+            // Delay briefly to let the surface initialize its size
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak session] in
+                guard let self = self, let session = session else { return }
+                self.syncTmuxClientSize(session: session)
+            }
+        }
+
+        Self.debugLog("CONTROL: Session now has \(session.tabs.count) tabs, paneTabMap=\(session.paneTabMap)")
+    }
+
+    func controlConnection(_ connection: TmuxControlConnection, paneOutput paneId: Int, data: Data) {
+        guard let session = session(for: connection) else {
+            Self.debugLog("CONTROL: paneOutput %\(paneId) - no session found")
+            return
+        }
+        guard let surfaceView = surfaceForPane(paneId, in: session) else {
+            Self.debugLog("CONTROL: paneOutput %\(paneId) - no surface (paneTabMap=\(session.paneTabMap))")
+            return
+        }
+        injectOutput(into: surfaceView, data: data)
+    }
+
+    func controlConnection(_ connection: TmuxControlConnection, windowClosed windowId: Int) {
+        guard let session = session(for: connection) else { return }
+
+        // Find and close all tabs associated with this window
+        let panesToRemove = session.paneTabMap.filter { paneId, _ in
+            // Look up the pane's window from the connection's window list
+            // Since the window was already removed from connection.windows by handleWindowClose,
+            // find tabs that have this window ID
+            if let tab = session.tabs.first(where: { $0.id == session.paneTabMap[paneId] }) {
+                return tab.tmuxWindowId == windowId
+            }
+            return false
+        }
+
+        for (paneId, tabId) in panesToRemove {
+            session.paneTabMap.removeValue(forKey: paneId)
+            let isEmpty = session.closeTab(id: tabId)
+            if isEmpty {
+                closeSession(id: session.id)
+                return
+            }
+        }
+    }
+
+    func controlConnectionDidExit(_ connection: TmuxControlConnection) {
+        guard let session = session(for: connection) else { return }
+        Self.logger.warning("Control connection exited for workspace \(session.workspaceID)")
+        session.controlConnection = nil
+        // Optionally attempt reconnection here in the future
     }
 }

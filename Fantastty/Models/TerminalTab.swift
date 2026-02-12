@@ -32,6 +32,12 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     /// The tmux session name this tab is attached to (for layout serialization).
     var tmuxSessionName: String?
 
+    /// The tmux pane ID this tab is rendering (control mode).
+    var tmuxPaneId: Int?
+
+    /// The tmux window ID this tab belongs to (control mode).
+    var tmuxWindowId: Int?
+
     /// Icon name for the tab bar.
     var iconName: String {
         switch kind {

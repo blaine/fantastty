@@ -17,6 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
     /// Undo manager for the application
     let undoManager = UndoManager()
 
+    /// Event monitor for intercepting key equivalents (e.g. ⌘W)
+    private var localEventMonitor: Any?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.logger.info("applicationDidFinishLaunching")
         ghosttyApp.delegate = self
@@ -27,6 +30,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
         // Set up notification observers for Ghostty actions
         sessionManager.ghosttyApp = ghosttyApp
         sessionManager.setupNotificationObservers()
+
+        // Intercept ⌘W / ⌘⇧W before macOS sends performClose: to the window
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return event }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard event.charactersIgnoringModifiers == "w" else { return event }
+
+            if flags == .command {
+                // ⌘W → close the current tab (or workspace if last tab)
+                self.sessionManager.closeSelectedTab()
+                return nil
+            }
+            if flags == [.command, .shift] {
+                // ⌘⇧W → close the current workspace
+                if let id = self.sessionManager.selectedSessionID {
+                    self.sessionManager.closeSession(id: id)
+                }
+                return nil
+            }
+            return event
+        }
 
         // Create or restore sessions
         let readiness = self.ghosttyApp.readiness
