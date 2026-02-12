@@ -1,0 +1,187 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 0.2.0). Leave empty to use project default.'
+        required: false
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+jobs:
+  build:
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '16.2'
+
+    - name: Setup Zig
+      uses: mlugg/setup-zig@v2
+      with:
+        # Must match minimum_zig_version in vendor/ghostty/build.zig.zon
+        version: 0.15.2
+
+    - name: Determine version
+      id: version
+      run: |
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          # Strip 'v' prefix from tag
+          VERSION="${GITHUB_REF_NAME#v}"
+        elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          # Use project default for main branch pushes
+          VERSION=$(grep 'MARKETING_VERSION' project.yml | head -1 | sed 's/.*"\(.*\)"/\1/')
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        echo "Version: $VERSION, Build: ${{ github.run_number }}"
+
+    - name: Cache GhosttyKit xcframework
+      id: cache-xcframework
+      uses: actions/cache@v4
+      with:
+        path: xcframework/
+        key: ghosttykit-${{ runner.os }}-${{ hashFiles('vendor/ghostty/**/*.zig', 'vendor/ghostty/**/*.zon') }}
+
+    - name: Build GhosttyKit xcframework
+      if: steps.cache-xcframework.outputs.cache-hit != 'true'
+      run: make xcframework
+
+    - name: Setup signing certificates
+      env:
+        DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+        DEVELOPER_ID_APPLICATION_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+      run: |
+        # Create temporary keychain
+        security create-keychain -p "$RUNNER_TEMP" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "$RUNNER_TEMP" build.keychain
+        security set-keychain-settings -t 3600 -u build.keychain
+
+        # Import Developer ID Application certificate
+        echo "$DEVELOPER_ID_APPLICATION" | base64 --decode > cert.p12
+        security import cert.p12 -k build.keychain \
+          -P "$DEVELOPER_ID_APPLICATION_PASSWORD" \
+          -T /usr/bin/codesign -T /usr/bin/security
+        rm cert.p12
+
+        # Allow codesign to access the keychain
+        security set-key-partition-list -S apple-tool:,apple: \
+          -s -k "$RUNNER_TEMP" build.keychain
+
+    - name: Build Fantastty
+      env:
+        DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        BUILD_NUMBER="${{ steps.version.outputs.build_number }}"
+
+        xcodebuild \
+          -scheme Fantastty \
+          -configuration Release \
+          -derivedDataPath build/DerivedData \
+          MARKETING_VERSION="$VERSION" \
+          CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+          CODE_SIGN_IDENTITY="$DEVELOPER_ID_NAME" \
+          DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+          CODE_SIGN_STYLE=Manual \
+          ENABLE_HARDENED_RUNTIME=YES \
+          OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
+          build 2>&1 | tail -20
+
+        # Verify build output exists
+        APP_PATH="build/DerivedData/Build/Products/Release/Fantastty.app"
+        if [ ! -d "$APP_PATH" ]; then
+          echo "ERROR: Build product not found at $APP_PATH"
+          find build -name "Fantastty.app" -type d 2>/dev/null || true
+          exit 1
+        fi
+
+        # Verify code signature
+        echo "Verifying code signature..."
+        codesign --verify --deep --strict "$APP_PATH"
+        codesign -dvv "$APP_PATH" 2>&1 | grep -E "^(Authority|TeamIdentifier|Identifier|Runtime)"
+
+    - name: Create DMG
+      env:
+        DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        APP_PATH="build/DerivedData/Build/Products/Release/Fantastty.app"
+
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          DMG_NAME="Fantastty-v${VERSION}.dmg"
+        else
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DMG_NAME="Fantastty-${VERSION}-${SHORT_SHA}.dmg"
+        fi
+        echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
+
+        # Create DMG
+        DMG_STAGING="build/dmg-staging"
+        mkdir -p "$DMG_STAGING"
+        cp -R "$APP_PATH" "$DMG_STAGING/"
+        ln -s /Applications "$DMG_STAGING/Applications"
+
+        hdiutil create \
+          -volname "Fantastty" \
+          -srcfolder "$DMG_STAGING" \
+          -ov -format UDZO \
+          "$DMG_NAME"
+
+        rm -rf "$DMG_STAGING"
+
+        # Sign the DMG
+        codesign --force --sign "$DEVELOPER_ID_NAME" "$DMG_NAME"
+        codesign --verify --verbose "$DMG_NAME"
+
+    - name: Notarize DMG
+      env:
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      run: |
+        xcrun notarytool submit "$DMG_NAME" \
+          --apple-id "$APPLE_ID" \
+          --password "$APPLE_ID_PASSWORD" \
+          --team-id "$APPLE_TEAM_ID" \
+          --wait
+
+        xcrun stapler staple "$DMG_NAME"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Fantastty-${{ steps.version.outputs.version }}-build${{ steps.version.outputs.build_number }}
+        path: ${{ env.DMG_NAME }}
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "$GITHUB_REF_NAME" \
+          "$DMG_NAME" \
+          --title "Fantastty $GITHUB_REF_NAME" \
+          --generate-notes
+
+    - name: Cleanup keychain
+      if: always()
+      run: security delete-keychain build.keychain || true
