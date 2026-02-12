@@ -95,7 +95,7 @@ struct AppCommands: Commands {
             .keyboardShortcut("`", modifiers: [.command, .shift])
         }
 
-        CommandGroup(before: .windowSize) {
+        CommandGroup(replacing: .windowSize) {
             Button("Toggle Notes") {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     sessionManager.notesExpanded.toggle()
@@ -104,9 +104,7 @@ struct AppCommands: Commands {
             .keyboardShortcut(".", modifiers: .command)
 
             Divider()
-        }
 
-        CommandGroup(replacing: .windowSize) {
             Button("Close Tab") {
                 sessionManager.closeSelectedTab()
             }
