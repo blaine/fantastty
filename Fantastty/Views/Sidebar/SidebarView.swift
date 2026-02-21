@@ -124,6 +124,7 @@ private struct SidebarTabThumbnails: View {
             SidebarThumbnailView(
                 tab: tab,
                 isSelected: tab.id == session.selectedTabID,
+                isSessionActive: session.id == sessionManager.selectedSessionID,
                 onSelect: {
                     session.selectedTabID = tab.id
                 },

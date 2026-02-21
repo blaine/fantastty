@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import GhosttyKit
+import Combine
 
 /// The kind of content a tab holds.
 enum TabKind {
@@ -31,6 +32,9 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
 
     /// The tmux session name this tab is attached to (for layout serialization).
     var tmuxSessionName: String?
+
+    /// Combine subscriptions for this tab. Cancelled automatically when the tab deallocates.
+    var cancellables = Set<AnyCancellable>()
 
     /// Icon name for the tab bar.
     var iconName: String {

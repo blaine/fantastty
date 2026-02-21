@@ -7,6 +7,7 @@ import GhosttyKit
 struct SidebarThumbnailView: View {
     @ObservedObject var tab: TerminalTab
     let isSelected: Bool
+    let isSessionActive: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
 
@@ -16,11 +17,16 @@ struct SidebarThumbnailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack {
-                // TimelineView drives periodic re-capture of the thumbnail
-                TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                // TimelineView drives periodic re-capture of the thumbnail.
+                // Only run the timer for the active session to avoid GPU readbacks on all background sessions.
+                if isSessionActive {
+                    TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                        thumbnailImage
+                            .onAppear { captureBrowserSnapshot() }
+                            .onChange(of: context.date) { captureBrowserSnapshot() }
+                    }
+                } else {
                     thumbnailImage
-                        .onAppear { captureBrowserSnapshot() }
-                        .onChange(of: context.date) { captureBrowserSnapshot() }
                 }
 
                 // Hover overlay with close button

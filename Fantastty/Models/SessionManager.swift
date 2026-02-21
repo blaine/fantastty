@@ -45,13 +45,18 @@ class SessionManager: ObservableObject {
     /// Whether to show the SSH connection sheet
     @Published var showSSHSheet: Bool = false
 
+    /// Whether to show the Sprite connection sheet
+    @Published var showSpriteSheet: Bool = false
+
     /// Whether the notes panel is expanded
     @Published var notesExpanded: Bool = false
 
     /// Reference to the Ghostty app state
     var ghosttyApp: Ghostty.App?
 
-    private var titleCancellables = Set<AnyCancellable>()
+    /// O(1) lookup: surface object identity → (Session, TerminalTab).
+    /// Populated in setupTitleObserver; pruned in closeTab/closeSurface/closeSession.
+    private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
 
     /// The currently selected session
     var selectedSession: Session? {
@@ -259,14 +264,18 @@ class SessionManager: ObservableObject {
                 }
             }
 
-            // Recreate orphaned SSH sessions (local tmux gone, remote tmux may still be alive)
+            // Recreate orphaned SSH/Sprite sessions (local tmux gone, remote tmux may still be alive)
             for wsLayout in layout.workspaces {
                 guard let sessionType = wsLayout.sessionType,
-                      case .ssh = sessionType,
                       liveWorkspaces[wsLayout.workspaceID] == nil else { continue }
-                // Use the same workspace ID so remote tmux session name matches
-                Self.logger.info("Recreating orphaned SSH workspace \(wsLayout.workspaceID)")
-                createSession(type: sessionType, workspaceID: wsLayout.workspaceID)
+                switch sessionType {
+                case .ssh, .sprite:
+                    // Use the same workspace ID so remote tmux session name matches
+                    Self.logger.info("Recreating orphaned \(sessionType.displayName) workspace \(wsLayout.workspaceID)")
+                    createSession(type: sessionType, workspaceID: wsLayout.workspaceID)
+                default:
+                    break
+                }
             }
 
             // Restore selected workspace
@@ -320,7 +329,7 @@ class SessionManager: ObservableObject {
         tab.tmuxSessionName = tmuxSessionName
 
         session.addTab(tab)
-        setupTitleObserver(for: tab, surfaceView: surfaceView)
+        setupTitleObserver(for: tab, surfaceView: surfaceView, session: session)
 
         return tab
     }
@@ -354,6 +363,10 @@ class SessionManager: ObservableObject {
                 if case .ssh = type, let sshCmd = type.sshCommand {
                     let remoteSessionName = "fantastty-\(workspaceID)"
                     paneCommand = "\(sshCmd) tmux new-session -A -s \"\(remoteSessionName)\""
+                } else if case .sprite(let spriteName) = type {
+                    // Setup remote tmux on the sprite (fire-and-forget)
+                    SpriteManager.shared.setupRemoteTmux(spriteName: spriteName, workspaceID: workspaceID)
+                    paneCommand = "\(SpriteManager.shared.spritePath) console -s \"\(spriteName)\""
                 }
                 surfaceConfig.command = tmuxManager.commandForFirstTab(
                     sessionName: actualTmuxSessionName!,
@@ -390,7 +403,7 @@ class SessionManager: ObservableObject {
 
         // Observe title changes
         if let tab = session.selectedTab {
-            setupTitleObserver(for: tab, surfaceView: surfaceView)
+            setupTitleObserver(for: tab, surfaceView: surfaceView, session: session)
         }
 
         Self.logger.info("Created session \(session.id) type=\(type.displayName)")
@@ -404,6 +417,11 @@ class SessionManager: ObservableObject {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
 
         let session = sessions[index]
+
+        // Remove all surfaces in this session from the lookup index
+        for tab in session.tabs {
+            deregisterSurfaces(in: tab)
+        }
 
         // Kill tmux session if requested and session has one
         if killTmux {
@@ -535,7 +553,7 @@ class SessionManager: ObservableObject {
         tab.tmuxSessionName = actualTabSessionName
 
         session.addTab(tab)
-        setupTitleObserver(for: tab, surfaceView: surfaceView)
+        setupTitleObserver(for: tab, surfaceView: surfaceView, session: session)
 
         Self.logger.info("Created tab \(tab.id) in session \(session.id)")
         return tab
@@ -561,10 +579,13 @@ class SessionManager: ObservableObject {
         guard let session = sessions.first(where: { $0.tabs.contains { $0.id == id } }) else { return }
 
         // Kill the tab's linked tmux session (skip base session — other tabs need it)
-        if let tab = session.tabs.first(where: { $0.id == id }),
-           let tabTmuxName = tab.tmuxSessionName,
-           tabTmuxName != session.tmuxSessionName {
-            tmuxManager.killSession(name: tabTmuxName)
+        if let tab = session.tabs.first(where: { $0.id == id }) {
+            if let tabTmuxName = tab.tmuxSessionName,
+               tabTmuxName != session.tmuxSessionName {
+                tmuxManager.killSession(name: tabTmuxName)
+            }
+            // Remove tab's surfaces from the lookup index before the tab is removed
+            deregisterSurfaces(in: tab)
         }
 
         let shouldCloseSession = session.closeTab(id: id)
@@ -585,7 +606,8 @@ class SessionManager: ObservableObject {
 
     /// Create a new split in the currently selected tab.
     func newSplit(direction: SplitTree<Ghostty.SurfaceView>.NewDirection) {
-        guard let tab = selectedTab,
+        guard let session = selectedSession,
+              let tab = selectedTab,
               let focusedSurface = tab.focusedSurface,
               let app = ghosttyApp?.app else { return }
 
@@ -600,7 +622,7 @@ class SessionManager: ObservableObject {
                 direction: direction
             )
             tab.focusedSurface = newSurface
-            setupTitleObserver(for: tab, surfaceView: newSurface)
+            setupTitleObserver(for: tab, surfaceView: newSurface, session: session)
         } catch {
             Self.logger.error("Failed to create split: \(error)")
         }
@@ -609,6 +631,7 @@ class SessionManager: ObservableObject {
     /// Close a surface within a tab's split tree.
     func closeSurface(_ surfaceView: Ghostty.SurfaceView) {
         guard let (_, tab) = findSessionAndTab(for: surfaceView) else { return }
+        surfaceIndex.removeValue(forKey: ObjectIdentifier(surfaceView))
 
         guard let node = tab.surfaceTree?.root?.node(view: surfaceView) else { return }
 
@@ -646,7 +669,11 @@ class SessionManager: ObservableObject {
     }
 
     /// Find the session and tab containing a given surface view.
+    /// Checks the O(1) surfaceIndex first; falls back to linear search for safety.
     func findSessionAndTab(for surfaceView: Ghostty.SurfaceView) -> (Session, TerminalTab)? {
+        if let result = surfaceIndex[ObjectIdentifier(surfaceView)] {
+            return result
+        }
         for session in sessions {
             if let tab = session.tab(containing: surfaceView) {
                 return (session, tab)
@@ -787,7 +814,7 @@ class SessionManager: ObservableObject {
 
     @objc private func handleNewSplit(_ notification: Foundation.Notification) {
         guard let surfaceView = notification.object as? Ghostty.SurfaceView,
-              let (_, tab) = findSessionAndTab(for: surfaceView),
+              let (session, tab) = findSessionAndTab(for: surfaceView),
               let app = ghosttyApp?.app else { return }
 
         let direction: SplitTree<Ghostty.SurfaceView>.NewDirection
@@ -826,7 +853,7 @@ class SessionManager: ObservableObject {
                 direction: direction
             )
             tab.focusedSurface = newSurface
-            setupTitleObserver(for: tab, surfaceView: newSurface)
+            setupTitleObserver(for: tab, surfaceView: newSurface, session: session)
         } catch {
             Self.logger.error("Failed to create split: \(error)")
         }
@@ -1005,10 +1032,28 @@ class SessionManager: ObservableObject {
 
     // MARK: - Private Helpers
 
-    private func setupTitleObserver(for tab: TerminalTab, surfaceView: Ghostty.SurfaceView) {
+    /// Remove all surfaces in a tab's split tree from the surface index.
+    private func deregisterSurfaces(in tab: TerminalTab) {
+        guard let root = tab.surfaceTree?.root else { return }
+        deregisterSurfaces(in: root)
+    }
+
+    private func deregisterSurfaces(in node: SplitTree<Ghostty.SurfaceView>.Node) {
+        switch node {
+        case .leaf(let view):
+            surfaceIndex.removeValue(forKey: ObjectIdentifier(view))
+        case .split(let split):
+            deregisterSurfaces(in: split.left)
+            deregisterSurfaces(in: split.right)
+        }
+    }
+
+    private func setupTitleObserver(for tab: TerminalTab, surfaceView: Ghostty.SurfaceView, session: Session) {
         Self.debugLog("setupTitleObserver: Setting up observers for surface \(surfaceView.id)")
 
-        // Observe title changes
+        // Register in the O(1) lookup index
+        surfaceIndex[ObjectIdentifier(surfaceView)] = (session, tab)
+
         // Observe title changes to update tab title (but NOT for attention detection)
         surfaceView.$title
             .receive(on: DispatchQueue.main)
@@ -1021,7 +1066,7 @@ class SessionManager: ObservableObject {
                     tab.title = newTitle
                 }
             }
-            .store(in: &titleCancellables)
+            .store(in: &tab.cancellables)
 
         // Observe bell state changes - only set attention for background sessions
         surfaceView.$bell
@@ -1041,7 +1086,7 @@ class SessionManager: ObservableObject {
                     Self.debugLog("BELL: ERROR - Could not find session for surface")
                 }
             }
-            .store(in: &titleCancellables)
+            .store(in: &tab.cancellables)
 
         Self.debugLog("setupTitleObserver: Observers registered")
     }
