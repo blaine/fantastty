@@ -18,22 +18,9 @@ class SessionManager: ObservableObject {
     /// Reference to tmux manager
     private let tmuxManager = TmuxManager.shared
 
-    /// Debug log to file for easier debugging
+    /// Debug log — routed through os.Logger (async, zero-cost when not captured).
     private static func debugLog(_ message: String) {
-        let logFile = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".fantastty_debug.log")
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        let line = "[\(timestamp)] \(message)\n"
-        if let data = line.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: logFile.path) {
-                if let handle = try? FileHandle(forWritingTo: logFile) {
-                    handle.seekToEndOfFile()
-                    handle.write(data)
-                    handle.closeFile()
-                }
-            } else {
-                try? data.write(to: logFile)
-            }
-        }
+        logger.debug("\(message, privacy: .public)")
     }
 
     /// All sessions (sidebar items)
@@ -58,6 +45,20 @@ class SessionManager: ObservableObject {
     /// Populated in setupTitleObserver; pruned in closeTab/closeSurface/closeSession.
     private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
 
+    // MARK: - Activity Tracking
+
+    /// Last key/mouse input timestamp per workspace ID
+    private var lastKeyInputAt: [String: Date] = [:]
+
+    /// Cancellables for SessionManager-owned timers/publishers
+    private var smCancellables = Set<AnyCancellable>()
+
+    /// Local event monitor for mouse activity (token returned by NSEvent.addLocalMonitorForEvents)
+    private var mouseMonitor: Any?
+
+    private static let idleThreshold: TimeInterval = 60
+    private static let tickInterval: TimeInterval = 5
+
     /// The currently selected session
     var selectedSession: Session? {
         guard let id = selectedSessionID else { return nil }
@@ -72,6 +73,30 @@ class SessionManager: ObservableObject {
     /// The currently focused surface view
     var focusedSurfaceView: Ghostty.SurfaceView? {
         return selectedTab?.focusedSurface
+    }
+
+    deinit {
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+
+    // MARK: - Activity Tracking Methods
+
+    private func activityTick() {
+        guard let session = selectedSession else { return }
+        let lastInput = lastKeyInputAt[session.workspaceID] ?? .distantPast
+        guard Date().timeIntervalSince(lastInput) < Self.idleThreshold else { return }
+        session.totalActiveSeconds += Self.tickInterval
+    }
+
+    /// Flush all in-memory active times to disk. Call on deselect and app quit.
+    func flushActiveTimes() {
+        for session in sessions {
+            var meta = SessionMetadataStore.shared.getOrCreate(forKey: session.workspaceID)
+            meta.totalActiveSeconds = session.totalActiveSeconds
+            SessionMetadataStore.shared.update(meta)
+        }
     }
 
     // MARK: - Workspace Name Generation
@@ -792,6 +817,42 @@ class SessionManager: ObservableObject {
             object: nil
         )
 
+        // Activity accumulation tick
+        Timer.publish(every: Self.tickInterval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in self?.activityTick() }
+            .store(in: &smCancellables)
+
+        // Periodic disk flush
+        Timer.publish(every: 60, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in self?.flushActiveTimes() }
+            .store(in: &smCancellables)
+
+        // Flush active time for the old session whenever selection changes
+        $selectedSessionID
+            .scan((UUID?.none, UUID?.none)) { ($0.1, $1) }
+            .dropFirst()
+            .sink { [weak self] (oldID, _) in
+                guard let self = self, let oldID = oldID,
+                      let session = self.sessions.first(where: { $0.id == oldID }) else { return }
+                var meta = SessionMetadataStore.shared.getOrCreate(forKey: session.workspaceID)
+                meta.totalActiveSeconds = session.totalActiveSeconds
+                SessionMetadataStore.shared.update(meta)
+            }
+            .store(in: &smCancellables)
+
+        // Mouse activity monitor — keeps the idle clock from expiring while mousing
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown,
+                       .scrollWheel, .mouseMoved]
+        ) { [weak self] event in
+            if let session = self?.selectedSession {
+                self?.lastKeyInputAt[session.workspaceID] = Date()
+            }
+            return event
+        }
+
         Self.debugLog("setupNotificationObservers: All observers registered")
     }
 
@@ -979,6 +1040,9 @@ class SessionManager: ObservableObject {
             session.needsAttention = false
             Self.debugLog("KEY_INPUT: Cleared attention for session \(session.id)")
         }
+
+        // Record key input for idle detection
+        lastKeyInputAt[session.workspaceID] = Date()
     }
 
     @objc private func handleSessionNote(_ notification: Foundation.Notification) {
@@ -1070,6 +1134,7 @@ class SessionManager: ObservableObject {
 
         // Observe bell state changes - only set attention for background sessions
         surfaceView.$bell
+            .filter { $0 }  // only act when bell rings; keyDown sets bell=false on every keypress
             .receive(on: DispatchQueue.main)
             .sink { [weak self, weak surfaceView] bellActive in
                 Self.debugLog("BELL STATE: \(bellActive)")

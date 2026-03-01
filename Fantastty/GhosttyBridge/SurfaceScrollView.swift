@@ -178,6 +178,15 @@ class SurfaceScrollView: NSView {
         // When our scrollview changes make sure our scroller and surface views are synchronized
         synchronizeScrollView()
         synchronizeSurfaceView()
+        // Skip resizing the core surface during live resize to prevent tmux reflow on every
+        // frame. viewDidEndLiveResize() fires once when the drag finishes.
+        if !inLiveResize {
+            synchronizeCoreSurface()
+        }
+    }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
         synchronizeCoreSurface()
     }
     
