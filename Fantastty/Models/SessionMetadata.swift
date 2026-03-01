@@ -99,6 +99,9 @@ struct SessionMetadata: Codable, Identifiable {
     /// Last modified date
     var modifiedAt: Date
 
+    /// Cumulative seconds the session was actively focused (idle excluded)
+    var totalActiveSeconds: Double
+
     init(
         id: UUID = UUID(),
         workspaceID: String = "",
@@ -109,7 +112,8 @@ struct SessionMetadata: Codable, Identifiable {
         isArchived: Bool = false,
         archivedAt: Date? = nil,
         ticketURL: String? = nil,
-        pullRequestURL: String? = nil
+        pullRequestURL: String? = nil,
+        totalActiveSeconds: Double = 0.0
     ) {
         self.id = id
         self.workspaceID = workspaceID
@@ -122,6 +126,7 @@ struct SessionMetadata: Codable, Identifiable {
         self.archivedAt = archivedAt
         self.ticketURL = ticketURL
         self.pullRequestURL = pullRequestURL
+        self.totalActiveSeconds = totalActiveSeconds
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -139,6 +144,7 @@ struct SessionMetadata: Codable, Identifiable {
         case id, workspaceID, name, noteEntries
         case needsAttention, attentionFlaggedAt, tags, createdAt, modifiedAt
         case isArchived, archivedAt, ticketURL, pullRequestURL
+        case totalActiveSeconds
         // Legacy keys for migration
         case stableKey, notes, description, basePath, remoteHost
         case tmuxSessionName, tmuxTabSessions
@@ -172,6 +178,7 @@ struct SessionMetadata: Codable, Identifiable {
         pullRequestURL = try container.decodeIfPresent(String.self, forKey: .pullRequestURL)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
+        totalActiveSeconds = (try? container.decodeIfPresent(Double.self, forKey: .totalActiveSeconds)) ?? 0
 
         // Try to decode new noteEntries format first
         if let entries = try container.decodeIfPresent([SessionNoteEntry].self, forKey: .noteEntries) {
@@ -202,6 +209,7 @@ struct SessionMetadata: Codable, Identifiable {
         try container.encodeIfPresent(pullRequestURL, forKey: .pullRequestURL)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(modifiedAt, forKey: .modifiedAt)
+        try container.encode(totalActiveSeconds, forKey: .totalActiveSeconds)
         // Don't encode legacy keys
     }
 }

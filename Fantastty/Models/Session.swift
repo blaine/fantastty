@@ -26,6 +26,12 @@ class Session: ObservableObject, Identifiable, Hashable {
     /// The currently selected tab ID.
     @Published var selectedTabID: UUID?
 
+    /// Live cumulative active-focus time (persisted via SessionManager flush)
+    @Published var totalActiveSeconds: Double
+
+    /// When this workspace was first created
+    var createdAt: Date { metadata?.createdAt ?? Date() }
+
     /// Tmux base session name for this workspace (when persistent sessions enabled)
     var tmuxSessionName: String?
 
@@ -43,6 +49,7 @@ class Session: ObservableObject, Identifiable, Hashable {
         self.defaultTitle = title
         self.tabs = [initialTab]
         self.selectedTabID = initialTab.id
+        self.totalActiveSeconds = SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).totalActiveSeconds
     }
 
     /// Convenience initializer for creating a session with a new surface.

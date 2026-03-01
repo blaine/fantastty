@@ -24,5 +24,8 @@ struct MainWindow: View {
         .sheet(isPresented: $sessionManager.showSSHSheet) {
             SSHConnectionSheet()
         }
+        .sheet(isPresented: $sessionManager.showSpriteSheet) {
+            SpriteConnectionSheet()
+        }
     }
 }

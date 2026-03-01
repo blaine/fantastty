@@ -49,6 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        sessionManager.flushActiveTimes()
         sessionManager.saveLayout()
         return .terminateNow
     }

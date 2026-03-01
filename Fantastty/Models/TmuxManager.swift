@@ -121,6 +121,8 @@ class TmuxManager {
         if supportsPassthrough {
             cmd += " \\; set-option allow-passthrough on"
         }
+        cmd += " \\; set -g terminal-overrides ',*:smcup@:rmcup@'"
+        cmd += " \\; set -g history-limit 500"
         // Keep pane alive if SSH disconnects
         if paneCommand != nil {
             cmd += " \\; set-option remain-on-exit on"
@@ -139,6 +141,8 @@ class TmuxManager {
             }
             cmd += " \\; set-option allow-passthrough on"
         }
+        cmd += " \\; set -g terminal-overrides ',*:smcup@:rmcup@'"
+        cmd += " \\; set -g history-limit 500"
         return cmd
     }
 
@@ -148,6 +152,8 @@ class TmuxManager {
         if supportsPassthrough {
             cmd += " \\; set-option allow-passthrough on"
         }
+        cmd += " \\; set -g terminal-overrides ',*:smcup@:rmcup@'"
+        cmd += " \\; set -g history-limit 500"
         return cmd
     }
 

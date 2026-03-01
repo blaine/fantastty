@@ -4,6 +4,7 @@ import Foundation
 enum SessionType: Equatable, Hashable {
     case local
     case ssh(host: String, user: String?, port: Int?)
+    case sprite(name: String)
 
     /// The display name for the sidebar.
     var displayName: String {
@@ -15,6 +16,8 @@ enum SessionType: Equatable, Hashable {
                 return "\(user)@\(host)"
             }
             return host
+        case .sprite(let name):
+            return name
         }
     }
 
@@ -25,6 +28,8 @@ enum SessionType: Equatable, Hashable {
             return "terminal"
         case .ssh:
             return "network"
+        case .sprite:
+            return "cloud"
         }
     }
 
@@ -44,6 +49,8 @@ enum SessionType: Equatable, Hashable {
                 cmd += " \(host)"
             }
             return cmd
+        case .sprite(let name):
+            return "\(SpriteManager.shared.spritePath) console -s \"\(name)\""
         }
     }
 
@@ -55,13 +62,19 @@ enum SessionType: Equatable, Hashable {
         if let user = user { cmd += " \(user)@\(host)" } else { cmd += " \(host)" }
         return cmd
     }
+
+    /// The sprite console command for use inside local tmux, or nil for non-sprite sessions.
+    var spriteConsoleCommand: String? {
+        guard case .sprite(let name) = self else { return nil }
+        return "\(SpriteManager.shared.spritePath) console -s \"\(name)\""
+    }
 }
 
 // MARK: - Codable
 
 extension SessionType: Codable {
     private enum CodingKeys: String, CodingKey {
-        case kind, host, user, port
+        case kind, host, user, port, spriteName
     }
 
     func encode(to encoder: Encoder) throws {
@@ -74,6 +87,9 @@ extension SessionType: Codable {
             try container.encode(host, forKey: .host)
             try container.encodeIfPresent(user, forKey: .user)
             try container.encodeIfPresent(port, forKey: .port)
+        case .sprite(let name):
+            try container.encode("sprite", forKey: .kind)
+            try container.encode(name, forKey: .spriteName)
         }
     }
 
@@ -86,6 +102,9 @@ extension SessionType: Codable {
             let user = try container.decodeIfPresent(String.self, forKey: .user)
             let port = try container.decodeIfPresent(Int.self, forKey: .port)
             self = .ssh(host: host, user: user, port: port)
+        case "sprite":
+            let name = try container.decode(String.self, forKey: .spriteName)
+            self = .sprite(name: name)
         default:
             self = .local
         }

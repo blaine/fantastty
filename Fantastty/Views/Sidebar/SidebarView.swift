@@ -4,6 +4,7 @@ struct SidebarView: View {
     @EnvironmentObject var sessionManager: SessionManager
     @ObservedObject private var metadataStore = SessionMetadataStore.shared
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
+    @AppStorage("showArchivedSessions") private var showArchived = false
     @State private var expandedSessions: Set<UUID> = []
     @State private var workspaceToDelete: String?
 
@@ -50,24 +51,17 @@ struct SidebarView: View {
                 sessionManager.sessions.move(fromOffsets: source, toOffset: destination)
             }
 
-            // Archived workspaces section
-            if !metadataStore.archivedWorkspaces.isEmpty {
+            // Archived workspaces section (hidden by default)
+            if showArchived && !metadataStore.archivedWorkspaces.isEmpty {
                 Section("Archived") {
                     ForEach(metadataStore.archivedWorkspaces, id: \.workspaceID) { meta in
                         HStack {
                             Image(systemName: "archivebox")
                                 .foregroundStyle(.secondary)
                                 .frame(width: 16)
-                            VStack(alignment: .leading) {
-                                Text(meta.name.isEmpty ? meta.workspaceID : meta.name)
-                                    .lineLimit(1)
-                                    .foregroundStyle(.secondary)
-                                if let archivedAt = meta.archivedAt {
-                                    Text(archivedAt, style: .relative)
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
+                            Text(meta.name.isEmpty ? meta.workspaceID : meta.name)
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
                             Spacer()
                         }
                         .contextMenu {
@@ -85,15 +79,38 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .frame(minWidth: 180)
         .safeAreaInset(edge: .bottom) {
-            Button {
-                sessionManager.createSession()
-            } label: {
-                Label("New Workspace", systemImage: "plus")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: 0) {
+                if !metadataStore.archivedWorkspaces.isEmpty {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showArchived.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "archivebox")
+                            Text("Archived (\(metadataStore.archivedWorkspaces.count))")
+                            Spacer()
+                            Image(systemName: showArchived ? "eye" : "eye.slash")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+
+                Button {
+                    sessionManager.createSession()
+                } label: {
+                    Label("New Workspace", systemImage: "plus")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .background(.regularMaterial)
         }
         .alert("Delete Workspace?", isPresented: Binding(
             get: { workspaceToDelete != nil },

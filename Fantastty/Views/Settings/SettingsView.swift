@@ -34,9 +34,50 @@ struct SettingsView: View {
                     Text("When enabled, each workspace runs in a tmux session. Quitting the app leaves sessions running; relaunching reattaches to them.")
                 }
             }
+            Section("Integrations") {
+                LinearAPIKeyRow()
+            }
         }
         .formStyle(.grouped)
         .frame(width: 450)
         .fixedSize()
+    }
+}
+
+// MARK: - LinearAPIKeyRow
+
+private struct LinearAPIKeyRow: View {
+    @ObservedObject private var service = LinearService.shared
+    @State private var draft = ""
+    @State private var saved = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                SecureField("Personal API key", text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                Button(saved ? "Saved ✓" : "Save") { save() }
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if service.apiKey != nil {
+                    Button("Clear") {
+                        service.setAPIKey("")
+                        draft = ""
+                    }
+                    .foregroundStyle(.red)
+                }
+            }
+            Text("Get your key: Linear → Settings → Account → API. Stored in Keychain.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .onAppear {
+            draft = service.loadAPIKey() ?? ""
+        }
+    }
+
+    private func save() {
+        service.setAPIKey(draft)
+        saved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
     }
 }

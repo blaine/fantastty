@@ -5,6 +5,7 @@ struct SidebarRowView: View {
     @EnvironmentObject var sessionManager: SessionManager
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @State private var isHovering = false
+    @State private var showDestroyAlert = false
 
     /// The primary session type (from the first tab) for display purposes
     private var primarySessionType: SessionType {
@@ -43,6 +44,14 @@ struct SidebarRowView: View {
                 // Show SSH host info as subtitle
                 if case .ssh(let host, let user, _) = primarySessionType {
                     Text(user.map { "\($0)@\(host)" } ?? host)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                // Show Sprite name as subtitle
+                if case .sprite(let name) = primarySessionType {
+                    Text("sprite: \(name)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -107,10 +116,30 @@ struct SidebarRowView: View {
                 sessionManager.archiveSession(id: session.id)
             }
 
+            if case .sprite = primarySessionType {
+                Button("Destroy Sprite...", role: .destructive) {
+                    showDestroyAlert = true
+                }
+            }
+
             Divider()
 
             Button("Close Workspace") {
                 sessionManager.closeSession(id: session.id)
+            }
+        }
+        .alert("Destroy Sprite?", isPresented: $showDestroyAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Destroy", role: .destructive) {
+                if case .sprite(let name) = primarySessionType {
+                    SpriteManager.shared.destroy(name: name) { _ in
+                        sessionManager.closeSession(id: session.id)
+                    }
+                }
+            }
+        } message: {
+            if case .sprite(let name) = primarySessionType {
+                Text("This will permanently destroy the sprite \"\(name)\" and close the workspace.")
             }
         }
     }

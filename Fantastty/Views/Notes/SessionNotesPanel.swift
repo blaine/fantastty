@@ -56,7 +56,11 @@ struct SessionNotesPanel: View {
     @ObservedObject var session: Session
     @Binding var isExpanded: Bool
 
+    @ObservedObject private var linearService = LinearService.shared
+
     @State private var newNoteText = ""
+    @State private var now = Date()
+    private let minuteTick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -76,10 +80,22 @@ struct SessionNotesPanel: View {
         contentView
             .background(.regularMaterial, in: UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10))
             .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+            .onReceive(minuteTick) { now = $0 }
     }
 
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Time stats
+            timeStatsSection
+
+            Divider()
+
+            // Linear ticket details (only when ticket URL is a Linear URL)
+            if let resource = LinearService.parseLinearURL(session.ticketURL ?? "") {
+                linearSection(resource: resource, ticketURL: session.ticketURL)
+                Divider()
+            }
+
             // URL section (ticket, PR)
             urlSection
 
@@ -93,6 +109,43 @@ struct SessionNotesPanel: View {
             tagsSection
         }
         .padding(12)
+    }
+
+    private var timeStatsSection: some View {
+        HStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Open")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Text(formatDuration(now.timeIntervalSince(session.createdAt)))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Active")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Text(formatDuration(session.totalActiveSeconds))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func linearSection(resource: LinearResource, ticketURL: String?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("LINEAR")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.tertiary)
+                .tracking(1)
+
+            LinearDetailView(resource: resource, service: linearService, ticketURL: ticketURL)
+        }
     }
 
     @ViewBuilder
@@ -533,6 +586,247 @@ struct SessionNotesPopover: View {
         session.addNote(content: content, source: .user)
         newNoteText = ""
     }
+}
+
+// MARK: - LinearDetailView
+
+private struct LinearDetailView: View {
+    let resource: LinearResource
+    @ObservedObject var service: LinearService
+    let ticketURL: String?
+
+    @State private var state: ViewState = .idle
+
+    enum ViewState {
+        case idle
+        case loading
+        case issue(LinearIssue)
+        case project(LinearProject)
+        case error(String)
+    }
+
+    private var resourceKey: String {
+        switch resource {
+        case .issue(let id): return "issue:\(id)"
+        case .project(let id): return "project:\(id)"
+        }
+    }
+
+    var body: some View {
+        // Wrap in ZStack so .task always has a real view to attach to,
+        // even when contentBody is EmptyView (which has no lifecycle events).
+        ZStack(alignment: .leading) {
+            contentBody
+        }
+        .task(id: resourceKey) {
+            await fetch()
+        }
+    }
+
+    @ViewBuilder
+    private var contentBody: some View {
+        if service.apiKey == nil {
+            Text("Configure a Linear API key in Settings to view issue details.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        } else {
+            switch state {
+            case .idle:
+                EmptyView()
+            case .loading:
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .frame(height: 20)
+            case .issue(let issue):
+                issueView(issue)
+            case .project(let project):
+                projectView(project)
+            case .error(let msg):
+                HStack(spacing: 6) {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Button("Retry") {
+                        Task { await fetch() }
+                    }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                }
+            }
+        }
+    }
+
+    private func issueView(_ issue: LinearIssue) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                if let urlStr = ticketURL, let url = URL(string: urlStr) {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(issue.identifier)
+                            .fontWeight(.semibold)
+                        Text(issue.title)
+                    }
+                    .font(.caption)
+                    .lineLimit(1)
+
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(stateColor(issue.stateName))
+                            .frame(width: 7, height: 7)
+                        Text(issue.stateName)
+                        if let assignee = issue.assigneeName {
+                            Text("·").foregroundStyle(.tertiary)
+                            Text(assignee)
+                        }
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(issue.priorityLabel)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if !issue.children.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(issue.children, id: \.identifier) { child in
+                        subIssueRow(child)
+                    }
+                }
+                .padding(.leading, 10)
+            }
+        }
+    }
+
+    private func projectView(_ project: LinearProject) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                if let urlStr = ticketURL, let url = URL(string: urlStr) {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.name)
+                        .font(.caption)
+                        .lineLimit(1)
+
+                    HStack(spacing: 6) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.secondary.opacity(0.2))
+                                    .frame(height: 4)
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.accentColor)
+                                    .frame(width: geo.size.width * project.progress, height: 4)
+                            }
+                        }
+                        .frame(width: 60, height: 4)
+
+                        Text("\(Int(project.progress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+
+                        if let targetDate = project.targetDate {
+                            Text("·")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                            Text("Due \(formattedDate(targetDate))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            if !project.issues.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(project.issues, id: \.identifier) { issue in
+                        subIssueRow(issue)
+                    }
+                }
+                .padding(.leading, 4)
+            }
+        }
+    }
+
+    private func subIssueRow(_ issue: LinearIssue) -> some View {
+        Button {
+            if let urlStr = ticketURL,
+               let url = LinearService.issueURL(identifier: issue.identifier, fromBaseURL: urlStr) {
+                NSWorkspace.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(stateColor(issue.stateName))
+                    .frame(width: 5, height: 5)
+                Text(issue.identifier)
+                    .fontWeight(.medium)
+                Text(issue.title)
+                    .lineLimit(1)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func stateColor(_ name: String) -> Color {
+        let lower = name.lowercased()
+        if lower.contains("done") || lower.contains("complete") || lower.contains("closed") {
+            return .green
+        } else if lower.contains("progress") || lower.contains("review") || lower.contains("active") {
+            return .blue
+        } else if lower.contains("cancel") || lower.contains("discard") {
+            return .gray
+        } else if lower.contains("urgent") || lower.contains("blocked") {
+            return .red
+        }
+        return .secondary
+    }
+
+    private func formattedDate(_ iso: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        if let date = formatter.date(from: iso) {
+            let out = DateFormatter()
+            out.dateFormat = "MMM d"
+            return out.string(from: date)
+        }
+        return iso
+    }
+
+    private func fetch() async {
+        guard service.apiKey != nil else { return }
+        state = .loading
+        do {
+            switch resource {
+            case .issue(let identifier):
+                let issue = try await service.fetchIssue(identifier: identifier)
+                state = .issue(issue)
+            case .project(let id):
+                let project = try await service.fetchProject(id: id)
+                state = .project(project)
+            }
+        } catch {
+            state = .error(error.localizedDescription)
+        }
+    }
+}
+
+private func formatDuration(_ seconds: TimeInterval) -> String {
+    let s = Int(seconds)
+    if s < 60    { return "<1m" }
+    if s < 3600  { return "\(s / 60)m" }
+    if s < 86400 { return "\(s / 3600)h \((s % 3600) / 60)m" }
+    return "\(s / 86400)d \((s % 86400) / 3600)h"
 }
 
 /// An editable URL field row with an icon, inline text field, and open-link button.

@@ -12,6 +12,10 @@ struct NewSessionMenu: View {
             Button("New SSH Workspace...") {
                 sessionManager.showSSHSheet = true
             }
+
+            Button("New Sprite Workspace...") {
+                sessionManager.showSpriteSheet = true
+            }
         } label: {
             Image(systemName: "plus")
         }

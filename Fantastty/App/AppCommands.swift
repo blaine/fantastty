@@ -26,6 +26,11 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])
 
+            Button("New Sprite Workspace...") {
+                sessionManager.showSpriteSheet = true
+            }
+            .keyboardShortcut("k", modifiers: [.command, .option])
+
             Divider()
 
             Button("Split Right") {
