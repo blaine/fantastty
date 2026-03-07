@@ -122,6 +122,11 @@ actor TmuxControlClient {
         sendFireAndForget("send-keys -t %\(paneID) -H \(hex)")
     }
 
+    func resizePane(paneID: Int, width: Int, height: Int) {
+        guard width > 0, height > 0 else { return }
+        sendFireAndForget("resize-pane -t %\(paneID) -x \(width) -y \(height)")
+    }
+
     // MARK: - Line Handling
 
     private func handleLine(_ line: String) async {

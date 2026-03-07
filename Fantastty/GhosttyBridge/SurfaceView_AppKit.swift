@@ -466,6 +466,14 @@ extension Ghostty {
             setSurfaceSize(width: UInt32(scaledSize.width), height: UInt32(scaledSize.height))
             // Store this size so we can reuse it when backing properties change
             contentSize = size
+
+            // Tmux control mode: notify tmux of pane resize
+            if let paneID = tmuxPaneID, let client = tmuxControlClient, let surface = self.surface {
+                let surfaceSize = ghostty_surface_size(surface)
+                let cols = Int(surfaceSize.columns)
+                let rows = Int(surfaceSize.rows)
+                Task { await client.resizePane(paneID: paneID, width: cols, height: rows) }
+            }
         }
 
         private func setSurfaceSize(width: UInt32, height: UInt32) {
