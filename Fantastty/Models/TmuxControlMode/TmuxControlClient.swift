@@ -101,13 +101,18 @@ actor TmuxControlClient {
         await delegate?.controlClient(self, didChangeState: .connected)
     }
 
-    func disconnect() {
+    func disconnect() async {
         readTask?.cancel()
         readTask = nil
         process?.terminate()
         process = nil
         stdinHandle = nil
         state = .disconnected(reason: "user disconnected")
+        // Drain pending continuations to avoid leaked CheckedContinuation
+        while !commandQueue.isEmpty {
+            commandQueue.dequeueWithError(TmuxControlError.notConnected)
+        }
+        await delegate?.controlClient(self, didChangeState: .disconnected(reason: "user disconnected"))
     }
 
     // MARK: - Commands
