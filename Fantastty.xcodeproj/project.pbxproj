@@ -76,6 +76,8 @@
 		B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */; };
 		C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */; };
 		CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8161ED573E974F43EFDC11 /* TmuxManager.swift */; };
+		F1A2B3C4D5E6F7089A1B2C3D /* TmuxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8161ED573E974F43EFDC11 /* TmuxManager.swift */; };
+		F1A2B3C4D5E6F7089A1B2C3E /* ShellIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */; };
 		B7E3A91D4C2F5D6A8B0E17C3 /* LinearService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D5E6F7A8B9C0D1E2F3A4B5 /* LinearService.swift */; };
 		D9DE9253074604BD02EEDE01 /* Ghostty.Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */; };
 		DA0A1994119A432E83D4BFDA /* NewSessionMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D308F8F4C24380795511065 /* NewSessionMenu.swift */; };
@@ -784,6 +786,8 @@
 				A2246AF7C19E139E576E0399 /* SessionType.swift in Sources */,
 				39606B15D99AE7F48EFDFDAC /* SpriteManager.swift in Sources */,
 				C5AF55BC311FA859242DAD06 /* PersistenceTests.swift in Sources */,
+				F1A2B3C4D5E6F7089A1B2C3D /* TmuxManager.swift in Sources */,
+				F1A2B3C4D5E6F7089A1B2C3E /* ShellIntegration.swift in Sources */,
 				108AF37DA597C8C495EE3B86 /* TmuxAttachSheet.swift in Sources */,
 				DAC7BA6234725254AE53E196 /* TmuxAttachUITests.swift in Sources */,
 				A9521F28901D7B6168676648 /* SessionDisplayInfo.swift in Sources */,

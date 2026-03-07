@@ -9,6 +9,8 @@ struct TmuxAttachSheet: View {
     @State private var isLocal: Bool = true
     @State private var isDiscovering: Bool = false
 
+    private let tmuxManager = TmuxManager.shared
+
     var onAttach: ((TmuxAttachmentInfo) -> Void)?
 
     var body: some View {
@@ -49,12 +51,37 @@ struct TmuxAttachSheet: View {
             }
 
             HStack {
+                Button("Refresh") { discoverSessions() }
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
         }
         .padding()
         .frame(width: 400, height: 350)
+        .onAppear { discoverSessions() }
+        .onChange(of: isLocal) { discoverSessions() }
+    }
+
+    private func discoverSessions() {
+        isDiscovering = true
+        Task.detached {
+            let sessions: [DiscoveredSession]
+            if isLocal {
+                let tmuxSessions = TmuxManager.shared.listAllSessions()
+                sessions = tmuxSessions.map { DiscoveredSession(name: $0.name, host: .local, windowCount: $0.windowCount) }
+            } else {
+                guard let hostInfo = Self.parseHostString(hostString) else {
+                    await MainActor.run { isDiscovering = false }
+                    return
+                }
+                let tmuxSessions = TmuxManager.shared.listRemoteSessions(host: hostInfo)
+                sessions = tmuxSessions.map { DiscoveredSession(name: $0.name, host: .ssh(hostInfo), windowCount: $0.windowCount) }
+            }
+            await MainActor.run {
+                discoveredSessions = sessions
+                isDiscovering = false
+            }
+        }
     }
 
     private var filteredSessions: [DiscoveredSession] {

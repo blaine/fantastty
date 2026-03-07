@@ -201,6 +201,87 @@ class TmuxManager {
         }
     }
 
+    /// List all tmux sessions on the local machine (not just Fantastty-managed ones).
+    func listAllSessions() -> [TmuxSessionInfo] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tmuxPath)
+        process.arguments = ["list-sessions", "-F", "#{session_name}:#{session_created}:#{session_windows}"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            guard process.terminationStatus == 0 else { return [] }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+
+            return output
+                .split(separator: "\n")
+                .compactMap { line -> TmuxSessionInfo? in
+                    let parts = line.split(separator: ":", maxSplits: 2)
+                    guard parts.count >= 1 else { return nil }
+
+                    let name = String(parts[0])
+                    let created = parts.count > 1 ? TimeInterval(parts[1]) ?? 0 : 0
+                    let windows = parts.count > 2 ? Int(parts[2]) ?? 1 : 1
+
+                    return TmuxSessionInfo(
+                        name: name,
+                        createdAt: Date(timeIntervalSince1970: created),
+                        windowCount: windows
+                    )
+                }
+        } catch {
+            return []
+        }
+    }
+
+    /// List tmux sessions on a remote host via SSH.
+    func listRemoteSessions(host: SSHHostInfo) -> [TmuxSessionInfo] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        var args = ["-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
+        if let port = host.port, port != 22 {
+            args += ["-p", "\(port)"]
+        }
+        var target = ""
+        if let user = host.user { target += "\(user)@" }
+        target += host.hostname
+        args.append(target)
+        args.append("tmux list-sessions -F '#{session_name}:#{session_created}:#{session_windows}'")
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return [] }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+
+            return output
+                .split(separator: "\n")
+                .compactMap { line -> TmuxSessionInfo? in
+                    let parts = line.split(separator: ":", maxSplits: 2)
+                    guard parts.count >= 1 else { return nil }
+                    let name = String(parts[0])
+                    let created = parts.count > 1 ? TimeInterval(parts[1]) ?? 0 : 0
+                    let windows = parts.count > 2 ? Int(parts[2]) ?? 1 : 1
+                    return TmuxSessionInfo(name: name, createdAt: Date(timeIntervalSince1970: created), windowCount: windows)
+                }
+        } catch {
+            return []
+        }
+    }
+
     /// Group sessions by workspace (base session + linked tab sessions)
     func groupSessionsByWorkspace() -> [String: TmuxWorkspaceInfo] {
         let sessions = listFantasttySessions()
