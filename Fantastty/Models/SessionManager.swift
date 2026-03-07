@@ -35,6 +35,9 @@ class SessionManager: ObservableObject {
     /// Whether to show the Sprite connection sheet
     @Published var showSpriteSheet: Bool = false
 
+    /// Whether to show the tmux attach sheet
+    @Published var showTmuxAttachSheet: Bool = false
+
     /// Whether the notes panel is expanded
     @Published var notesExpanded: Bool = false
 
