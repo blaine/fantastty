@@ -1173,4 +1173,98 @@ class SessionManager: ObservableObject {
             return firstLeafView(in: split.left)
         }
     }
+
+    // MARK: - Tmux Attach
+
+    /// Attach to an existing tmux session and display it as a new Session.
+    func attachToTmuxSession(info: TmuxAttachmentInfo) {
+        guard let app = ghosttyApp?.app else { return }
+
+        // Create a placeholder surface for the initial tab
+        let surfaceView = Ghostty.SurfaceView(app, baseConfig: nil)
+        let wsID = String(UUID().uuidString.prefix(8)).lowercased()
+        let session = Session(type: .local, surfaceView: surfaceView, workspaceID: wsID)
+        session.mode = .attached(info)
+
+        // Create the control client
+        let client = TmuxControlClient(attachmentInfo: info)
+        client.delegate = self
+        session.controlClient = client
+
+        sessions.append(session)
+        selectedSessionID = session.id
+
+        // Connect in background
+        Task {
+            do {
+                try await client.connect()
+            } catch {
+                Self.debugLog("Failed to connect to tmux session: \(error)")
+            }
+        }
+    }
+
+    /// Find the session associated with a control client.
+    private func session(for client: TmuxControlClient) -> Session? {
+        sessions.first { $0.controlClient === client }
+    }
+}
+
+// MARK: - TmuxControlClientDelegate
+
+extension SessionManager: TmuxControlClientDelegate {
+
+    func controlClient(_ client: TmuxControlClient, didAddWindow window: TmuxWindow) {
+        guard let session = session(for: client), let app = ghosttyApp?.app else { return }
+
+        let surfaceView = Ghostty.SurfaceView(app, baseConfig: nil)
+        let tab = TerminalTab(type: session.type, surfaceView: surfaceView)
+        tab.title = window.name.isEmpty ? "Window @\(window.windowID)" : window.name
+        tab.tmuxWindowID = window.windowID
+        session.addTab(tab)
+
+        if session.selectedTabID == nil {
+            session.selectedTabID = tab.id
+        }
+    }
+
+    func controlClient(_ client: TmuxControlClient, didCloseWindowID windowID: Int) {
+        guard let session = session(for: client) else { return }
+        guard let idx = session.tabs.firstIndex(where: { $0.tmuxWindowID == windowID }) else { return }
+        let tab = session.tabs[idx]
+        session.tabs.remove(at: idx)
+        if session.selectedTabID == tab.id {
+            session.selectedTabID = session.tabs.first?.id
+        }
+    }
+
+    func controlClient(_ client: TmuxControlClient, didRenameWindowID windowID: Int, to name: String) {
+        guard let session = session(for: client) else { return }
+        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }) else { return }
+        tab.title = name
+    }
+
+    func controlClient(_ client: TmuxControlClient, didChangeLayoutForWindowID windowID: Int, layout: String) {
+        // Layout changes will be handled in future tasks
+    }
+
+    func controlClient(_ client: TmuxControlClient, didReceiveOutput data: Data, forPaneID paneID: Int) {
+        // Output injection will be handled in future tasks
+    }
+
+    func controlClient(_ client: TmuxControlClient, didChangeState state: ConnectionState) {
+        guard let session = session(for: client) else { return }
+        if case .attached(var info) = session.mode {
+            info.connectionState = state
+            session.mode = .attached(info)
+        }
+    }
+
+    func controlClientDidExit(_ client: TmuxControlClient, reason: String?) {
+        guard let session = session(for: client) else { return }
+        if case .attached(var info) = session.mode {
+            info.connectionState = .disconnected(reason: reason)
+            session.mode = .attached(info)
+        }
+    }
 }

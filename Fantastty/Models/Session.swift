@@ -35,6 +35,12 @@ class Session: ObservableObject, Identifiable, Hashable {
     /// Tmux base session name for this workspace (when persistent sessions enabled)
     var tmuxSessionName: String?
 
+    /// Whether this session is managed locally or attached to an external tmux session.
+    @Published var mode: SessionMode = .managed
+
+    /// Control mode client for attached tmux sessions.
+    var controlClient: TmuxControlClient?
+
     /// Counter for generating tab session names
     var tmuxTabCounter: Int = 0
 
