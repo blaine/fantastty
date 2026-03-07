@@ -5,6 +5,7 @@ import Foundation
 struct TmuxWindow: Sendable {
     let windowID: Int
     var name: String
+    var paneIDs: Set<Int> = []
 }
 
 // MARK: - TmuxControlError
@@ -205,6 +206,9 @@ actor TmuxControlClient {
             await delegate?.controlClient(self, didRenameWindowID: windowID, to: name)
 
         case .layoutChange(let windowID, let layout):
+            // Update tracked pane IDs from the layout descriptor
+            let layoutNode = TmuxLayoutParser.parse(layout)
+            windows[windowID]?.paneIDs = Set(layoutNode.allPaneIDs())
             await delegate?.controlClient(self, didChangeLayoutForWindowID: windowID, layout: layout)
 
         case .output(let paneID, let data):

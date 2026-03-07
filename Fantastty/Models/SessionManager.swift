@@ -1245,11 +1245,52 @@ extension SessionManager: TmuxControlClientDelegate {
     }
 
     func controlClient(_ client: TmuxControlClient, didChangeLayoutForWindowID windowID: Int, layout: String) {
-        // Layout changes will be handled in future tasks
+        guard let session = session(for: client), let app = ghosttyApp?.app else { return }
+        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }) else { return }
+
+        let layoutNode = TmuxLayoutParser.parse(layout)
+
+        // Build a lookup of existing surfaces by pane ID
+        var existingSurfaces: [Int: Ghostty.SurfaceView] = [:]
+        if let leaves = tab.surfaceTree?.root?.leaves() {
+            for surface in leaves {
+                if let pid = surface.tmuxPaneID {
+                    existingSurfaces[pid] = surface
+                }
+            }
+        }
+
+        // Map layout to SplitTree, reusing existing surfaces or creating new ones
+        let rootNode = TmuxLayoutMapper.mapToSplitTree(layoutNode) { paneID -> Ghostty.SurfaceView in
+            if let existing = existingSurfaces[paneID] {
+                return existing
+            }
+            let surface = Ghostty.SurfaceView(app, baseConfig: nil)
+            surface.tmuxPaneID = paneID
+            surface.tmuxControlClient = client
+            return surface
+        }
+
+        tab.surfaceTree = .init(root: rootNode, zoomed: nil)
+        tab.focusedSurface = tab.surfaceTree?.root?.leaves().first
     }
 
     func controlClient(_ client: TmuxControlClient, didReceiveOutput data: Data, forPaneID paneID: Int) {
-        // Output injection will be handled in future tasks
+        guard let session = session(for: client) else { return }
+
+        // Find the surface with matching tmuxPaneID
+        for tab in session.tabs {
+            guard let leaves = tab.surfaceTree?.root?.leaves() else { continue }
+            for surface in leaves {
+                if surface.tmuxPaneID == paneID, let cSurface = surface.surface {
+                    data.withUnsafeBytes { buffer in
+                        guard let ptr = buffer.baseAddress?.assumingMemoryBound(to: CChar.self) else { return }
+                        ghostty_surface_inject_output(cSurface, ptr, UInt(buffer.count))
+                    }
+                    return
+                }
+            }
+        }
     }
 
     func controlClient(_ client: TmuxControlClient, didChangeState state: ConnectionState) {
