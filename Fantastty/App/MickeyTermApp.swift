@@ -16,6 +16,7 @@ struct FantasttyApp: App {
 
         Settings {
             SettingsView()
+                .environmentObject(appDelegate.ghosttyApp)
         }
     }
 }

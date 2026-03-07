@@ -16,7 +16,6 @@
 		25C133A6066C09E29CF27024 /* fantastty.sh in Resources */ = {isa = PBXBuildFile; fileRef = 140C34BE75F8E35B9803CA1B /* fantastty.sh */; };
 		260BDF277FF320CC7296AD69 /* BrowserTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */; };
 		270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */; };
-		2F4A8B1C3D9E7F0A12BC5E89 /* LayoutSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */; };
 		31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCE90FA0D374014602A3628 /* KeyboardLayout.swift */; };
 		32FAC9DD5A6997E3B393D04A /* EventModifiers+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE3D4FD18EDC4733E55361B /* EventModifiers+Extension.swift */; };
 		3BA1B6775DB786318C833725 /* WorkspaceOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E2DF833F359BF737FCCDE8 /* WorkspaceOverviewView.swift */; };
@@ -27,10 +26,12 @@
 		4192ED72D868F2143B69D835 /* SurfaceGrabHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */; };
 		4223434CE7F0CB9F797654F9 /* SurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 482DB758E2BE4C3AD4389566 /* SurfaceView.swift */; };
 		427A07BBE45BB0DEC82D5C02 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE841348EE5474B5AB2322A1 /* main.swift */; };
+		43E61D6D00674799F8CF348C /* SpriteConnectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49A61842A1B2A3B1A8A9B72 /* SpriteConnectionSheet.swift */; };
 		442252375FE92C0781EE7F56 /* SessionType.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7614C13A5B0B575404F8D0 /* SessionType.swift */; };
 		4772E230F503EE8E223E0A39 /* CGS.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47B3F24C3964B77FF83FC42 /* CGS.swift */; };
 		47821B73E1E8A92CB69251A7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B297D7747AEDED8B243C380 /* Assets.xcassets */; };
 		47D5DF0E77A71E93A0338129 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C576F46E002ADD95360E83 /* TabBarView.swift */; };
+		49CF459CA78F22F5F3183B72 /* LayoutSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D5EF3AE8EA9CAC35C46FA9 /* LayoutSnapshot.swift */; };
 		51793B079D1382885FCFE514 /* Ghostty.Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1F62E4EC552622732B6159 /* Ghostty.Config.swift */; };
 		541547BBE23F440B723CDD8E /* MickeyTermApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902A1A3E8E0322EFCD2935A3 /* MickeyTermApp.swift */; };
 		557472C53DB00D2D8587D263 /* SurfaceProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87017B8990883C045D8CFF1A /* SurfaceProgressBar.swift */; };
@@ -39,6 +40,7 @@
 		61FFE79D665D951DEF99C7D2 /* NSImage+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD293FCABE3E0127AC62AE4 /* NSImage+Extension.swift */; };
 		66D8DE5DB1C49470CA0EDEC7 /* Cursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B77A79CB26271F6320B64C /* Cursor.swift */; };
 		6722435A060E46F00A350667 /* SurfaceView_AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */; };
+		70DABCD0AA83EA2EAFB3A263 /* SpriteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34833D14903AEFDEF5ABF51 /* SpriteManager.swift */; };
 		736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A288EE4B731A40F8A2C9450 /* SessionManager.swift */; };
 		7706DB04E347DDA7F9099788 /* SurfaceDragSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */; };
 		78DAE20C2BA37EDA496DC829 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0CC6B051A5ABFD6B9981012 /* AppCommands.swift */; };
@@ -57,13 +59,16 @@
 		92C1A3B57CF9725999440AF2 /* NSAppearance+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B02E4572BA85ACBF338282 /* NSAppearance+Extension.swift */; };
 		94C1E6EAAE0F5503D45A05FA /* SecureInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3D40FE81067CF9B1DFAC08 /* SecureInput.swift */; };
 		9BF047548789E221114FD014 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E84612A640F2178E1C3922B /* AppInfo.swift */; };
+		9FCC0B688CF4E5FB7432BEE5 /* AppearanceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2257D5AEC003EC80DB1C60E4 /* AppearanceMode.swift */; };
 		A000CF83FE0A314CCD1284E8 /* VibrantLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = C665C8B1C5DE1A96F7551FEA /* VibrantLayer.m */; };
 		A17BC6AC3DABF4D7FCEB715A /* NSMenuItem+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */; };
 		A33574334905D9B61A851CD6 /* SecureInputOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7B00FE80794F99FE38F94B /* SecureInputOverlay.swift */; };
 		A58BD4EA26A93B02F0414384 /* Weak.swift in Sources */ = {isa = PBXBuildFile; fileRef = C687CCDD55BD703C1591317F /* Weak.swift */; };
 		A6BECDF92E74B14518A6F4B9 /* Backport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5F2F67928ACFE5120BA782 /* Backport.swift */; };
 		A7E343D6FF292BAEA5BD4305 /* UUID+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E9BEAAEEE081129B9DA55D /* UUID+Extension.swift */; };
+		A81A31971FB8D3D9F5F540A5 /* ShellIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1577291356D8D70C1A24523 /* ShellIntegration.swift */; };
 		A9F34CEEB77C0AA4EC5F839B /* SSHConnectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43F4F2AA796509D25A0202C /* SSHConnectionSheet.swift */; };
+		AC85A84FF82F9A3EFB85C55C /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8749292FE6DD8B6295E9EC /* ThemeManager.swift */; };
 		ADF7E6F6919033ABA6473F31 /* Ghostty.Inspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F87DDBE81BB19A02EA301A2 /* Ghostty.Inspector.swift */; };
 		BB98D303E99E1EA106BD2E42 /* NSPasteboard+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */; };
 		BC14E76875E00603E4B6E874 /* NSView+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F89AB559009B06C7920573 /* NSView+Extension.swift */; };
@@ -73,10 +78,8 @@
 		C761878FED3416A183D53D85 /* GhosttyDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */; };
 		C86109E5CA51D8D1C236071C /* NSEvent+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */; };
 		C907BB7160482732FA45EF14 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC71494450F49AF3C3EF59D6 /* Session.swift */; };
-		B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */; };
 		C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */; };
 		CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8161ED573E974F43EFDC11 /* TmuxManager.swift */; };
-		B7E3A91D4C2F5D6A8B0E17C3 /* LinearService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D5E6F7A8B9C0D1E2F3A4B5 /* LinearService.swift */; };
 		D9DE9253074604BD02EEDE01 /* Ghostty.Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */; };
 		DA0A1994119A432E83D4BFDA /* NewSessionMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D308F8F4C24380795511065 /* NewSessionMenu.swift */; };
 		DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */; };
@@ -96,13 +99,13 @@
 		FA5C11D8C21ECED7586C0B3D /* MickeyTermCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */; };
 		FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */; };
 		FBFA1E0675EF5FEE2AC0B318 /* Ghostty.Package.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */; };
+		FD93CFA1A4A51FDCD875E4AE /* LinearService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03009A822B44BF71D0A6A601 /* LinearService.swift */; };
 		FE61456B62F8148C9116B783 /* EditableToolbarTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEA9F76436655E1C37EC758 /* EditableToolbarTitle.swift */; };
-		F2E1D0C9B8A7F6E5D4C3B2A1 /* SpriteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SpriteManager.swift */; };
-		D5E6F7A8B9C0D1E2F3A4B5C6 /* SpriteConnectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* SpriteConnectionSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0032177DDB0FCEC5F7A9027D /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
+		03009A822B44BF71D0A6A601 /* LinearService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinearService.swift; sourceTree = "<group>"; };
 		0480E075E87ECAB31B193046 /* VibrantLayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VibrantLayer.h; sourceTree = "<group>"; };
 		04E2DF833F359BF737FCCDE8 /* WorkspaceOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceOverviewView.swift; sourceTree = "<group>"; };
 		05FDE6EECD20438D68A96708 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -111,7 +114,6 @@
 		129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceView_AppKit.swift; sourceTree = "<group>"; };
 		140C34BE75F8E35B9803CA1B /* fantastty.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = fantastty.sh; sourceTree = "<group>"; };
 		1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSMenuItem+Extension.swift"; sourceTree = "<group>"; };
-		1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutSnapshot.swift; sourceTree = "<group>"; };
 		183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extension.swift"; sourceTree = "<group>"; };
 		19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSEvent+Extension.swift"; sourceTree = "<group>"; };
 		1D5F2F67928ACFE5120BA782 /* Backport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backport.swift; sourceTree = "<group>"; };
@@ -119,13 +121,13 @@
 		1E84612A640F2178E1C3922B /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
 		2111E93090C4BEB02D66D875 /* Fantastty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fantastty.entitlements; sourceTree = "<group>"; };
 		21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTabView.swift; sourceTree = "<group>"; };
+		2257D5AEC003EC80DB1C60E4 /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceMode.swift; sourceTree = "<group>"; };
 		2657C84B550AC9E3AAF5FB77 /* Fantastty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fantastty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2675910C3625ED685E6C3D18 /* Ghostty.Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Event.swift; sourceTree = "<group>"; };
 		29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSplitTreeView.swift; sourceTree = "<group>"; };
 		29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.Divider.swift; sourceTree = "<group>"; };
 		2D308F8F4C24380795511065 /* NewSessionMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionMenu.swift; sourceTree = "<group>"; };
 		2D8161ED573E974F43EFDC11 /* TmuxManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxManager.swift; sourceTree = "<group>"; };
-		C4D5E6F7A8B9C0D1E2F3A4B5 /* LinearService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinearService.swift; sourceTree = "<group>"; };
 		327A1E3AA417AA9F703D4217 /* Ghostty.Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Package.swift; sourceTree = "<group>"; };
 		34925F86E43A164C45263A32 /* SurfaceScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceScrollView.swift; sourceTree = "<group>"; };
 		3D6D0A497378B6E622F60483 /* GhosttyDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyDelegate.swift; sourceTree = "<group>"; };
@@ -162,8 +164,11 @@
 		A518E4FB9A2186B6AD6B40E3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceGrabHandle.swift; sourceTree = "<group>"; };
 		B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FullscreenMode+Extension.swift"; sourceTree = "<group>"; };
+		B1577291356D8D70C1A24523 /* ShellIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegration.swift; sourceTree = "<group>"; };
+		B49A61842A1B2A3B1A8A9B72 /* SpriteConnectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteConnectionSheet.swift; sourceTree = "<group>"; };
 		B9B8AC7C303442AAFD418CCF /* SessionNotesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNotesPanel.swift; sourceTree = "<group>"; };
 		BAEA9F76436655E1C37EC758 /* EditableToolbarTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableToolbarTitle.swift; sourceTree = "<group>"; };
+		BB8749292FE6DD8B6295E9EC /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		C4F0A4BE5D2B4749783AFC3E /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		C665C8B1C5DE1A96F7551FEA /* VibrantLayer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VibrantLayer.m; sourceTree = "<group>"; };
 		C6670262CF1B809D2FE12DD3 /* Duration+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Duration+Extension.swift"; sourceTree = "<group>"; };
@@ -176,13 +181,14 @@
 		CC27720BAEBA076458B8FC0E /* SidebarRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRowView.swift; sourceTree = "<group>"; };
 		CE7614C13A5B0B575404F8D0 /* SessionType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionType.swift; sourceTree = "<group>"; };
 		CE841348EE5474B5AB2322A1 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		D34833D14903AEFDEF5ABF51 /* SpriteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteManager.swift; sourceTree = "<group>"; };
 		D3B7F7C3CC3EBC5CAD4B4E10 /* NSWindow+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSWindow+Extension.swift"; sourceTree = "<group>"; };
 		D3E9BEAAEEE081129B9DA55D /* UUID+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UUID+Extension.swift"; sourceTree = "<group>"; };
 		D43F4F2AA796509D25A0202C /* SSHConnectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHConnectionSheet.swift; sourceTree = "<group>"; };
+		D4D5EF3AE8EA9CAC35C46FA9 /* LayoutSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutSnapshot.swift; sourceTree = "<group>"; };
 		D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceDragSource.swift; sourceTree = "<group>"; };
 		DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTab.swift; sourceTree = "<group>"; };
 		DC71494450F49AF3C3EF59D6 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
-		7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegration.swift; sourceTree = "<group>"; };
 		E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardShortcut+Extension.swift"; sourceTree = "<group>"; };
 		E47B3F24C3964B77FF83FC42 /* CGS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGS.swift; sourceTree = "<group>"; };
 		E5BB97FCC010F3C963B20329 /* Ghostty.Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Shell.swift; sourceTree = "<group>"; };
@@ -197,8 +203,6 @@
 		F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MickeyTermCompat.swift; sourceTree = "<group>"; };
 		FB48187E648FF83678869E8C /* Double+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Double+Extension.swift"; sourceTree = "<group>"; };
 		FBE52D3A18570B508FE63761 /* NSColor+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSColor+Extension.swift"; sourceTree = "<group>"; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* SpriteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteManager.swift; sourceTree = "<group>"; };
-		B3C4D5E6F7A8B9C0D1E2F3A4 /* SpriteConnectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteConnectionSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -270,15 +274,17 @@
 		45158AA4C8059D62D1F22F87 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */,
-				C4D5E6F7A8B9C0D1E2F3A4B5 /* LinearService.swift */,
+				2257D5AEC003EC80DB1C60E4 /* AppearanceMode.swift */,
+				D4D5EF3AE8EA9CAC35C46FA9 /* LayoutSnapshot.swift */,
+				03009A822B44BF71D0A6A601 /* LinearService.swift */,
 				DC71494450F49AF3C3EF59D6 /* Session.swift */,
 				6A288EE4B731A40F8A2C9450 /* SessionManager.swift */,
 				07DF09D816789200644A34F6 /* SessionMetadata.swift */,
 				CE7614C13A5B0B575404F8D0 /* SessionType.swift */,
-				7E1B3C4A9D0F28E6A5B71D83 /* ShellIntegration.swift */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* SpriteManager.swift */,
+				B1577291356D8D70C1A24523 /* ShellIntegration.swift */,
+				D34833D14903AEFDEF5ABF51 /* SpriteManager.swift */,
 				DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */,
+				BB8749292FE6DD8B6295E9EC /* ThemeManager.swift */,
 				2D8161ED573E974F43EFDC11 /* TmuxManager.swift */,
 			);
 			path = Models;
@@ -348,20 +354,20 @@
 			path = Terminal;
 			sourceTree = "<group>";
 		};
+		B335083139DB9EF2D5FA57A0 /* Sprite */ = {
+			isa = PBXGroup;
+			children = (
+				B49A61842A1B2A3B1A8A9B72 /* SpriteConnectionSheet.swift */,
+			);
+			path = Sprite;
+			sourceTree = "<group>";
+		};
 		B461EE309C9505164D6B15AB /* SSH */ = {
 			isa = PBXGroup;
 			children = (
 				D43F4F2AA796509D25A0202C /* SSHConnectionSheet.swift */,
 			);
 			path = SSH;
-			sourceTree = "<group>";
-		};
-		C7D8E9F0A1B2C3D4E5F6A7B8 /* Sprite */ = {
-			isa = PBXGroup;
-			children = (
-				B3C4D5E6F7A8B9C0D1E2F3A4 /* SpriteConnectionSheet.swift */,
-			);
-			path = Sprite;
 			sourceTree = "<group>";
 		};
 		B7B501F12A229A70EB9AB4DD /* GhosttyBridge */ = {
@@ -435,7 +441,7 @@
 				338153001698F5C0EF1BBEA8 /* Notes */,
 				2FD261F67A4C157477115AFF /* Settings */,
 				E7FE1DFDAE0F5594CAF024BA /* Sidebar */,
-				C7D8E9F0A1B2C3D4E5F6A7B8 /* Sprite */,
+				B335083139DB9EF2D5FA57A0 /* Sprite */,
 				B461EE309C9505164D6B15AB /* SSH */,
 				881F2D1687E86AE52961A2AE /* Terminal */,
 			);
@@ -483,9 +489,10 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = 808C813E5F8342B598C505FF /* Build configuration list for PBXProject "Fantastty" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -495,6 +502,7 @@
 			mainGroup = 2E46A21E389E5A68179E9553;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 4D8DB826533E6550C81BAA91 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -523,6 +531,7 @@
 				78DAE20C2BA37EDA496DC829 /* AppCommands.swift in Sources */,
 				81EE90AA01128AE549CE3012 /* AppDelegate.swift in Sources */,
 				9BF047548789E221114FD014 /* AppInfo.swift in Sources */,
+				9FCC0B688CF4E5FB7432BEE5 /* AppearanceMode.swift in Sources */,
 				C289639676F0C3C2A5367F85 /* Array+Extension.swift in Sources */,
 				A6BECDF92E74B14518A6F4B9 /* Backport.swift in Sources */,
 				260BDF277FF320CC7296AD69 /* BrowserTabView.swift in Sources */,
@@ -548,8 +557,9 @@
 				7F8D1260B39EC323DF372FAF /* Ghostty.Surface.swift in Sources */,
 				C761878FED3416A183D53D85 /* GhosttyDelegate.swift in Sources */,
 				31CAF354AC98BE7DC6EA5E7C /* KeyboardLayout.swift in Sources */,
-				2F4A8B1C3D9E7F0A12BC5E89 /* LayoutSnapshot.swift in Sources */,
 				FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */,
+				49CF459CA78F22F5F3183B72 /* LayoutSnapshot.swift in Sources */,
+				FD93CFA1A4A51FDCD875E4AE /* LinearService.swift in Sources */,
 				C9446C4A6EFB773AD45D41F5 /* MainWindow.swift in Sources */,
 				7C5DEE882BF9B5485FDD361B /* MetalView.swift in Sources */,
 				541547BBE23F440B723CDD8E /* MickeyTermApp.swift in Sources */,
@@ -569,21 +579,21 @@
 				94C1E6EAAE0F5503D45A05FA /* SecureInput.swift in Sources */,
 				A33574334905D9B61A851CD6 /* SecureInputOverlay.swift in Sources */,
 				C907BB7160482732FA45EF14 /* Session.swift in Sources */,
-				B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */,
 				E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */,
 				736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */,
 				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
 				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
 				442252375FE92C0781EE7F56 /* SessionType.swift in Sources */,
-				F2E1D0C9B8A7F6E5D4C3B2A1 /* SpriteManager.swift in Sources */,
-				D5E6F7A8B9C0D1E2F3A4B5C6 /* SpriteConnectionSheet.swift in Sources */,
 				E4BF5F05D33D0F0F06511A36 /* SettingsView.swift in Sources */,
+				A81A31971FB8D3D9F5F540A5 /* ShellIntegration.swift in Sources */,
 				9250F29A9F9701A55471D84F /* SidebarRowView.swift in Sources */,
 				0E2E09180514E7EEEE0D6E11 /* SidebarThumbnailView.swift in Sources */,
 				E0CA045544DCEF8FCE50789A /* SidebarView.swift in Sources */,
 				C1DFDC13F4DD6F2EDBBF47FF /* SplitTree.swift in Sources */,
 				8DC11FD4D658BD50F45E94CA /* SplitView.Divider.swift in Sources */,
 				7CFE92E6178B25652F1716A9 /* SplitView.swift in Sources */,
+				43E61D6D00674799F8CF348C /* SpriteConnectionSheet.swift in Sources */,
+				70DABCD0AA83EA2EAFB3A263 /* SpriteManager.swift in Sources */,
 				270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */,
 				7706DB04E347DDA7F9099788 /* SurfaceDragSource.swift in Sources */,
 				4192ED72D868F2143B69D835 /* SurfaceGrabHandle.swift in Sources */,
@@ -597,7 +607,7 @@
 				DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */,
 				7E78A52CCC4F8B345DCDFFF1 /* TerminalSplitTreeView.swift in Sources */,
 				58BE9BB13F2EF1EC78FD192C /* TerminalTab.swift in Sources */,
-				B7E3A91D4C2F5D6A8B0E17C3 /* LinearService.swift in Sources */,
+				AC85A84FF82F9A3EFB85C55C /* ThemeManager.swift in Sources */,
 				CA86297742EC30E64CD2417B /* TmuxManager.swift in Sources */,
 				EB8BC4643B893A85F4D032D3 /* Transferable+Extension.swift in Sources */,
 				A7E343D6FF292BAEA5BD4305 /* UUID+Extension.swift in Sources */,
@@ -675,14 +685,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Fantastty/Fantastty.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Manual;
-				DEVELOPMENT_TEAM = 39A946CQ75;
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_HARDENED_RUNTIME = YES;
-				OTHER_CODE_SIGN_FLAGS = "--timestamp";
+				ENABLE_HARDENED_RUNTIME = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/xcframework",
 					"\"xcframework\"",
@@ -708,12 +714,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Fantastty/Fantastty.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				CODE_SIGN_STYLE = Manual;
-				DEVELOPMENT_TEAM = 39A946CQ75;
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/xcframework",
 					"\"xcframework\"",

@@ -39,8 +39,15 @@ Zsh integration (pwd tracking, escape sequence passthrough) is set up automatica
 ### Prerequisites
 
 - Xcode 16+
+- Xcode Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`)
 - [Zig](https://ziglang.org) (see `vendor/ghostty/build.zig.zon` for the required version)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (if regenerating the Xcode project)
+
+Make sure Xcode is the active developer directory:
+
+```sh
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
 
 ### Build
 
