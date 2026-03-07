@@ -207,6 +207,11 @@ extension Ghostty {
         // Notification identifiers associated with this surface
         var notificationIdentifiers: Set<String> = []
 
+        /// Tmux control mode: pane ID this surface represents.
+        var tmuxPaneID: Int?
+        /// Tmux control mode: weak ref to control client for input routing.
+        weak var tmuxControlClient: TmuxControlClient?
+
         private var markedText: NSMutableAttributedString
         private(set) var focused: Bool = true
         private var prevPressureStage: Int = 0
@@ -1358,6 +1363,15 @@ extension Ghostty {
             text: String? = nil,
             composing: Bool = false
         ) -> Bool {
+            // Tmux control mode: intercept input and route to control client
+            if let paneID = tmuxPaneID, let client = tmuxControlClient {
+                if let text = text, !text.isEmpty {
+                    let data = Data(text.utf8)
+                    Task { await client.sendKeys(paneID: paneID, data: data) }
+                    return true
+                }
+            }
+
             guard let surface = self.surface else { return false }
 
             var key_ev = event.ghosttyKeyEvent(action, translationMods: translationEvent?.modifierFlags)
