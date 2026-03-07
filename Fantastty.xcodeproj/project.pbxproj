@@ -99,6 +99,9 @@
 		FE61456B62F8148C9116B783 /* EditableToolbarTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEA9F76436655E1C37EC758 /* EditableToolbarTitle.swift */; };
 		F2E1D0C9B8A7F6E5D4C3B2A1 /* SpriteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SpriteManager.swift */; };
 		D5E6F7A8B9C0D1E2F3A4B5C6 /* SpriteConnectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* SpriteConnectionSheet.swift */; };
+		068FF8730A30841DA55B5764 /* TmuxAttachSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87031A46E1037B65FE0C7405 /* TmuxAttachSheet.swift */; };
+		108AF37DA597C8C495EE3B86 /* TmuxAttachSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87031A46E1037B65FE0C7405 /* TmuxAttachSheet.swift */; };
+		DAC7BA6234725254AE53E196 /* TmuxAttachUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24BC0FBC420FC3F136B6C7AB /* TmuxAttachUITests.swift */; };
 		AEC22220C1479A140E23F69B /* TmuxEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B820A893232D6A4F6A0D6547 /* TmuxEvent.swift */; };
 		B714240AC5294957C3AD6BAC /* TmuxProtocolParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 896CDC05B4B9692B5D69ED3A /* TmuxProtocolParser.swift */; };
 		D21720060AE550550E3FC9C6 /* TmuxLayoutParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3794A6F0726C8FF4FE5BAA1 /* TmuxLayoutParser.swift */; };
@@ -250,6 +253,8 @@
 		29308BB8CE72FA426D42CA67 /* TmuxResizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxResizeTests.swift; sourceTree = "<group>"; };
 		5998B86593715E0E17C5A920 /* SSHHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHHostStore.swift; sourceTree = "<group>"; };
 		A16ADBDC569D151A14F8B2CA /* PersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceTests.swift; sourceTree = "<group>"; };
+		87031A46E1037B65FE0C7405 /* TmuxAttachSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxAttachSheet.swift; sourceTree = "<group>"; };
+		24BC0FBC420FC3F136B6C7AB /* TmuxAttachUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxAttachUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -499,6 +504,7 @@
 				C7D8E9F0A1B2C3D4E5F6A7B8 /* Sprite */,
 				B461EE309C9505164D6B15AB /* SSH */,
 				881F2D1687E86AE52961A2AE /* Terminal */,
+				6A743B5CD66301466D765B57 /* Tmux */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -526,8 +532,17 @@
 				54FCA8A41F8DE649749FD45E /* TmuxSurfaceManagerTests.swift */,
 				29308BB8CE72FA426D42CA67 /* TmuxResizeTests.swift */,
 				A16ADBDC569D151A14F8B2CA /* PersistenceTests.swift */,
+				24BC0FBC420FC3F136B6C7AB /* TmuxAttachUITests.swift */,
 			);
 			path = FantasttyTests;
+			sourceTree = "<group>";
+		};
+		6A743B5CD66301466D765B57 /* Tmux */ = {
+			isa = PBXGroup;
+			children = (
+				87031A46E1037B65FE0C7405 /* TmuxAttachSheet.swift */,
+			);
+			path = Tmux;
 			sourceTree = "<group>";
 		};
 		A0B1C2D3E4F5A6B7C8D9E0F1 /* TmuxControlMode */ = {
@@ -727,6 +742,7 @@
 				3A204721692A0C52582F1307 /* TmuxLayoutMapper.swift in Sources */,
 				BD064BB6914F370DAE222813 /* TmuxSurfaceManager.swift in Sources */,
 				9DE1C9541DAF8BABF4C44F9F /* SSHHostStore.swift in Sources */,
+				068FF8730A30841DA55B5764 /* TmuxAttachSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -757,6 +773,8 @@
 				A2246AF7C19E139E576E0399 /* SessionType.swift in Sources */,
 				39606B15D99AE7F48EFDFDAC /* SpriteManager.swift in Sources */,
 				C5AF55BC311FA859242DAD06 /* PersistenceTests.swift in Sources */,
+				108AF37DA597C8C495EE3B86 /* TmuxAttachSheet.swift in Sources */,
+				DAC7BA6234725254AE53E196 /* TmuxAttachUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
