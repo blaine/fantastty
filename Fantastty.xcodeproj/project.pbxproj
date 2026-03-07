@@ -203,6 +203,9 @@
 		F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MickeyTermCompat.swift; sourceTree = "<group>"; };
 		FB48187E648FF83678869E8C /* Double+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Double+Extension.swift"; sourceTree = "<group>"; };
 		FBE52D3A18570B508FE63761 /* NSColor+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSColor+Extension.swift"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* SpriteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteManager.swift; sourceTree = "<group>"; };
+		B3C4D5E6F7A8B9C0D1E2F3A4 /* SpriteConnectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteConnectionSheet.swift; sourceTree = "<group>"; };
+		F4E5D6C7B8A9BAADA4B5C6D7 /* FantasttyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FantasttyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -212,6 +215,13 @@
 			files = (
 				79C2315E7EE9A36D57402E51 /* GhosttyKit.xcframework in Frameworks */,
 				3D6FFCC3EC3CE2BC8E31C879 /* Carbon.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F8E9DACBCCCDFEEBC8D9EAFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,6 +242,7 @@
 				5D4A8BF521222FCFA3270B19 /* Fantastty */,
 				4468854273099A95F2239C08 /* Frameworks */,
 				4D8DB826533E6550C81BAA91 /* Products */,
+				F3E4D5C6B7A8A99CA3B4C5D6 /* FantasttyTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -239,6 +250,7 @@
 			isa = PBXGroup;
 			children = (
 				05FDE6EECD20438D68A96708 /* SettingsView.swift */,
+				F4E5D6C7B8A9BAADA4B5C6D7 /* FantasttyTests.xctest */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -286,6 +298,7 @@
 				DA1E637BD3B1A5A17016EEA0 /* TerminalTab.swift */,
 				BB8749292FE6DD8B6295E9EC /* ThemeManager.swift */,
 				2D8161ED573E974F43EFDC11 /* TmuxManager.swift */,
+				A0B1C2D3E4F5A6B7C8D9E0F1 /* TmuxControlMode */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -459,6 +472,20 @@
 			path = Sidebar;
 			sourceTree = "<group>";
 		};
+		F3E4D5C6B7A8A99CA3B4C5D6 /* FantasttyTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = FantasttyTests;
+			sourceTree = "<group>";
+		};
+		A0B1C2D3E4F5A6B7C8D9E0F1 /* TmuxControlMode */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = TmuxControlMode;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -480,6 +507,22 @@
 			productName = Fantastty;
 			productReference = 2657C84B550AC9E3AAF5FB77 /* Fantastty.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F1E2D3C4B5A69788A1B2C3D4 /* FantasttyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F5E6D7C8B9AACBBEA5B6C7D8 /* Build configuration list for PBXNativeTarget "FantasttyTests" */;
+			buildPhases = (
+				F2E3D4C5B6A7988BA2B3C4D5 /* Sources */,
+				F8E9DACBCCCDFEEBC8D9EAFB /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FantasttyTests;
+			productName = FantasttyTests;
+			productReference = F4E5D6C7B8A9BAADA4B5C6D7 /* FantasttyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -507,6 +550,7 @@
 			projectRoot = "";
 			targets = (
 				CB5692159373E500BD905E3F /* Fantastty */,
+				F1E2D3C4B5A69788A1B2C3D4 /* FantasttyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -618,6 +662,13 @@
 				3BA1B6775DB786318C833725 /* WorkspaceOverviewView.swift in Sources */,
 				EBCB934F24446618BFB6AA06 /* macOS26Compat.swift in Sources */,
 				427A07BBE45BB0DEC82D5C02 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2E3D4C5B6A7988BA2B3C4D5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -801,6 +852,36 @@
 			};
 			name = Debug;
 		};
+		F6E7D8C9BAABDCCFA6B7C8D9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 39A946CQ75;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blainecook.fantastty.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fantastty.app/Contents/MacOS/Fantastty";
+			};
+			name = Debug;
+		};
+		F7E8D9CABBBCEDDAB7C8D9EA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 39A946CQ75;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blainecook.fantastty.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fantastty.app/Contents/MacOS/Fantastty";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -821,6 +902,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		F5E6D7C8B9AACBBEA5B6C7D8 /* Build configuration list for PBXNativeTarget "FantasttyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F6E7D8C9BAABDCCFA6B7C8D9 /* Debug */,
+				F7E8D9CABBBCEDDAB7C8D9EA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
