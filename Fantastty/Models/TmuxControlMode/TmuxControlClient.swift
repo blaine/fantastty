@@ -28,6 +28,18 @@ protocol TmuxControlClientDelegate: AnyObject {
     func controlClientDidExit(_ client: TmuxControlClient, reason: String?)
 }
 
+// MARK: - TmuxCommandSending
+
+/// Protocol for sending commands to a tmux session.
+/// Allows testing SessionManager without a real TmuxControlClient.
+protocol TmuxCommandSending: AnyObject {
+    func newWindow() async throws -> String
+    func killWindow(windowID: Int) async throws
+    func renameWindow(windowID: Int, name: String) async throws
+    func splitPane(paneID: Int, horizontal: Bool) async throws
+    func killPane(paneID: Int) async throws
+}
+
 // MARK: - TmuxControlClient
 
 actor TmuxControlClient {
@@ -127,6 +139,29 @@ actor TmuxControlClient {
         sendFireAndForget("resize-pane -t %\(paneID) -x \(width) -y \(height)")
     }
 
+    // MARK: - Window Management
+
+    func newWindow() async throws -> String {
+        try await send("new-window")
+    }
+
+    func killWindow(windowID: Int) async throws {
+        _ = try await send("kill-window -t @\(windowID)")
+    }
+
+    func renameWindow(windowID: Int, name: String) async throws {
+        _ = try await send("rename-window -t @\(windowID) '\(name)'")
+    }
+
+    func splitPane(paneID: Int, horizontal: Bool) async throws {
+        let flag = horizontal ? "-h" : "-v"
+        _ = try await send("split-window \(flag) -t %\(paneID)")
+    }
+
+    func killPane(paneID: Int) async throws {
+        _ = try await send("kill-pane -t %\(paneID)")
+    }
+
     // MARK: - Line Handling
 
     private func handleLine(_ line: String) async {
@@ -199,3 +234,5 @@ actor TmuxControlClient {
     }
     #endif
 }
+
+extension TmuxControlClient: TmuxCommandSending {}
