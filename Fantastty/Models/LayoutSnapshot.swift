@@ -14,19 +14,23 @@ struct WorkspaceLayout: Codable {
     var tabSessionNames: [String]   // ordered, excludes base tab
     var selectedTabIndex: Int?       // 0 = base tab
     var sessionType: SessionType?   // nil = .local (backwards compatible)
+    var attachment: TmuxAttachmentInfo?  // non-nil for attached (external) tmux sessions
 
     enum CodingKeys: String, CodingKey {
         case workspaceID, baseSessionName, tabSessionNames, selectedTabIndex, sessionType
+        case attachment
         case stableKey  // legacy, decoded but ignored
     }
 
     init(workspaceID: String, baseSessionName: String, tabSessionNames: [String],
-         selectedTabIndex: Int? = nil, sessionType: SessionType? = nil) {
+         selectedTabIndex: Int? = nil, sessionType: SessionType? = nil,
+         attachment: TmuxAttachmentInfo? = nil) {
         self.workspaceID = workspaceID
         self.baseSessionName = baseSessionName
         self.tabSessionNames = tabSessionNames
         self.selectedTabIndex = selectedTabIndex
         self.sessionType = sessionType
+        self.attachment = attachment
     }
 
     init(from decoder: Decoder) throws {
@@ -36,6 +40,7 @@ struct WorkspaceLayout: Codable {
         tabSessionNames = try container.decode([String].self, forKey: .tabSessionNames)
         selectedTabIndex = try container.decodeIfPresent(Int.self, forKey: .selectedTabIndex)
         sessionType = try container.decodeIfPresent(SessionType.self, forKey: .sessionType)
+        attachment = try container.decodeIfPresent(TmuxAttachmentInfo.self, forKey: .attachment)
         // stableKey decoded and ignored for backward compat
     }
 
@@ -46,6 +51,7 @@ struct WorkspaceLayout: Codable {
         try container.encode(tabSessionNames, forKey: .tabSessionNames)
         try container.encodeIfPresent(selectedTabIndex, forKey: .selectedTabIndex)
         try container.encodeIfPresent(sessionType, forKey: .sessionType)
+        try container.encodeIfPresent(attachment, forKey: .attachment)
         // Don't encode stableKey
     }
 }

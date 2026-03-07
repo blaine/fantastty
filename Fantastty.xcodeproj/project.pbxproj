@@ -125,6 +125,12 @@
 		3141A58823AE87D3F5612931 /* SplitTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E4986A3D30A9E9EAD3A6C93 /* SplitTree.swift */; };
 		EDE69129BF4E22325600291C /* Array+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D9B0B29EB99483941D80DA /* Array+Extension.swift */; };
 		759B58C1B80E9BEE5D5750A4 /* TmuxLayoutMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AC84A5E91E55E07CF9FE84 /* TmuxLayoutMapper.swift */; };
+		9DE1C9541DAF8BABF4C44F9F /* SSHHostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5998B86593715E0E17C5A920 /* SSHHostStore.swift */; };
+		8C2CC5D21E21B2079B29D66F /* SSHHostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5998B86593715E0E17C5A920 /* SSHHostStore.swift */; };
+		C5AF55BC311FA859242DAD06 /* PersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16ADBDC569D151A14F8B2CA /* PersistenceTests.swift */; };
+		C7018E5CAB628FF87BFFD0C5 /* LayoutSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3C5D8E6B2F40A79E81C3D7 /* LayoutSnapshot.swift */; };
+		A2246AF7C19E139E576E0399 /* SessionType.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7614C13A5B0B575404F8D0 /* SessionType.swift */; };
+		39606B15D99AE7F48EFDFDAC /* SpriteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SpriteManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -242,6 +248,8 @@
 		E296BA43AB62D8C5E1220298 /* TmuxControlClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxControlClientTests.swift; sourceTree = "<group>"; };
 		E8FC1228ECB2BF9E969B47F6 /* TmuxLayoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxLayoutMapperTests.swift; sourceTree = "<group>"; };
 		29308BB8CE72FA426D42CA67 /* TmuxResizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxResizeTests.swift; sourceTree = "<group>"; };
+		5998B86593715E0E17C5A920 /* SSHHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHHostStore.swift; sourceTree = "<group>"; };
+		A16ADBDC569D151A14F8B2CA /* PersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -517,6 +525,7 @@
 				E8FC1228ECB2BF9E969B47F6 /* TmuxLayoutMapperTests.swift */,
 				54FCA8A41F8DE649749FD45E /* TmuxSurfaceManagerTests.swift */,
 				29308BB8CE72FA426D42CA67 /* TmuxResizeTests.swift */,
+				A16ADBDC569D151A14F8B2CA /* PersistenceTests.swift */,
 			);
 			path = FantasttyTests;
 			sourceTree = "<group>";
@@ -532,6 +541,7 @@
 				DC6AC3226D44E7AE9D1BD9DE /* TmuxControlClient.swift */,
 				83AC84A5E91E55E07CF9FE84 /* TmuxLayoutMapper.swift */,
 				58F05CD954F40C7BC0446D27 /* TmuxSurfaceManager.swift */,
+				5998B86593715E0E17C5A920 /* SSHHostStore.swift */,
 			);
 			path = TmuxControlMode;
 			sourceTree = "<group>";
@@ -716,6 +726,7 @@
 				709CA306A80F104F1920C4CC /* TmuxControlClient.swift in Sources */,
 				3A204721692A0C52582F1307 /* TmuxLayoutMapper.swift in Sources */,
 				BD064BB6914F370DAE222813 /* TmuxSurfaceManager.swift in Sources */,
+				9DE1C9541DAF8BABF4C44F9F /* SSHHostStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -741,6 +752,11 @@
 				EAE56E7AF8A7EBB0B4D07471 /* TmuxLayoutMapperTests.swift in Sources */,
 				1AC7ABB5CDA83367198B92E3 /* TmuxSurfaceManagerTests.swift in Sources */,
 				90062D49CACB63F642009B3D /* TmuxResizeTests.swift in Sources */,
+				8C2CC5D21E21B2079B29D66F /* SSHHostStore.swift in Sources */,
+				C7018E5CAB628FF87BFFD0C5 /* LayoutSnapshot.swift in Sources */,
+				A2246AF7C19E139E576E0399 /* SessionType.swift in Sources */,
+				39606B15D99AE7F48EFDFDAC /* SpriteManager.swift in Sources */,
+				C5AF55BC311FA859242DAD06 /* PersistenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
