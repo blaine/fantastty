@@ -24,5 +24,23 @@
 	<string></string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Ghostty Surface Identifier</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.mitchellh.ghosttySurfaceId</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.mime-type</key>
+				<string>application/vnd.mitchellh.ghostty-surface-id</string>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

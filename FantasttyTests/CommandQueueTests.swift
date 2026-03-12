@@ -75,3 +75,51 @@ final class CommandQueueTests: XCTestCase {
         XCTAssertTrue(queue.isEmpty)
     }
 }
+
+final class TmuxControlBlockTrackerTests: XCTestCase {
+
+    func testBeginStartsActiveBlock() throws {
+        var tracker = TmuxControlBlockTracker()
+
+        XCTAssertFalse(tracker.hasActiveBlock)
+        try tracker.begin(id: 7, flags: 0)
+        XCTAssertTrue(tracker.hasActiveBlock)
+    }
+
+    func testAppendAndEndReturnsAccumulatedResponse() throws {
+        var tracker = TmuxControlBlockTracker()
+        try tracker.begin(id: 11, flags: 0)
+
+        tracker.append("line 1\n")
+        tracker.append("line 2\n")
+
+        let response = try tracker.end(id: 11, flags: 0)
+        XCTAssertEqual(response, "line 1\nline 2\n")
+        XCTAssertFalse(tracker.hasActiveBlock)
+    }
+
+    func testErrorReturnsAccumulatedResponse() throws {
+        var tracker = TmuxControlBlockTracker()
+        try tracker.begin(id: 15, flags: 1)
+
+        tracker.append("failure detail")
+        let response = try tracker.error(id: 15, flags: 1)
+
+        XCTAssertEqual(response, "failure detail")
+        XCTAssertFalse(tracker.hasActiveBlock)
+    }
+
+    func testUnexpectedEndWithoutBeginThrowsProtocolViolation() {
+        var tracker = TmuxControlBlockTracker()
+        XCTAssertThrowsError(try tracker.end(id: 1, flags: 0)) { error in
+            XCTAssertEqual(error as? TmuxControlBlockTracker.Error, .unexpectedEnd(id: 1, flags: 0))
+        }
+    }
+
+    func testUnexpectedErrorWithoutBeginThrowsProtocolViolation() {
+        var tracker = TmuxControlBlockTracker()
+        XCTAssertThrowsError(try tracker.error(id: 1, flags: 0)) { error in
+            XCTAssertEqual(error as? TmuxControlBlockTracker.Error, .unexpectedError(id: 1, flags: 0))
+        }
+    }
+}

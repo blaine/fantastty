@@ -1,6 +1,91 @@
 import SwiftUI
 import WebKit
 import GhosttyKit
+import AppKit
+
+enum TerminalThumbnailRenderer {
+    static func contentRect(for node: SplitTree<Ghostty.SurfaceView>.Node?) -> CGRect? {
+        let frames = leafSurfaces(in: node).map(visibleFrame(of:))
+        guard let first = frames.first else { return nil }
+        return frames.dropFirst().reduce(first) { partial, frame in
+            partial.union(frame)
+        }
+    }
+
+    static func thumbnailImage(
+        for node: SplitTree<Ghostty.SurfaceView>.Node?,
+        targetSize: NSSize? = nil
+    ) -> NSImage? {
+        let leaves = leafSurfaces(in: node)
+        guard !leaves.isEmpty,
+              let contentRect = contentRect(for: node),
+              contentRect.width > 0,
+              contentRect.height > 0 else {
+            return nil
+        }
+
+        let image = NSImage(size: contentRect.size)
+        image.lockFocus()
+        NSColor.black.setFill()
+        NSBezierPath(rect: CGRect(origin: .zero, size: contentRect.size)).fill()
+
+        for surface in leaves {
+            guard let surfaceImage = surface.asImage else { continue }
+            let frame = visibleFrame(of: surface)
+            let drawRect = CGRect(
+                x: frame.minX - contentRect.minX,
+                y: frame.minY - contentRect.minY,
+                width: frame.width,
+                height: frame.height
+            )
+            surfaceImage.draw(in: drawRect)
+        }
+
+        image.unlockFocus()
+
+        if let targetSize {
+            return image.resized(toFit: targetSize)
+        }
+        return image
+    }
+
+    private static func leafSurfaces(
+        in node: SplitTree<Ghostty.SurfaceView>.Node?
+    ) -> [Ghostty.SurfaceView] {
+        guard let node else { return [] }
+
+        switch node {
+        case .leaf(let view):
+            return [view]
+        case .split(let split):
+            return leafSurfaces(in: split.left) + leafSurfaces(in: split.right)
+        }
+    }
+
+    private static func visibleFrame(of surface: Ghostty.SurfaceView) -> CGRect {
+        let bounds = surface.bounds.isEmpty
+            ? CGRect(origin: .zero, size: surface.frame.size)
+            : surface.bounds
+
+        if surface.window != nil {
+            return surface.convert(bounds, to: nil)
+        }
+
+        if let superview = surface.superview {
+            return surface.convert(bounds, to: superview)
+        }
+
+        return surface.frame.isEmpty ? bounds : surface.frame
+    }
+}
+
+private struct ThumbnailPanelScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
 
 /// A panel showing live thumbnails of non-focused tabs in the current session.
 struct TabThumbnailPanel: View {
@@ -9,9 +94,7 @@ struct TabThumbnailPanel: View {
 
     /// Width of the thumbnail panel
     static let panelWidth: CGFloat = 160
-
-    /// Refresh interval for thumbnails
-    static let refreshInterval: TimeInterval = 0.5
+    static let thumbnailRenderSize = NSSize(width: 144, height: 90)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,6 +134,18 @@ struct TabThumbnailPanel: View {
                     }
                 }
                 .padding(8)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: ThumbnailPanelScrollOffsetPreferenceKey.self,
+                            value: proxy.frame(in: .named("thumbnailPanelScroll")).minY
+                        )
+                    }
+                }
+            }
+            .coordinateSpace(name: "thumbnailPanelScroll")
+            .onPreferenceChange(ThumbnailPanelScrollOffsetPreferenceKey.self) { _ in
+                sessionManager.noteThumbnailScrollActivity()
             }
         }
         .frame(width: Self.panelWidth)
@@ -61,19 +156,13 @@ struct TabThumbnailPanel: View {
 /// A single tab thumbnail with live preview.
 struct TabThumbnailView: View {
     @ObservedObject var tab: TerminalTab
+    @EnvironmentObject var sessionManager: SessionManager
     let isSelected: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
 
     @State private var thumbnail: NSImage?
     @State private var isHovered = false
-
-    /// Timer for refreshing the thumbnail
-    private let timer = Timer.publish(
-        every: TabThumbnailPanel.refreshInterval,
-        on: .main,
-        in: .common
-    ).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -141,24 +230,30 @@ struct TabThumbnailView: View {
             isHovered = hovering
         }
         .onAppear {
+            guard !sessionManager.areThumbnailRefreshesSuspended else { return }
             updateThumbnail()
         }
-        .onReceive(timer) { _ in
-            // Only update if not selected (selected tab is visible anyway)
-            if !isSelected {
-                updateThumbnail()
-            }
+        .onChange(of: sessionManager.areThumbnailRefreshesSuspended) { _, isSuspended in
+            guard !isSuspended else { return }
+            updateThumbnail()
+        }
+        .onReceive(tab.thumbnailRefreshes.debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
+            guard !sessionManager.areThumbnailRefreshesSuspended else { return }
+            updateThumbnail()
         }
     }
 
     private func updateThumbnail() {
         switch tab.kind {
         case .terminal:
-            guard let surface = firstSurface(in: tab.surfaceTree?.root) else { return }
+            guard let image = TerminalThumbnailRenderer.thumbnailImage(
+                for: tab.surfaceTree?.root,
+                targetSize: TabThumbnailPanel.thumbnailRenderSize
+            ) else {
+                return
+            }
             DispatchQueue.main.async {
-                if let image = surface.asImage {
-                    self.thumbnail = image
-                }
+                self.thumbnail = image
             }
         case .browser:
             guard let webView = tab.webView else { return }
@@ -171,14 +266,4 @@ struct TabThumbnailView: View {
         }
     }
 
-    /// Get the first leaf surface from a split tree node.
-    private func firstSurface(in node: SplitTree<Ghostty.SurfaceView>.Node?) -> Ghostty.SurfaceView? {
-        guard let node = node else { return nil }
-        switch node {
-        case .leaf(let view):
-            return view
-        case .split(let split):
-            return firstSurface(in: split.left)
-        }
-    }
 }

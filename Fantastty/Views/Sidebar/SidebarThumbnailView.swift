@@ -12,22 +12,13 @@ struct SidebarThumbnailView: View {
     let onClose: () -> Void
 
     @State private var isHovered = false
+    @State private var terminalSnapshot: NSImage?
     @State private var browserSnapshot: NSImage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack {
-                // TimelineView drives periodic re-capture of the thumbnail.
-                // Only run the timer for the active session to avoid GPU readbacks on all background sessions.
-                if isSessionActive {
-                    TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                        thumbnailImage
-                            .onAppear { captureBrowserSnapshot() }
-                            .onChange(of: context.date) { captureBrowserSnapshot() }
-                    }
-                } else {
-                    thumbnailImage
-                }
+                thumbnailImage
 
                 // Hover overlay with close button
                 if isHovered && !isSelected {
@@ -72,14 +63,18 @@ struct SidebarThumbnailView: View {
         .onHover { hovering in
             isHovered = hovering
         }
+        .onAppear { updateThumbnail() }
+        .onReceive(tab.thumbnailRefreshes.debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
+            guard isSessionActive else { return }
+            updateThumbnail()
+        }
     }
 
     @ViewBuilder
     private var thumbnailImage: some View {
         switch tab.kind {
         case .terminal:
-            if let surface = firstSurface(in: tab.surfaceTree?.root),
-               let image = surface.asImage {
+            if let image = terminalSnapshot {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -131,13 +126,16 @@ struct SidebarThumbnailView: View {
         }
     }
 
-    private func firstSurface(in node: SplitTree<Ghostty.SurfaceView>.Node?) -> Ghostty.SurfaceView? {
-        guard let node = node else { return nil }
-        switch node {
-        case .leaf(let view):
-            return view
-        case .split(let split):
-            return firstSurface(in: split.left)
+    private func updateThumbnail() {
+        switch tab.kind {
+        case .terminal:
+            terminalSnapshot = TerminalThumbnailRenderer.thumbnailImage(
+                for: tab.surfaceTree?.root,
+                targetSize: TabThumbnailPanel.thumbnailRenderSize
+            )
+        case .browser:
+            captureBrowserSnapshot()
         }
     }
+
 }

@@ -7,10 +7,100 @@ import AppKit
 /// Central orchestrator for all terminal sessions.
 /// Routes libghostty notifications to the correct session/tab.
 class SessionManager: ObservableObject {
+    typealias TmuxOutputInjector = (Ghostty.SurfaceView, Data) -> Bool
+    typealias TmuxWindowResizeSender = SessionManagerV2.TmuxWindowResizeSender
+    typealias TmuxWindowInitialCaptureRequester = SessionManagerV2.TmuxWindowInitialCaptureRequester
+    typealias AttachedTmuxSplitSender = (TmuxControlClient, Int, Bool) async throws -> Void
+    typealias AttachedTmuxNewWindowSender = (TmuxControlClient) async throws -> String
+    typealias LiveTmuxWorkspaceProvider = () -> [String: TmuxWorkspaceInfo]
+    typealias AttachedSessionReconnectStarter = (Session) -> Void
+    typealias WorkspaceMetadataProvider = () -> [SessionMetadata]
+
+    final class ThumbnailRefreshController {
+        private enum Reason: Hashable {
+            case startup
+            case scroll
+        }
+
+        private let startupResumeDelay: TimeInterval
+        private let scrollResumeDelay: TimeInterval
+        private var activeReasons: Set<Reason> = []
+        private var resumeTasks: [Reason: Task<Void, Never>] = [:]
+
+        var onStateChange: ((Bool) -> Void)?
+
+        private(set) var isSuspended = false {
+            didSet {
+                guard oldValue != isSuspended else { return }
+                onStateChange?(isSuspended)
+            }
+        }
+
+        init(
+            startupResumeDelay: TimeInterval = 1.5,
+            scrollResumeDelay: TimeInterval = 0.35
+        ) {
+            self.startupResumeDelay = startupResumeDelay
+            self.scrollResumeDelay = scrollResumeDelay
+        }
+
+        deinit {
+            resumeTasks.values.forEach { $0.cancel() }
+        }
+
+        func beginStartup() {
+            suspend(.startup)
+        }
+
+        func endStartup() {
+            scheduleResume(for: .startup, after: startupResumeDelay)
+        }
+
+        func noteScrollActivity() {
+            suspend(.scroll)
+            scheduleResume(for: .scroll, after: scrollResumeDelay)
+        }
+
+        private func suspend(_ reason: Reason) {
+            resumeTasks[reason]?.cancel()
+            activeReasons.insert(reason)
+            updateSuspensionState()
+        }
+
+        private func scheduleResume(for reason: Reason, after delay: TimeInterval) {
+            resumeTasks[reason]?.cancel()
+
+            let delayNanoseconds = UInt64(max(delay, 0) * 1_000_000_000)
+            resumeTasks[reason] = Task { [weak self] in
+                do {
+                    try await Task.sleep(nanoseconds: delayNanoseconds)
+                } catch {
+                    return
+                }
+
+                guard let self else { return }
+                await MainActor.run {
+                    self.activeReasons.remove(reason)
+                    self.resumeTasks[reason] = nil
+                    self.updateSuspensionState()
+                }
+            }
+        }
+
+        private func updateSuspensionState() {
+            isSuspended = !activeReasons.isEmpty
+        }
+    }
+
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.blainecook.fantastty",
         category: "session-manager"
     )
+    private static let defaultLayoutURL: URL = {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        return homeDir.appendingPathComponent(".fantastty/layout.json")
+    }()
+    static var layoutURLOverride: URL?
 
     /// Whether persistent tmux sessions are enabled
     @AppStorage("persistentSessions") var persistentSessionsEnabled: Bool = false
@@ -21,6 +111,83 @@ class SessionManager: ObservableObject {
     /// Debug log — routed through os.Logger (async, zero-cost when not captured).
     private static func debugLog(_ message: String) {
         logger.debug("\(message, privacy: .public)")
+    }
+
+    private static func defaultTmuxOutputInjector(_ surface: Ghostty.SurfaceView, _ data: Data) -> Bool {
+        guard let cSurface = surface.surface else { return false }
+        data.withUnsafeBytes { buffer in
+            guard let ptr = buffer.baseAddress?.assumingMemoryBound(to: CChar.self) else { return }
+            ghostty_surface_inject_output(cSurface, ptr, UInt(buffer.count))
+        }
+        return true
+    }
+
+    private static func defaultAttachedTmuxSplitSender(
+        _ client: TmuxControlClient,
+        _ paneID: Int,
+        _ horizontal: Bool
+    ) async throws {
+        try await client.splitPane(paneID: paneID, horizontal: horizontal)
+    }
+
+    private static func defaultAttachedTmuxNewWindowSender(
+        _ client: TmuxControlClient
+    ) async throws -> String {
+        try await client.newWindow()
+    }
+
+    private static func connectAttachedSessionWithTimeout(
+        _ client: TmuxControlClient,
+        timeoutSeconds: TimeInterval = 20
+    ) async throws {
+        let timeoutNanoseconds = UInt64(max(timeoutSeconds, 0) * 1_000_000_000)
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await client.connect()
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                await client.disconnect()
+                throw TmuxControlError.serverError("timed out waiting for tmux control handshake")
+            }
+
+            _ = try await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private static func defaultAttachedSessionReconnectStarter(_ session: Session) {
+        guard let client = session.controlClient else { return }
+        logger.info(
+            "Attached tmux reconnect start workspace=\(session.workspaceID, privacy: .public) session=\(client.attachmentInfo.sessionName, privacy: .public) launchMode=\(client.attachmentInfo.launchMode.rawValue, privacy: .public)"
+        )
+
+        Task { @MainActor [weak session] in
+            do {
+                try await connectAttachedSessionWithTimeout(client)
+            } catch {
+                guard let session else { return }
+                #if DEBUG
+                let trace = await client.currentDebugTrace()
+                let tailTrace = trace.suffix(30).joined(separator: " | ")
+                logger.error(
+                    "Attached tmux reconnect failed workspace=\(session.workspaceID, privacy: .public) error=\(error.localizedDescription, privacy: .public) trace=\(tailTrace, privacy: .public)"
+                )
+                #else
+                logger.error(
+                    "Attached tmux reconnect failed workspace=\(session.workspaceID, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+                #endif
+                if case .attached(var info) = session.mode {
+                    info.connectionState = .disconnected(reason: error.localizedDescription)
+                    session.mode = .attached(info)
+                }
+                if !session.tabs.contains(where: { $0.kind == .terminal }) {
+                    session.backingState = .missingAttachedBacking(reason: error.localizedDescription)
+                }
+            }
+        }
     }
 
     /// All sessions (sidebar items)
@@ -41,12 +208,44 @@ class SessionManager: ObservableObject {
     /// Whether the notes panel is expanded
     @Published var notesExpanded: Bool = false
 
+    /// Whether thumbnail refresh work should currently be suppressed.
+    @Published private(set) var areThumbnailRefreshesSuspended: Bool = false
+
     /// Reference to the Ghostty app state
-    var ghosttyApp: Ghostty.App?
+    var ghosttyApp: Ghostty.App? {
+        didSet {
+            attachedSessionManagerV2.ghosttyApp = ghosttyApp
+        }
+    }
 
     /// O(1) lookup: surface object identity → (Session, TerminalTab).
     /// Populated in setupTitleObserver; pruned in closeTab/closeSurface/closeSession.
     private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
+    private let attachedSessionManagerV2 = SessionManagerV2()
+    var tmuxOutputInjector: TmuxOutputInjector = SessionManager.defaultTmuxOutputInjector {
+        didSet {
+            attachedSessionManagerV2.tmuxOutputInjector = tmuxOutputInjector
+        }
+    }
+    var tmuxWindowResizeSender: TmuxWindowResizeSender {
+        get { attachedSessionManagerV2.tmuxWindowResizeSender }
+        set { attachedSessionManagerV2.tmuxWindowResizeSender = newValue }
+    }
+    var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester {
+        get { attachedSessionManagerV2.tmuxWindowInitialCaptureRequester }
+        set { attachedSessionManagerV2.tmuxWindowInitialCaptureRequester = newValue }
+    }
+    var attachedTmuxWindowRecaptureDelay: TimeInterval {
+        get { attachedSessionManagerV2.attachedTmuxWindowRecaptureDelay }
+        set { attachedSessionManagerV2.attachedTmuxWindowRecaptureDelay = newValue }
+    }
+    var attachedTmuxSplitSender: AttachedTmuxSplitSender = SessionManager.defaultAttachedTmuxSplitSender
+    var attachedTmuxNewWindowSender: AttachedTmuxNewWindowSender = SessionManager.defaultAttachedTmuxNewWindowSender
+    var tmuxAvailabilityProvider: () -> Bool
+    var liveTmuxWorkspaceProvider: LiveTmuxWorkspaceProvider
+    var attachedSessionReconnectStarter: AttachedSessionReconnectStarter
+    var workspaceMetadataProvider: WorkspaceMetadataProvider
+    private let thumbnailRefreshController = ThumbnailRefreshController()
 
     // MARK: - Activity Tracking
 
@@ -78,6 +277,20 @@ class SessionManager: ObservableObject {
         return selectedTab?.focusedSurface
     }
 
+    init() {
+        tmuxAvailabilityProvider = { TmuxManager.shared.isTmuxAvailable }
+        liveTmuxWorkspaceProvider = { TmuxManager.shared.groupSessionsByWorkspace() }
+        attachedSessionReconnectStarter = SessionManager.defaultAttachedSessionReconnectStarter
+        workspaceMetadataProvider = { Array(SessionMetadataStore.shared.metadata.values) }
+        attachedSessionManagerV2.tmuxOutputInjector = tmuxOutputInjector
+
+        thumbnailRefreshController.onStateChange = { [weak self] isSuspended in
+            DispatchQueue.main.async {
+                self?.areThumbnailRefreshesSuspended = isSuspended
+            }
+        }
+    }
+
     deinit {
         if let monitor = mouseMonitor {
             NSEvent.removeMonitor(monitor)
@@ -102,6 +315,18 @@ class SessionManager: ObservableObject {
         }
     }
 
+    func beginStartupThumbnailRefreshSuppression() {
+        thumbnailRefreshController.beginStartup()
+    }
+
+    func endStartupThumbnailRefreshSuppression() {
+        thumbnailRefreshController.endStartup()
+    }
+
+    func noteThumbnailScrollActivity() {
+        thumbnailRefreshController.noteScrollActivity()
+    }
+
     // MARK: - Workspace Name Generation
 
     private static func generateWorkspaceName() -> String {
@@ -117,10 +342,18 @@ class SessionManager: ObservableObject {
     // MARK: - Layout Persistence
 
     /// Path to the layout snapshot file.
-    private static let layoutURL: URL = {
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        return homeDir.appendingPathComponent(".fantastty/layout.json")
-    }()
+    private static var layoutURL: URL {
+        layoutURLOverride ?? defaultLayoutURL
+    }
+
+    private func tmuxHost(for sessionType: SessionType) -> TmuxHost {
+        switch sessionType {
+        case .ssh(let host, let user, let port):
+            return .ssh(SSHHostInfo(user: user, hostname: host, port: port))
+        case .local, .sprite:
+            return .local
+        }
+    }
 
     /// Save the current layout (sidebar order, tab order, selections) to disk.
     func saveLayout() {
@@ -129,24 +362,32 @@ class SessionManager: ObservableObject {
         var workspaces: [WorkspaceLayout] = []
 
         for session in sessions {
-            guard let baseSessionName = session.tmuxSessionName else { continue }
+            guard case .attached(let info) = session.mode else {
+                Self.logger.error("Skipping non-attached session during save: \(session.workspaceID, privacy: .public)")
+                continue
+            }
 
-            let tabSessionNames = session.tabs.dropFirst().compactMap { $0.tmuxSessionName }
-
-            let selectedTabIndex: Int?
+            let browserTabs = session.tabs.compactMap { tab -> WorkspaceTabLayout? in
+                guard tab.kind == .browser else { return nil }
+                return WorkspaceTabLayout(kind: .browser, url: tab.url)
+            }
+            let selectedBrowserIndex: Int?
             if let selectedID = session.selectedTabID,
-               let idx = session.tabs.firstIndex(where: { $0.id == selectedID }) {
-                selectedTabIndex = idx
+               let selectedIndex = session.tabs.firstIndex(where: { $0.id == selectedID }),
+               session.tabs[selectedIndex].kind == .browser {
+                selectedBrowserIndex = session.tabs[..<selectedIndex]
+                    .filter { $0.kind == .browser }
+                    .count
             } else {
-                selectedTabIndex = nil
+                selectedBrowserIndex = nil
             }
 
             workspaces.append(WorkspaceLayout(
                 workspaceID: session.workspaceID,
-                baseSessionName: baseSessionName,
-                tabSessionNames: tabSessionNames,
-                selectedTabIndex: selectedTabIndex,
-                sessionType: session.type == .local ? nil : session.type
+                selectedTabIndex: selectedBrowserIndex,
+                sessionType: session.type == .local ? nil : session.type,
+                attachment: persistedAttachmentInfo(from: info),
+                tabs: browserTabs
             ))
         }
 
@@ -198,15 +439,20 @@ class SessionManager: ObservableObject {
     @discardableResult
     func restoreTmuxSessions() -> Bool {
         let isPersistent = persistentSessionsEnabled
-        let isTmuxAvailable = tmuxManager.isTmuxAvailable
-        guard isPersistent && isTmuxAvailable else {
-            Self.logger.info("Tmux restoration skipped: persistentSessions=\(isPersistent), tmuxAvailable=\(isTmuxAvailable)")
+        let isTmuxAvailable = tmuxAvailabilityProvider()
+        guard isPersistent else {
+            Self.logger.info("Tmux restoration skipped: persistentSessions=\(isPersistent)")
             return false
         }
 
-        var liveWorkspaces = tmuxManager.groupSessionsByWorkspace()
+        var liveWorkspaces = isTmuxAvailable ? liveTmuxWorkspaceProvider() : [:]
         let layout = loadLayout()
         var restoredCount = 0
+        let metadataByWorkspaceID = Dictionary(
+            uniqueKeysWithValues: workspaceMetadataProvider()
+                .filter { !$0.workspaceID.isEmpty }
+                .map { ($0.workspaceID, $0) }
+        )
 
         if let layout = layout {
             Self.logger.info("Restoring with layout snapshot (\(layout.workspaces.count) workspaces)")
@@ -214,57 +460,33 @@ class SessionManager: ObservableObject {
             // Restore workspaces in layout order
             for wsLayout in layout.workspaces {
                 // Skip archived workspaces (tmux should already be dead, but be defensive)
-                if SessionMetadataStore.shared.getOrCreate(forKey: wsLayout.workspaceID).isArchived {
-                    Self.logger.info("Skipping archived workspace \(wsLayout.workspaceID)")
+                let metadata = metadataByWorkspaceID[wsLayout.workspaceID]
+                if metadata?.isArchived == true || metadata?.isTrashed == true {
+                    Self.logger.info("Skipping inactive workspace \(wsLayout.workspaceID)")
                     liveWorkspaces.removeValue(forKey: wsLayout.workspaceID)
                     continue
                 }
 
-                guard let workspace = liveWorkspaces[wsLayout.workspaceID],
-                      workspace.isValid, let baseSession = workspace.baseSession else {
-                    Self.logger.info("Skipping stale workspace \(wsLayout.workspaceID)")
-                    continue
-                }
-
-                // Build a set of live tab session names for this workspace
-                let liveTabNames = Set(workspace.tabSessions.map { $0.name })
-                let sessionType = wsLayout.sessionType ?? .local
-
-                if let session = createSession(type: sessionType, tmuxSessionName: baseSession.name,
-                                               workspaceID: wsLayout.workspaceID) {
-                    // Restore tabs in layout order
-                    var tabCounter = 0
-                    for tabName in wsLayout.tabSessionNames {
-                        guard liveTabNames.contains(tabName) else {
-                            Self.logger.info("Skipping stale tab session \(tabName)")
-                            continue
-                        }
-                        tabCounter += 1
-                        if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabName) {
-                            session.tmuxTabCounter = max(session.tmuxTabCounter, tabCounter)
-                            Self.logger.info("Restored tab \(tab.id) with tmux session \(tabName)")
-                        }
-                    }
-
-                    // Append any live tabs not in the layout (new tabs created outside the app)
-                    for tabSession in workspace.tabSessions {
-                        if !wsLayout.tabSessionNames.contains(tabSession.name) {
-                            tabCounter += 1
-                            if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabSession.name) {
-                                session.tmuxTabCounter = max(session.tmuxTabCounter, tabCounter)
-                                Self.logger.info("Restored new tab \(tab.id) with tmux session \(tabSession.name)")
-                            }
-                        }
-                    }
-
-                    // Restore selected tab
-                    if let selectedIdx = wsLayout.selectedTabIndex,
-                       selectedIdx >= 0 && selectedIdx < session.tabs.count {
-                        session.selectedTabID = session.tabs[selectedIdx].id
-                    }
-
-                    restoredCount += 1
-                }
+                let attachment = wsLayout.attachment
+                    ?? metadata?.attachment
+                    ?? TmuxAttachmentInfo(
+                        sessionName: tmuxManager.baseSessionName(workspaceID: wsLayout.workspaceID),
+                        host: tmuxHost(for: wsLayout.sessionType ?? .local),
+                        connectionState: .disconnected(reason: nil),
+                        launchMode: .attach
+                    )
+                Self.logger.info("Restoring attached tmux workspace \(wsLayout.workspaceID)")
+                restoreAttachedSession(
+                    attachment: attachment,
+                    workspaceID: wsLayout.workspaceID,
+                    tabLayouts: wsLayout.tabs,
+                    selectedTabIndex: wsLayout.selectedTabIndex,
+                    autoReconnect: shouldAutoReconnect(
+                        attachment: attachment,
+                        tmuxAvailable: isTmuxAvailable
+                    )
+                )
+                restoredCount += 1
 
                 // Remove from live workspaces so we know what's left
                 liveWorkspaces.removeValue(forKey: wsLayout.workspaceID)
@@ -273,38 +495,30 @@ class SessionManager: ObservableObject {
             // Append any live workspaces not in the layout
             for (workspaceID, workspace) in liveWorkspaces {
                 guard workspace.isValid, let baseSession = workspace.baseSession else { continue }
-                if SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).isArchived {
-                    Self.logger.info("Skipping archived workspace \(workspaceID)")
+                let metadata = metadataByWorkspaceID[workspaceID]
+                if metadata?.isArchived == true || metadata?.isTrashed == true {
+                    Self.logger.info("Skipping inactive workspace \(workspaceID)")
                     continue
                 }
 
                 Self.logger.info("Restoring unlayouted workspace \(workspaceID)")
-                if let session = createSession(type: .local, tmuxSessionName: baseSession.name,
-                                               workspaceID: workspaceID) {
-                    for (index, tabSession) in workspace.tabSessions.enumerated() {
-                        if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabSession.name) {
-                            session.tmuxTabCounter = max(session.tmuxTabCounter, index + 1)
-                            Self.logger.info("Restored tab \(tab.id) with tmux session \(tabSession.name)")
-                        }
-                    }
-
-                    restoredCount += 1
-                }
+                restoreAttachedSession(
+                    attachment: TmuxAttachmentInfo(
+                        sessionName: baseSession.name,
+                        host: .local,
+                        connectionState: .disconnected(reason: nil),
+                        launchMode: .attach
+                    ),
+                    workspaceID: workspaceID
+                )
+                restoredCount += 1
             }
 
-            // Recreate orphaned SSH/Sprite sessions (local tmux gone, remote tmux may still be alive)
-            for wsLayout in layout.workspaces {
-                guard let sessionType = wsLayout.sessionType,
-                      liveWorkspaces[wsLayout.workspaceID] == nil else { continue }
-                switch sessionType {
-                case .ssh, .sprite:
-                    // Use the same workspace ID so remote tmux session name matches
-                    Self.logger.info("Recreating orphaned \(sessionType.displayName) workspace \(wsLayout.workspaceID)")
-                    createSession(type: sessionType, workspaceID: wsLayout.workspaceID)
-                default:
-                    break
-                }
-            }
+            restoredCount += restoreMetadataOnlyPlaceholders(
+                excluding: Set(sessions.map(\.workspaceID)),
+                preferredOrder: layout.workspaces.map(\.workspaceID),
+                tmuxAvailable: isTmuxAvailable
+            )
 
             // Restore selected workspace
             if let selectedWSID = layout.selectedWorkspaceID,
@@ -317,124 +531,299 @@ class SessionManager: ObservableObject {
 
             for (workspaceID, workspace) in liveWorkspaces {
                 guard workspace.isValid, let baseSession = workspace.baseSession else { continue }
-                if SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).isArchived {
-                    Self.logger.info("Skipping archived workspace \(workspaceID)")
+                let metadata = metadataByWorkspaceID[workspaceID]
+                if metadata?.isArchived == true || metadata?.isTrashed == true {
+                    Self.logger.info("Skipping inactive workspace \(workspaceID)")
                     continue
                 }
 
-                Self.logger.info("Restoring workspace \(workspaceID) with \(workspace.tabSessions.count + 1) tabs")
+                Self.logger.info("Restoring workspace \(workspaceID)")
 
-                if let session = createSession(type: .local, tmuxSessionName: baseSession.name,
-                                               workspaceID: workspaceID) {
-                    for (index, tabSession) in workspace.tabSessions.enumerated() {
-                        if let tab = restoreTabWithTmuxSession(session: session, tmuxSessionName: tabSession.name) {
-                            session.tmuxTabCounter = max(session.tmuxTabCounter, index + 1)
-                            Self.logger.info("Restored tab \(tab.id) with tmux session \(tabSession.name)")
-                        }
-                    }
-
-                    restoredCount += 1
-                }
+                restoreAttachedSession(
+                    attachment: TmuxAttachmentInfo(
+                        sessionName: baseSession.name,
+                        host: .local,
+                        connectionState: .disconnected(reason: nil),
+                        launchMode: .attach
+                    ),
+                    workspaceID: workspaceID
+                )
+                restoredCount += 1
             }
+
+            restoredCount += restoreMetadataOnlyPlaceholders(
+                excluding: Set(sessions.map(\.workspaceID)),
+                tmuxAvailable: isTmuxAvailable
+            )
         }
 
         // Delete layout file after consumption
         deleteLayout()
 
+        if selectedSessionID == nil {
+            selectedSessionID = sessions.first?.id
+        }
+
         Self.logger.info("Restored \(restoredCount) workspaces from tmux")
         return restoredCount > 0
     }
 
-    /// Restore a single tab by attaching to an existing tmux session.
-    private func restoreTabWithTmuxSession(session: Session, tmuxSessionName: String) -> TerminalTab? {
-        guard let app = ghosttyApp?.app else { return nil }
+    private func persistedAttachmentInfo(from info: TmuxAttachmentInfo) -> TmuxAttachmentInfo {
+        var persisted = info
+        persisted.connectionState = .disconnected(reason: nil)
+        persisted.launchMode = .attach
+        return persisted
+    }
 
-        var surfaceConfig = Ghostty.SurfaceConfiguration()
-        surfaceConfig.command = tmuxManager.commandForAttach(sessionName: tmuxSessionName)
+    private func restoreAttachedSession(
+        attachment: TmuxAttachmentInfo,
+        workspaceID: String,
+        tabLayouts: [WorkspaceTabLayout] = [],
+        selectedTabIndex: Int? = nil,
+        autoReconnect: Bool = true
+    ) {
+        let session = makeAttachedSession(
+            info: persistedAttachmentInfo(from: attachment),
+            workspaceID: workspaceID
+        )
+        restorePersistedAttachedTabs(
+            tabLayouts,
+            in: session,
+            selectedTabIndex: selectedTabIndex
+        )
+        sessions.append(session)
+        if autoReconnect {
+            startAttachedSessionReconnect(session)
+        } else {
+            session.backingState = placeholderBackingState(for: attachment)
+        }
+    }
 
-        let surfaceView = Ghostty.SurfaceView(app, baseConfig: surfaceConfig)
-        let tab = TerminalTab(type: .local, surfaceView: surfaceView)
-        tab.tmuxSessionName = tmuxSessionName
+    private func restorePersistedAttachedTabs(
+        _ tabLayouts: [WorkspaceTabLayout],
+        in session: Session,
+        selectedTabIndex: Int?
+    ) {
+        let browserTabs = tabLayouts.enumerated().filter { $0.element.kind == .browser }
+        guard !browserTabs.isEmpty else { return }
 
-        session.addTab(tab)
-        setupTitleObserver(for: tab, surfaceView: surfaceView, session: session)
+        session.tabs = browserTabs.map { entry in
+            TerminalTab(url: entry.element.url ?? URL(string: "https://www.google.com")!)
+        }
 
-        return tab
+        if let selectedTabIndex,
+           tabLayouts.indices.contains(selectedTabIndex),
+           tabLayouts[selectedTabIndex].kind == .browser,
+           let remappedSelectedIndex = browserTabs.firstIndex(where: { $0.offset == selectedTabIndex }),
+           session.tabs.indices.contains(remappedSelectedIndex) {
+            session.selectedTabID = session.tabs[remappedSelectedIndex].id
+        } else {
+            session.selectedTabID = session.tabs.first?.id
+        }
+    }
+
+    @discardableResult
+    private func restoreMetadataOnlyPlaceholders(
+        excluding restoredWorkspaceIDs: Set<String>,
+        preferredOrder: [String] = [],
+        tmuxAvailable: Bool
+    ) -> Int {
+        let preferredOrderIndex = Dictionary(
+            uniqueKeysWithValues: preferredOrder.enumerated().map { ($0.element, $0.offset) }
+        )
+
+        let placeholders = workspaceMetadataProvider()
+            .filter { !$0.isArchived && !$0.isTrashed && !restoredWorkspaceIDs.contains($0.workspaceID) && !$0.workspaceID.isEmpty }
+            .sorted { lhs, rhs in
+                let lhsIndex = preferredOrderIndex[lhs.workspaceID] ?? Int.max
+                let rhsIndex = preferredOrderIndex[rhs.workspaceID] ?? Int.max
+                if lhsIndex != rhsIndex {
+                    return lhsIndex < rhsIndex
+                }
+                if lhs.modifiedAt != rhs.modifiedAt {
+                    return lhs.modifiedAt > rhs.modifiedAt
+                }
+                return lhs.workspaceID < rhs.workspaceID
+            }
+
+        for meta in placeholders {
+            let attachment = meta.attachment ?? TmuxAttachmentInfo(
+                sessionName: tmuxManager.baseSessionName(workspaceID: meta.workspaceID),
+                host: .local,
+                connectionState: .disconnected(reason: nil),
+                launchMode: .attach
+            )
+            restoreAttachedSession(
+                attachment: attachment,
+                workspaceID: meta.workspaceID,
+                autoReconnect: shouldAutoReconnect(
+                    attachment: attachment,
+                    tmuxAvailable: tmuxAvailable
+                )
+            )
+        }
+
+        return placeholders.count
+    }
+
+    private func placeholderBackingState(for attachment: TmuxAttachmentInfo) -> SessionBackingState {
+        if case .disconnected(let reason) = attachment.connectionState {
+            return .missingAttachedBacking(reason: reason)
+        }
+        return .missingAttachedBacking(reason: nil)
+    }
+
+    private func shouldAutoReconnect(
+        attachment: TmuxAttachmentInfo,
+        tmuxAvailable: Bool
+    ) -> Bool {
+        switch attachment.host {
+        case .local:
+            return tmuxAvailable
+        case .ssh:
+            return true
+        }
+    }
+
+    func createShell(for session: Session) {
+        clearStaleTerminalTabsForRecovery(in: session)
+
+        guard !session.tabs.contains(where: { $0.kind == .terminal }) else {
+            return
+        }
+
+        guard session.type == .local, tmuxManager.isTmuxAvailable else {
+            return
+        }
+
+        let canonicalSessionName = tmuxManager.baseSessionName(workspaceID: session.workspaceID)
+        let info = TmuxAttachmentInfo(
+            sessionName: canonicalSessionName,
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .create
+        )
+        Self.logger.info(
+            "Create shell requested workspace=\(session.workspaceID, privacy: .public) session=\(canonicalSessionName, privacy: .public) launchMode=create"
+        )
+        configureAttachedSession(session, with: info)
+        session.backingState = .available
+        selectedSessionID = session.id
+        startAttachedSessionReconnect(session)
+    }
+
+    func reattachPlaceholderSession(_ session: Session) {
+        clearStaleTerminalTabsForRecovery(in: session)
+
+        guard case .attached(let existingInfo) = session.mode else { return }
+        var info = persistedAttachmentInfo(from: existingInfo)
+        info.connectionState = .disconnected(reason: nil)
+        info.launchMode = .attach
+        configureAttachedSession(session, with: info)
+        selectedSessionID = session.id
+        startAttachedSessionReconnect(session)
+    }
+
+    private func configureAttachedSession(_ session: Session, with info: TmuxAttachmentInfo) {
+        attachedSessionManagerV2.unregisterSession(session)
+        let client = TmuxControlClient(attachmentInfo: info)
+        session.controlClient = client
+        session.mode = .attached(info)
+        attachedSessionManagerV2.registerAttachedSession(session)
+    }
+
+    private func clearStaleTerminalTabsForRecovery(in session: Session) {
+        guard shouldClearStaleTerminalTabsForRecovery(in: session) else { return }
+        guard session.tabs.contains(where: { $0.kind == .terminal }) else { return }
+
+        for terminalTab in session.tabs where terminalTab.kind == .terminal {
+            deregisterSurfaces(in: terminalTab)
+        }
+
+        session.tabs.removeAll { $0.kind == .terminal }
+        if let selectedTabID = session.selectedTabID,
+           !session.tabs.contains(where: { $0.id == selectedTabID }) {
+            session.selectedTabID = session.tabs.first?.id
+        }
+    }
+
+    private func shouldClearStaleTerminalTabsForRecovery(in session: Session) -> Bool {
+        if session.backingState != .available {
+            return true
+        }
+        if case .attached(let info) = session.mode,
+           case .disconnected = info.connectionState {
+            return true
+        }
+        return false
+    }
+
+    private func startAttachedSessionReconnect(_ session: Session) {
+        guard case .attached(var info) = session.mode else { return }
+        if case .connecting = info.connectionState {
+            return
+        }
+        info.connectionState = .connecting
+        session.mode = .attached(info)
+        session.backingState = .available
+        attachedSessionReconnectStarter(session)
+
+        if case .attached(let updatedInfo) = session.mode,
+           case .disconnected(let reason) = updatedInfo.connectionState,
+           !session.tabs.contains(where: { $0.kind == .terminal }) {
+            session.backingState = .missingAttachedBacking(reason: reason)
+        }
     }
 
     // MARK: - Session Management (Sidebar)
 
-    /// Create a new session (sidebar item) with an initial tab.
+    /// Create a new session (sidebar item) in attached tmux control mode.
     @discardableResult
-    func createSession(type: SessionType = .local, config: Ghostty.SurfaceConfiguration? = nil, tmuxSessionName: String? = nil, workspaceID: String? = nil) -> Session? {
-        guard let app = ghosttyApp?.app else {
-            Self.logger.error("Cannot create session: ghostty app not initialized")
-            return nil
-        }
-
-        var surfaceConfig = config ?? Ghostty.SurfaceConfiguration()
-
-        // Generate a workspace ID for this session (or use provided one for reconnection)
+    func createSession(type: SessionType = .local, workspaceID: String? = nil) -> Session? {
         let workspaceID = workspaceID ?? String(UUID().uuidString.prefix(8).lowercased())
-        var actualTmuxSessionName: String? = nil
 
-        // Use tmux if enabled and available
-        if persistentSessionsEnabled && tmuxManager.isTmuxAvailable {
-            if let existingSession = tmuxSessionName {
-                // Reattaching to existing session
-                actualTmuxSessionName = existingSession
-                surfaceConfig.command = tmuxManager.commandForAttach(sessionName: existingSession)
-            } else {
-                // Creating new tmux session
-                actualTmuxSessionName = tmuxManager.baseSessionName(workspaceID: workspaceID)
-                var paneCommand: String? = nil
-                if case .ssh = type, let sshCmd = type.sshCommand {
-                    let remoteSessionName = "fantastty-\(workspaceID)"
-                    paneCommand = "\(sshCmd) tmux new-session -A -s \"\(remoteSessionName)\""
-                } else if case .sprite(let spriteName) = type {
-                    // Setup remote tmux on the sprite (fire-and-forget)
-                    SpriteManager.shared.setupRemoteTmux(spriteName: spriteName, workspaceID: workspaceID)
-                    paneCommand = "\(SpriteManager.shared.spritePath) console -s \"\(spriteName)\""
-                }
-                surfaceConfig.command = tmuxManager.commandForFirstTab(
-                    sessionName: actualTmuxSessionName!,
-                    workingDirectory: type == .local ? surfaceConfig.workingDirectory : nil,
-                    paneCommand: paneCommand
-                )
+        let host: TmuxHost = {
+            switch type {
+            case .local, .sprite:
+                return .local
+            case .ssh(let hostname, let user, let port):
+                return .ssh(SSHHostInfo(user: user, hostname: hostname, port: port))
             }
-            Self.logger.info("Using tmux session: \(actualTmuxSessionName ?? "nil")")
-        } else if let command = type.command {
-            surfaceConfig.command = command
-        }
+        }()
 
-        let surfaceView = Ghostty.SurfaceView(app, baseConfig: surfaceConfig)
-        let session = Session(type: type, surfaceView: surfaceView, workspaceID: workspaceID)
+        let info = TmuxAttachmentInfo(
+            sessionName: tmuxManager.baseSessionName(workspaceID: workspaceID),
+            host: host,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .create
+        )
 
-        // Store tmux session name if using persistent sessions
-        if let tmuxName = actualTmuxSessionName {
-            session.tmuxSessionName = tmuxName
-            // Track tmux session name on the initial tab
-            session.selectedTab?.tmuxSessionName = tmuxName
-        }
-
-        // Auto-generate workspace name for new sessions (not reattaches)
-        if tmuxSessionName == nil {
-            let metadataStore = SessionMetadataStore.shared
-            let meta = metadataStore.getOrCreate(forKey: workspaceID)
-            if meta.name.isEmpty {
-                metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
-            }
-        }
-
+        let session = makeAttachedSession(info: info, workspaceID: workspaceID)
         sessions.append(session)
         selectedSessionID = session.id
 
-        // Observe title changes
-        if let tab = session.selectedTab {
-            setupTitleObserver(for: tab, surfaceView: surfaceView, session: session)
+        let shouldReconnect: Bool = {
+            switch host {
+            case .local:
+                return tmuxManager.isTmuxAvailable
+            case .ssh:
+                return true
+            }
+        }()
+
+        if shouldReconnect {
+            startAttachedSessionReconnect(session)
+        } else {
+            session.backingState = .missingAttachedBacking(reason: "tmux unavailable")
         }
 
-        Self.logger.info("Created session \(session.id) type=\(type.displayName)")
+        let metadataStore = SessionMetadataStore.shared
+        let meta = metadataStore.getOrCreate(forKey: workspaceID)
+        if meta.name.isEmpty {
+            metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
+        }
+
+        Self.logger.info("Created attached session \(session.id) type=\(type.displayName)")
         return session
     }
 
@@ -445,6 +834,14 @@ class SessionManager: ObservableObject {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
 
         let session = sessions[index]
+        attachedSessionManagerV2.unregisterSession(session)
+        let metadataStore = SessionMetadataStore.shared
+
+        metadataStore.update(
+            forKey: session.workspaceID,
+            isArchived: false,
+            isTrashed: true
+        )
 
         // Remove all surfaces in this session from the lookup index
         for tab in session.tabs {
@@ -495,18 +892,13 @@ class SessionManager: ObservableObject {
         selectedSessionID = sessions[prevIndex].id
     }
 
-    /// Select a session by index (0-based).
-    func selectSession(at index: Int) {
-        guard index >= 0, index < sessions.count else { return }
-        selectedSessionID = sessions[index].id
-    }
-
     // MARK: - Workspace Archiving
 
     /// Archive a workspace: kill tmux, set metadata flag, remove from active sessions.
     func archiveSession(id: UUID) {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[index]
+        attachedSessionManagerV2.unregisterSession(session)
 
         // Kill tmux sessions
         tmuxManager.killWorkspaceSessions(workspaceID: session.workspaceID)
@@ -540,8 +932,37 @@ class SessionManager: ObservableObject {
         createSession(workspaceID: workspaceID)
     }
 
+    /// Restore a trashed workspace as an active placeholder.
+    func restoreTrashedWorkspace(workspaceID: String) {
+        let metadataStore = SessionMetadataStore.shared
+        metadataStore.update(forKey: workspaceID, isArchived: false, isTrashed: false)
+
+        guard !sessions.contains(where: { $0.workspaceID == workspaceID }) else {
+            selectedSessionID = sessions.first(where: { $0.workspaceID == workspaceID })?.id
+            return
+        }
+
+        let metadata = metadataStore.getOrCreate(forKey: workspaceID)
+        let attachment = metadata.attachment ?? TmuxAttachmentInfo(
+            sessionName: tmuxManager.baseSessionName(workspaceID: metadata.workspaceID),
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach
+        )
+        restoreAttachedSession(
+            attachment: attachment,
+            workspaceID: metadata.workspaceID
+        )
+        selectedSessionID = sessions.last?.id
+    }
+
     /// Permanently delete an archived workspace's metadata.
     func deleteArchivedWorkspace(workspaceID: String) {
+        SessionMetadataStore.shared.remove(forKey: workspaceID)
+    }
+
+    /// Permanently delete a trashed workspace's metadata.
+    func deleteTrashedWorkspace(workspaceID: String) {
         SessionMetadataStore.shared.remove(forKey: workspaceID)
     }
 
@@ -549,42 +970,27 @@ class SessionManager: ObservableObject {
 
     /// Create a new tab in the current session.
     @discardableResult
-    func createTab(type: SessionType = .local, config: Ghostty.SurfaceConfiguration? = nil) -> TerminalTab? {
-        guard let session = selectedSession,
-              let app = ghosttyApp?.app else {
-            Self.logger.error("Cannot create tab: no session or ghostty app")
+    func createTab() -> TerminalTab? {
+        guard let session = selectedSession else {
+            Self.logger.error("Cannot create tab: no session")
             return nil
         }
 
-        var surfaceConfig = config ?? Ghostty.SurfaceConfiguration()
-        var actualTabSessionName: String? = nil
-
-        // Use independent tmux session if persistent sessions are active
-        if session.tmuxSessionName != nil,
-           tmuxManager.isTmuxAvailable {
-            session.tmuxTabCounter += 1
-            let tabSessionName = tmuxManager.tabSessionName(
-                workspaceID: session.workspaceID,
-                tabIndex: session.tmuxTabCounter
+        guard let client = session.controlClient else {
+            Self.logger.error(
+                "Cannot create tab: attached session missing control client for workspace \(session.workspaceID, privacy: .public)"
             )
-            surfaceConfig.command = tmuxManager.commandForTabSession(
-                tabSessionName: tabSessionName
-            )
-            actualTabSessionName = tabSessionName
-            Self.logger.info("Using independent tmux session: \(tabSessionName)")
-        } else if let command = type.command {
-            surfaceConfig.command = command
+            return nil
         }
 
-        let surfaceView = Ghostty.SurfaceView(app, baseConfig: surfaceConfig)
-        let tab = TerminalTab(type: type, surfaceView: surfaceView)
-        tab.tmuxSessionName = actualTabSessionName
-
-        session.addTab(tab)
-        setupTitleObserver(for: tab, surfaceView: surfaceView, session: session)
-
-        Self.logger.info("Created tab \(tab.id) in session \(session.id)")
-        return tab
+        Task {
+            do {
+                _ = try await attachedTmuxNewWindowSender(client)
+            } catch {
+                Self.logger.error("Failed to create attached tmux window: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        return nil
     }
 
     /// Create a new browser tab in the current session.
@@ -606,12 +1012,7 @@ class SessionManager: ObservableObject {
     func closeTab(id: UUID) {
         guard let session = sessions.first(where: { $0.tabs.contains { $0.id == id } }) else { return }
 
-        // Kill the tab's linked tmux session (skip base session — other tabs need it)
         if let tab = session.tabs.first(where: { $0.id == id }) {
-            if let tabTmuxName = tab.tmuxSessionName,
-               tabTmuxName != session.tmuxSessionName {
-                tmuxManager.killSession(name: tabTmuxName)
-            }
             // Remove tab's surfaces from the lookup index before the tab is removed
             deregisterSurfaces(in: tab)
         }
@@ -634,25 +1035,9 @@ class SessionManager: ObservableObject {
 
     /// Create a new split in the currently selected tab.
     func newSplit(direction: SplitTree<Ghostty.SurfaceView>.NewDirection) {
-        guard let session = selectedSession,
-              let tab = selectedTab,
-              let focusedSurface = tab.focusedSurface,
-              let app = ghosttyApp?.app else { return }
-
-        let config = Ghostty.SurfaceConfiguration()
-        let newSurface = Ghostty.SurfaceView(app, baseConfig: config)
-
-        do {
-            guard let tree = tab.surfaceTree else { return }
-            tab.surfaceTree = try tree.inserting(
-                view: newSurface,
-                at: focusedSurface,
-                direction: direction
-            )
-            tab.focusedSurface = newSurface
-            setupTitleObserver(for: tab, surfaceView: newSurface, session: session)
-        } catch {
-            Self.logger.error("Failed to create split: \(error)")
+        guard let focusedSurface = focusedSurfaceView else { return }
+        Task { @MainActor [weak self] in
+            await self?.performSplit(from: focusedSurface, direction: direction)
         }
     }
 
@@ -860,15 +1245,8 @@ class SessionManager: ObservableObject {
     }
 
     @objc private func handleNewTab(_ notification: Foundation.Notification) {
-        let config: Ghostty.SurfaceConfiguration?
-        if let userInfo = notification.userInfo,
-           let surfaceConfig = userInfo[Ghostty.Notification.NewSurfaceConfigKey] as? Ghostty.SurfaceConfiguration {
-            config = surfaceConfig
-        } else {
-            config = nil
-        }
         // Create a new tab in the current session (not a new session)
-        createTab(config: config)
+        createTab()
     }
 
     @objc private func handleCloseSurface(_ notification: Foundation.Notification) {
@@ -878,8 +1256,7 @@ class SessionManager: ObservableObject {
 
     @objc private func handleNewSplit(_ notification: Foundation.Notification) {
         guard let surfaceView = notification.object as? Ghostty.SurfaceView,
-              let (session, tab) = findSessionAndTab(for: surfaceView),
-              let app = ghosttyApp?.app else { return }
+              let _ = findSessionAndTab(for: surfaceView) else { return }
 
         let direction: SplitTree<Ghostty.SurfaceView>.NewDirection
         if let ghosttyDir = notification.userInfo?["direction"] as? ghostty_action_split_direction_e {
@@ -899,27 +1276,67 @@ class SessionManager: ObservableObject {
             direction = .right
         }
 
-        let config: Ghostty.SurfaceConfiguration
+        let config: Ghostty.SurfaceConfiguration?
         if let userInfo = notification.userInfo,
            let surfaceConfig = userInfo[Ghostty.Notification.NewSurfaceConfigKey] as? Ghostty.SurfaceConfiguration {
             config = surfaceConfig
         } else {
-            config = Ghostty.SurfaceConfiguration()
+            config = nil
         }
 
-        let newSurface = Ghostty.SurfaceView(app, baseConfig: config)
+        Task { @MainActor [weak self] in
+            await self?.performSplit(from: surfaceView, direction: direction, config: config)
+        }
+    }
+
+    @MainActor
+    func performSplit(
+        from surfaceView: Ghostty.SurfaceView,
+        direction: SplitTree<Ghostty.SurfaceView>.NewDirection,
+        config: Ghostty.SurfaceConfiguration? = nil
+    ) async {
+        _ = config
+        guard let (session, tab) = findSessionAndTab(for: surfaceView),
+              let client = session.controlClient,
+              let paneID = splitPaneIDIfAllowed(for: tab, direction: direction) else {
+            return
+        }
+        let horizontal = direction == .right
 
         do {
-            guard let tree = tab.surfaceTree else { return }
-            tab.surfaceTree = try tree.inserting(
-                view: newSurface,
-                at: surfaceView,
-                direction: direction
-            )
-            tab.focusedSurface = newSurface
-            setupTitleObserver(for: tab, surfaceView: newSurface, session: session)
+            try await attachedTmuxSplitSender(client, paneID, horizontal)
         } catch {
-            Self.logger.error("Failed to create split: \(error)")
+            Self.logger.error("Failed to split attached tmux pane: \(error)")
+        }
+    }
+
+    @MainActor
+    func canPerformSplit(
+        from surfaceView: Ghostty.SurfaceView,
+        direction: SplitTree<Ghostty.SurfaceView>.NewDirection
+    ) -> Bool {
+        guard let (_, tab) = findSessionAndTab(for: surfaceView) else { return false }
+        return splitPaneIDIfAllowed(for: tab, direction: direction) != nil
+    }
+
+    @MainActor
+    func canPerformSplitOnFocusedSurface(
+        direction: SplitTree<Ghostty.SurfaceView>.NewDirection
+    ) -> Bool {
+        guard let surfaceView = focusedSurfaceView else { return false }
+        return canPerformSplit(from: surfaceView, direction: direction)
+    }
+
+    @MainActor
+    private func splitPaneIDIfAllowed(
+        for tab: TerminalTab,
+        direction: SplitTree<Ghostty.SurfaceView>.NewDirection
+    ) -> Int? {
+        switch direction {
+        case .right, .down:
+            return tab.focusedSurface?.tmuxPaneID
+        case .left, .up:
+            return nil
         }
     }
 
@@ -1177,138 +1594,42 @@ class SessionManager: ObservableObject {
         }
     }
 
+    func updateAttachedTmuxWindowSize(
+        session: Session,
+        tab: TerminalTab,
+        contentSize: CGSize,
+        forceRecapture: Bool = false
+    ) {
+        attachedSessionManagerV2.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: contentSize,
+            forceRecapture: forceRecapture
+        )
+    }
+
     // MARK: - Tmux Attach
+
+    func makeAttachedSession(info: TmuxAttachmentInfo, workspaceID: String? = nil) -> Session {
+        let wsID = workspaceID ?? String(UUID().uuidString.prefix(8)).lowercased()
+        let session = Session(title: info.sessionName, type: .local, workspaceID: wsID)
+        session.mode = .attached(info)
+
+        let client = TmuxControlClient(attachmentInfo: info)
+        session.controlClient = client
+        attachedSessionManagerV2.registerAttachedSession(session)
+
+        return session
+    }
 
     /// Attach to an existing tmux session and display it as a new Session.
     func attachToTmuxSession(info: TmuxAttachmentInfo) {
-        guard let app = ghosttyApp?.app else { return }
-
-        // Create a placeholder surface for the initial tab
-        let surfaceView = Ghostty.SurfaceView(app, baseConfig: nil)
-        let wsID = String(UUID().uuidString.prefix(8)).lowercased()
-        let session = Session(type: .local, surfaceView: surfaceView, workspaceID: wsID)
-        session.mode = .attached(info)
-
-        // Create the control client
-        let client = TmuxControlClient(attachmentInfo: info)
-        client.delegate = self
-        session.controlClient = client
+        let session = makeAttachedSession(info: info)
 
         sessions.append(session)
         selectedSessionID = session.id
 
-        // Connect in background
-        Task {
-            do {
-                try await client.connect()
-            } catch {
-                Self.debugLog("Failed to connect to tmux session: \(error)")
-            }
-        }
+        startAttachedSessionReconnect(session)
     }
 
-    /// Find the session associated with a control client.
-    private func session(for client: TmuxControlClient) -> Session? {
-        sessions.first { $0.controlClient === client }
-    }
-}
-
-// MARK: - TmuxControlClientDelegate
-
-extension SessionManager: TmuxControlClientDelegate {
-
-    func controlClient(_ client: TmuxControlClient, didAddWindow window: TmuxWindow) {
-        guard let session = session(for: client), let app = ghosttyApp?.app else { return }
-
-        let surfaceView = Ghostty.SurfaceView(app, baseConfig: nil)
-        let tab = TerminalTab(type: session.type, surfaceView: surfaceView)
-        tab.title = window.name.isEmpty ? "Window @\(window.windowID)" : window.name
-        tab.tmuxWindowID = window.windowID
-        session.addTab(tab)
-
-        if session.selectedTabID == nil {
-            session.selectedTabID = tab.id
-        }
-    }
-
-    func controlClient(_ client: TmuxControlClient, didCloseWindowID windowID: Int) {
-        guard let session = session(for: client) else { return }
-        guard let idx = session.tabs.firstIndex(where: { $0.tmuxWindowID == windowID }) else { return }
-        let tab = session.tabs[idx]
-        session.tabs.remove(at: idx)
-        if session.selectedTabID == tab.id {
-            session.selectedTabID = session.tabs.first?.id
-        }
-    }
-
-    func controlClient(_ client: TmuxControlClient, didRenameWindowID windowID: Int, to name: String) {
-        guard let session = session(for: client) else { return }
-        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }) else { return }
-        tab.title = name
-    }
-
-    func controlClient(_ client: TmuxControlClient, didChangeLayoutForWindowID windowID: Int, layout: String) {
-        guard let session = session(for: client), let app = ghosttyApp?.app else { return }
-        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }) else { return }
-
-        let layoutNode = TmuxLayoutParser.parse(layout)
-
-        // Build a lookup of existing surfaces by pane ID
-        var existingSurfaces: [Int: Ghostty.SurfaceView] = [:]
-        if let leaves = tab.surfaceTree?.root?.leaves() {
-            for surface in leaves {
-                if let pid = surface.tmuxPaneID {
-                    existingSurfaces[pid] = surface
-                }
-            }
-        }
-
-        // Map layout to SplitTree, reusing existing surfaces or creating new ones
-        let rootNode = TmuxLayoutMapper.mapToSplitTree(layoutNode) { paneID -> Ghostty.SurfaceView in
-            if let existing = existingSurfaces[paneID] {
-                return existing
-            }
-            let surface = Ghostty.SurfaceView(app, baseConfig: nil)
-            surface.tmuxPaneID = paneID
-            surface.tmuxControlClient = client
-            return surface
-        }
-
-        tab.surfaceTree = .init(root: rootNode, zoomed: nil)
-        tab.focusedSurface = tab.surfaceTree?.root?.leaves().first
-    }
-
-    func controlClient(_ client: TmuxControlClient, didReceiveOutput data: Data, forPaneID paneID: Int) {
-        guard let session = session(for: client) else { return }
-
-        // Find the surface with matching tmuxPaneID
-        for tab in session.tabs {
-            guard let leaves = tab.surfaceTree?.root?.leaves() else { continue }
-            for surface in leaves {
-                if surface.tmuxPaneID == paneID, let cSurface = surface.surface {
-                    data.withUnsafeBytes { buffer in
-                        guard let ptr = buffer.baseAddress?.assumingMemoryBound(to: CChar.self) else { return }
-                        ghostty_surface_inject_output(cSurface, ptr, UInt(buffer.count))
-                    }
-                    return
-                }
-            }
-        }
-    }
-
-    func controlClient(_ client: TmuxControlClient, didChangeState state: ConnectionState) {
-        guard let session = session(for: client) else { return }
-        if case .attached(var info) = session.mode {
-            info.connectionState = state
-            session.mode = .attached(info)
-        }
-    }
-
-    func controlClientDidExit(_ client: TmuxControlClient, reason: String?) {
-        guard let session = session(for: client) else { return }
-        if case .attached(var info) = session.mode {
-            info.connectionState = .disconnected(reason: reason)
-            session.mode = .attached(info)
-        }
-    }
 }

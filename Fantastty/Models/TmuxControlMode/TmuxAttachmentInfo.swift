@@ -67,6 +67,11 @@ enum TmuxHost: Codable, Hashable {
     }
 }
 
+enum TmuxAttachmentLaunchMode: String, Codable, Equatable {
+    case attach
+    case create
+}
+
 // MARK: - TmuxAttachmentInfo
 
 /// Information about a tmux session attachment, including the session name,
@@ -75,6 +80,19 @@ struct TmuxAttachmentInfo: Codable, Equatable {
     let sessionName: String
     let host: TmuxHost
     var connectionState: ConnectionState
+    var launchMode: TmuxAttachmentLaunchMode
+
+    init(
+        sessionName: String,
+        host: TmuxHost,
+        connectionState: ConnectionState,
+        launchMode: TmuxAttachmentLaunchMode = .attach
+    ) {
+        self.sessionName = sessionName
+        self.host = host
+        self.connectionState = connectionState
+        self.launchMode = launchMode
+    }
 
     /// Generate the command to attach to this tmux session in control mode.
     /// - Parameter tmuxPath: Path to the tmux binary (default: "tmux").
@@ -88,12 +106,46 @@ struct TmuxAttachmentInfo: Codable, Equatable {
             return "\(info.sshCommandPrefix) \(tmuxArgs)"
         }
     }
+
+    /// Generate the command to create a new tmux session before attaching.
+    /// This keeps the control-mode transport on the simpler attach path.
+    func createSessionCommand(tmuxPath: String = "tmux") -> String {
+        let tmuxArgs = "\(tmuxPath) has-session -t '\(sessionName)' 2>/dev/null || \(tmuxPath) new-session -d -s '\(sessionName)'"
+        switch host {
+        case .local:
+            return tmuxArgs
+        case .ssh(let info):
+            return "\(info.sshCommandPrefix) \(tmuxArgs)"
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case sessionName
+        case host
+        case connectionState
+        case launchMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionName = try container.decode(String.self, forKey: .sessionName)
+        host = try container.decode(TmuxHost.self, forKey: .host)
+        connectionState = try container.decode(ConnectionState.self, forKey: .connectionState)
+        launchMode = try container.decodeIfPresent(TmuxAttachmentLaunchMode.self, forKey: .launchMode) ?? .attach
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionName, forKey: .sessionName)
+        try container.encode(host, forKey: .host)
+        try container.encode(connectionState, forKey: .connectionState)
+        try container.encode(launchMode, forKey: .launchMode)
+    }
 }
 
 // MARK: - SessionMode
 
-/// Whether a session is managed by Fantastty or attached to an external tmux session.
+/// Session attachment mode for a workspace.
 enum SessionMode: Codable, Equatable {
-    case managed
     case attached(TmuxAttachmentInfo)
 }

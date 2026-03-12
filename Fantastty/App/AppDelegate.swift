@@ -20,9 +20,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
     /// KVO observation for macOS appearance changes
     private var appearanceObservation: NSKeyValueObservation?
 
+    static func shouldBootstrapSessions(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        guard environment["XCTestConfigurationFilePath"] != nil else {
+            return true
+        }
+        return environment["FANTASTTY_BOOTSTRAP_DURING_TESTS"] == "1"
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.logger.info("applicationDidFinishLaunching")
         ghosttyApp.delegate = self
+
+        guard Self.shouldBootstrapSessions() else {
+            Self.logger.info("Skipping startup session bootstrap under XCTest")
+            return
+        }
 
         // Install shell integration scripts (before session creation)
         ShellIntegration.shared.ensureInstalled()
@@ -30,6 +44,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
         // Set up notification observers for Ghostty actions
         sessionManager.ghosttyApp = ghosttyApp
         sessionManager.setupNotificationObservers()
+        sessionManager.beginStartupThumbnailRefreshSuppression()
+        defer { sessionManager.endStartupThumbnailRefreshSuppression() }
 
         // Create or restore sessions
         let readiness = self.ghosttyApp.readiness

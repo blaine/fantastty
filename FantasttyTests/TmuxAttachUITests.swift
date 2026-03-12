@@ -96,4 +96,41 @@ final class TmuxAttachUITests: XCTestCase {
         let filtered = TmuxAttachSheet.filterSessions(sessions, by: "myproject")
         XCTAssertEqual(filtered.count, 1)
     }
+    func testDiscoverLocalSessionsMapsTmuxSessions() {
+        let sessions = TmuxAttachSheet.discoverSessions(
+            isLocal: true,
+            hostString: "",
+            listLocal: {
+                [
+                    TmuxSessionInfo(name: "alpha", createdAt: .distantPast, windowCount: 2),
+                    TmuxSessionInfo(name: "beta", createdAt: .distantPast, windowCount: 1),
+                ]
+            },
+            listRemote: { _ in
+                XCTFail("Remote discovery should not be used for local sessions")
+                return []
+            }
+        )
+
+        XCTAssertEqual(sessions.count, 2)
+        XCTAssertEqual(sessions.map(\.name), ["alpha", "beta"])
+        XCTAssertTrue(sessions.allSatisfy { $0.host == .local })
+    }
+
+    func testDiscoverRemoteSessionsRequiresValidHostString() {
+        let sessions = TmuxAttachSheet.discoverSessions(
+            isLocal: false,
+            hostString: "",
+            listLocal: {
+                XCTFail("Local discovery should not be used for remote sessions")
+                return []
+            },
+            listRemote: { _ in
+                XCTFail("Remote discovery should not run for invalid host strings")
+                return []
+            }
+        )
+
+        XCTAssertTrue(sessions.isEmpty)
+    }
 }

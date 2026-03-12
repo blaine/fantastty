@@ -1,15 +1,20 @@
 import SwiftUI
+import os
 
 struct TmuxAttachSheet: View {
     @Environment(\.dismiss) private var dismiss
+
+    nonisolated private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.blainecook.fantastty",
+        category: "tmux-attach-sheet"
+    )
 
     @State private var hostString: String = ""
     @State private var sessionFilter: String = ""
     @State private var discoveredSessions: [DiscoveredSession] = []
     @State private var isLocal: Bool = true
     @State private var isDiscovering: Bool = false
-
-    private let tmuxManager = TmuxManager.shared
+    @State private var discoveryTask: Task<Void, Never>?
 
     var onAttach: ((TmuxAttachmentInfo) -> Void)?
 
@@ -58,29 +63,62 @@ struct TmuxAttachSheet: View {
         }
         .padding()
         .frame(width: 400, height: 350)
-        .onAppear { discoverSessions() }
+        .onAppear {
+            Self.logger.info("Attach sheet appeared; starting discovery")
+            discoverSessions()
+        }
         .onChange(of: isLocal) { discoverSessions() }
     }
 
     private func discoverSessions() {
+        discoveryTask?.cancel()
         isDiscovering = true
-        Task.detached {
-            let sessions: [DiscoveredSession]
-            if isLocal {
-                let tmuxSessions = TmuxManager.shared.listAllSessions()
-                sessions = tmuxSessions.map { DiscoveredSession(name: $0.name, host: .local, windowCount: $0.windowCount) }
-            } else {
-                guard let hostInfo = Self.parseHostString(hostString) else {
-                    await MainActor.run { isDiscovering = false }
-                    return
-                }
-                let tmuxSessions = TmuxManager.shared.listRemoteSessions(host: hostInfo)
-                sessions = tmuxSessions.map { DiscoveredSession(name: $0.name, host: .ssh(hostInfo), windowCount: $0.windowCount) }
-            }
+        let isLocal = self.isLocal
+        let hostString = self.hostString
+        let startedAt = Date()
+        Self.logger.info("Discover sessions requested isLocal=\(isLocal) host=\(hostString, privacy: .public)")
+
+        discoveryTask = Task.detached(priority: .userInitiated) {
+            let detachedStartedAt = Date()
+            Self.logger.info("Detached discovery started isLocal=\(isLocal)")
+            let sessions = Self.discoverSessions(
+                isLocal: isLocal,
+                hostString: hostString,
+                listLocal: { TmuxManager.shared.listAllSessions() },
+                listRemote: { TmuxManager.shared.listRemoteSessions(host: $0) }
+            )
+            let detachedElapsedMs = Int(Date().timeIntervalSince(detachedStartedAt) * 1000)
+            Self.logger.info("Detached discovery finished sessions=\(sessions.count) elapsedMs=\(detachedElapsedMs)")
+
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
                 discoveredSessions = sessions
                 isDiscovering = false
+                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                Self.logger.info("Discovery applied on main actor sessions=\(sessions.count) elapsedMs=\(elapsedMs)")
             }
+        }
+    }
+
+    nonisolated static func discoverSessions(
+        isLocal: Bool,
+        hostString: String,
+        listLocal: () -> [TmuxSessionInfo],
+        listRemote: (SSHHostInfo) -> [TmuxSessionInfo]
+    ) -> [DiscoveredSession] {
+        if isLocal {
+            return listLocal().map {
+                DiscoveredSession(name: $0.name, host: .local, windowCount: $0.windowCount)
+            }
+        }
+
+        guard let hostInfo = parseHostString(hostString) else {
+            return []
+        }
+
+        return listRemote(hostInfo).map {
+            DiscoveredSession(name: $0.name, host: .ssh(hostInfo), windowCount: $0.windowCount)
         }
     }
 
@@ -107,7 +145,7 @@ struct TmuxAttachSheet: View {
         let windowCount: Int
     }
 
-    static func parseHostString(_ s: String) -> SSHHostInfo? {
+    nonisolated static func parseHostString(_ s: String) -> SSHHostInfo? {
         guard !s.isEmpty else { return nil }
         var user: String?
         var hostname = s
@@ -131,7 +169,7 @@ struct TmuxAttachSheet: View {
         return SSHHostInfo(user: user, hostname: hostname, port: port)
     }
 
-    static func filterSessions(_ sessions: [DiscoveredSession], by filter: String) -> [DiscoveredSession] {
+    nonisolated static func filterSessions(_ sessions: [DiscoveredSession], by filter: String) -> [DiscoveredSession] {
         guard !filter.isEmpty else { return sessions }
         return sessions.filter {
             $0.name.localizedCaseInsensitiveContains(filter) ||

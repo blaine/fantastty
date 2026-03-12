@@ -30,14 +30,17 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     /// The WKWebView instance for browser tabs. Nil for terminal tabs.
     var webView: WKWebView?
 
-    /// The tmux session name this tab is attached to (for layout serialization).
-    var tmuxSessionName: String?
-
     /// Tmux window ID this tab represents (for attached sessions).
     var tmuxWindowID: Int?
 
+    /// Tmux window index this tab represents (for attached-session ordering).
+    var tmuxWindowIndex: Int?
+
     /// Combine subscriptions for this tab. Cancelled automatically when the tab deallocates.
     var cancellables = Set<AnyCancellable>()
+
+    /// Debounced thumbnail refreshes should subscribe to this instead of polling.
+    let thumbnailRefreshes = PassthroughSubject<Void, Never>()
 
     /// Icon name for the tab bar.
     var iconName: String {
@@ -54,6 +57,15 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
         self.title = type.displayName
         self.surfaceTree = .init(root: .leaf(view: surfaceView), zoomed: nil)
         self.focusedSurface = surfaceView
+    }
+
+    /// Create a new terminal tab whose surfaces will be populated later.
+    init(type: SessionType, title: String) {
+        self.kind = .terminal
+        self.sessionType = type
+        self.title = title
+        self.surfaceTree = nil
+        self.focusedSurface = nil
     }
 
     /// Create a new browser tab.
@@ -79,5 +91,9 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     /// Check if this tab contains the given surface view.
     func contains(surfaceView: Ghostty.SurfaceView) -> Bool {
         return surfaceTree?.root?.node(view: surfaceView) != nil
+    }
+
+    func requestThumbnailRefresh() {
+        thumbnailRefreshes.send(())
     }
 }

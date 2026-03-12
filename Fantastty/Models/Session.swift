@@ -32,30 +32,40 @@ class Session: ObservableObject, Identifiable, Hashable {
     /// When this workspace was first created
     var createdAt: Date { metadata?.createdAt ?? Date() }
 
-    /// Tmux base session name for this workspace (when persistent sessions enabled)
-    var tmuxSessionName: String?
+    /// Workspace attachment mode (attached tmux control is the only supported runtime).
+    @Published var mode: SessionMode
 
-    /// Whether this session is managed locally or attached to an external tmux session.
-    @Published var mode: SessionMode = .managed
+    /// Runtime backing availability, separate from workspace ownership.
+    @Published var backingState: SessionBackingState = .available
 
     /// Control mode client for attached tmux sessions.
     var controlClient: TmuxControlClient?
 
-    /// Counter for generating tab session names
-    var tmuxTabCounter: Int = 0
-
     /// Reference to metadata store for persistence
     private let metadataStore = SessionMetadataStore.shared
 
-    /// Create a new session with an initial tab.
-    init(title: String, initialTab: TerminalTab, type: SessionType = .local,
+    /// Create a new session with explicit tabs and selection state.
+    init(title: String, tabs: [TerminalTab], selectedTabID: UUID? = nil, type: SessionType = .local,
          workspaceID: String) {
         self.type = type
         self.workspaceID = workspaceID
         self.defaultTitle = title
-        self.tabs = [initialTab]
-        self.selectedTabID = initialTab.id
+        self.tabs = tabs
+        self.selectedTabID = selectedTabID ?? tabs.first?.id
+        self.mode = .attached(Self.defaultAttachmentInfo(type: type, workspaceID: workspaceID))
         self.totalActiveSeconds = SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).totalActiveSeconds
+    }
+
+    /// Create a new session with an initial tab.
+    convenience init(title: String, initialTab: TerminalTab, type: SessionType = .local,
+                     workspaceID: String) {
+        self.init(title: title, tabs: [initialTab], selectedTabID: initialTab.id, type: type,
+                  workspaceID: workspaceID)
+    }
+
+    /// Create a new empty session with no tabs selected yet.
+    convenience init(title: String, type: SessionType = .local, workspaceID: String) {
+        self.init(title: title, tabs: [], selectedTabID: nil, type: type, workspaceID: workspaceID)
     }
 
     /// Convenience initializer for creating a session with a new surface.
@@ -238,5 +248,22 @@ class Session: ObservableObject, Identifiable, Hashable {
     /// Find the tab containing the given surface view.
     func tab(containing surfaceView: Ghostty.SurfaceView) -> TerminalTab? {
         return tabs.first { $0.contains(surfaceView: surfaceView) }
+    }
+
+    private static func defaultAttachmentInfo(type: SessionType, workspaceID: String) -> TmuxAttachmentInfo {
+        let host: TmuxHost
+        switch type {
+        case .local, .sprite:
+            host = .local
+        case .ssh(let hostname, let user, let port):
+            host = .ssh(SSHHostInfo(user: user, hostname: hostname, port: port))
+        }
+
+        return TmuxAttachmentInfo(
+            sessionName: TmuxManager.shared.baseSessionName(workspaceID: workspaceID),
+            host: host,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .create
+        )
     }
 }

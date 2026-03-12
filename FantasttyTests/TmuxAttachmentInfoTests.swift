@@ -91,6 +91,31 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         )
     }
 
+    func testControlCommandForCreateStillAttaches() {
+        let info = TmuxAttachmentInfo(
+            sessionName: "fresh",
+            host: .local,
+            connectionState: .connecting,
+            launchMode: .create
+        )
+
+        XCTAssertEqual(info.controlCommand(), "tmux -CC attach-session -t 'fresh'")
+    }
+
+    func testCreateSessionCommandLocal() {
+        let info = TmuxAttachmentInfo(
+            sessionName: "fresh",
+            host: .local,
+            connectionState: .connecting,
+            launchMode: .create
+        )
+
+        XCTAssertEqual(
+            info.createSessionCommand(),
+            "tmux has-session -t 'fresh' 2>/dev/null || tmux new-session -d -s 'fresh'"
+        )
+    }
+
     // MARK: - Codable Round-Trips: SSHHostInfo
 
     func testSSHHostInfoCodableRoundTrip() throws {
@@ -162,13 +187,6 @@ final class TmuxAttachmentInfoTests: XCTestCase {
     }
 
     // MARK: - Codable Round-Trips: SessionMode
-
-    func testSessionModeManagedCodableRoundTrip() throws {
-        let original = SessionMode.managed
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(SessionMode.self, from: data)
-        XCTAssertEqual(original, decoded)
-    }
 
     func testSessionModeAttachedCodableRoundTrip() throws {
         let info = TmuxAttachmentInfo(

@@ -26,4 +26,14 @@ final class TmuxResizeTests: XCTestCase {
         let command = "resize-pane -t %\(paneID) -x \(cols) -y \(rows)"
         XCTAssertEqual(command, "resize-pane -t %0 -x 1 -y 1")
     }
+
+    func testRefreshClientSizeCommandForAttachedWindow() {
+        let command = TmuxControlClient.clientSizeCommand(windowID: 9, width: 132, height: 38)
+        XCTAssertEqual(command, "refresh-client -C @9:132x38")
+    }
+
+    func testRefreshClientSizeCommandForWholeClient() {
+        let command = TmuxControlClient.clientSizeCommand(windowID: nil, width: 120, height: 40)
+        XCTAssertEqual(command, "refresh-client -C 120x40")
+    }
 }

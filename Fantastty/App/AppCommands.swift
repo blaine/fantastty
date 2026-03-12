@@ -37,11 +37,13 @@ struct AppCommands: Commands {
                 sessionManager.newSplit(direction: .right)
             }
             .keyboardShortcut("d", modifiers: .command)
+            .disabled(!sessionManager.canPerformSplitOnFocusedSurface(direction: .right))
 
             Button("Split Down") {
                 sessionManager.newSplit(direction: .down)
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(!sessionManager.canPerformSplitOnFocusedSurface(direction: .down))
         }
 
         CommandGroup(replacing: .pasteboard) {

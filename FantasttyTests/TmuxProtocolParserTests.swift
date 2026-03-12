@@ -29,6 +29,13 @@ final class TmuxProtocolParserTests: XCTestCase {
         XCTAssertEqual(event, .sessionsChanged)
     }
 
+    func testDCSPrefixStrippedWhenControlNoisePrecedesFirstLine() {
+        var parser = TmuxProtocolParser()
+        let line = "\u{04}\u{08}\u{08}\u{1b}P1000p%begin 1609459200 42 0"
+        let event = parser.parse(line: line)
+        XCTAssertEqual(event, .beginBlock(id: 42, flags: 0))
+    }
+
     func testDCSPrefixNotStrippedOnSecondLine() {
         var parser = TmuxProtocolParser()
         // First line: consume DCS stripping opportunity
@@ -83,8 +90,13 @@ final class TmuxProtocolParserTests: XCTestCase {
     func testLayoutChange() {
         var parser = TmuxProtocolParser()
         let layout = "b]d1,204x52,0,0{102x52,0,0,3,101x52,103,0,6}"
-        let event = parser.parse(line: "%layout-change @1 \(layout)")
-        XCTAssertEqual(event, .layoutChange(windowID: 1, layout: layout))
+        let visibleLayout = "b]d1,120x52,0,0{60x52,0,0,3,59x52,61,0,6}"
+        let flags = "*"
+        let event = parser.parse(line: "%layout-change @1 \(layout) \(visibleLayout) \(flags)")
+        XCTAssertEqual(
+            event,
+            .layoutChange(windowID: 1, layout: layout, visibleLayout: visibleLayout, flags: flags)
+        )
     }
 
     // MARK: - Pane Mode Changed
@@ -93,6 +105,93 @@ final class TmuxProtocolParserTests: XCTestCase {
         var parser = TmuxProtocolParser()
         let event = parser.parse(line: "%pane-mode-changed %5")
         XCTAssertEqual(event, .paneModeChanged(paneID: 5))
+    }
+
+    // MARK: - Additional 3.6a Notifications
+
+    func testClientDetached() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%client-detached /dev/ttys003")
+        XCTAssertEqual(event, .clientDetached(client: "/dev/ttys003"))
+    }
+
+    func testClientSessionChanged() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%client-session-changed /dev/ttys003 $2 my-session")
+        XCTAssertEqual(event, .clientSessionChanged(client: "/dev/ttys003", sessionID: 2, name: "my-session"))
+    }
+
+    func testConfigError() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%config-error unknown option: bad-option")
+        XCTAssertEqual(event, .configError(message: "unknown option: bad-option"))
+    }
+
+    func testContinue() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%continue %9")
+        XCTAssertEqual(event, .continued(paneID: 9))
+    }
+
+    func testMessage() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%message ready")
+        XCTAssertEqual(event, .message(message: "ready"))
+    }
+
+    func testPause() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%pause %3")
+        XCTAssertEqual(event, .pause(paneID: 3))
+    }
+
+    func testSessionRenamed() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%session-renamed renamed")
+        XCTAssertEqual(event, .sessionRenamed(name: "renamed"))
+    }
+
+    func testSessionWindowChanged() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%session-window-changed $4 @12")
+        XCTAssertEqual(event, .sessionWindowChanged(sessionID: 4, windowID: 12))
+    }
+
+    func testSubscriptionChanged() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(
+            line: "%subscription-changed fmt-$foo $4 @12 1 %9 ignored ignored : value text"
+        )
+        XCTAssertEqual(
+            event,
+            .subscriptionChanged(
+                name: "fmt-$foo",
+                sessionID: 4,
+                windowID: 12,
+                windowIndex: 1,
+                paneID: 9,
+                value: "value text"
+            )
+        )
+    }
+
+    func testWindowPaneChanged() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%window-pane-changed @12 %9")
+        XCTAssertEqual(event, .windowPaneChanged(windowID: 12, paneID: 9))
+    }
+
+    func testUnlinkedWindowNotifications() {
+        var parser = TmuxProtocolParser()
+        XCTAssertEqual(parser.parse(line: "%unlinked-window-add @7"), .unlinkedWindowAdd(windowID: 7))
+        XCTAssertEqual(parser.parse(line: "%unlinked-window-close @7"), .unlinkedWindowClose(windowID: 7))
+        XCTAssertEqual(parser.parse(line: "%unlinked-window-renamed @7"), .unlinkedWindowRenamed(windowID: 7))
+    }
+
+    func testPasteBufferNotifications() {
+        var parser = TmuxProtocolParser()
+        XCTAssertEqual(parser.parse(line: "%paste-buffer-changed buffer0"), .pasteBufferChanged(name: "buffer0"))
+        XCTAssertEqual(parser.parse(line: "%paste-buffer-deleted buffer0"), .pasteBufferDeleted(name: "buffer0"))
     }
 
     // MARK: - Exit
@@ -159,6 +258,23 @@ final class TmuxProtocolParserTests: XCTestCase {
         XCTAssertEqual(event, .output(paneID: 0, data: Data()))
     }
 
+    func testOutputPreservesLeadingSpaces() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%output %3   indented")
+        XCTAssertEqual(event, .output(paneID: 3, data: Data("  indented".utf8)))
+    }
+
+    func testExtendedOutputParsesLikeOutput() {
+        var parser = TmuxProtocolParser()
+        let event = parser.parse(line: "%extended-output %4 0 : line1\\015\\012line2")
+        let expected = Data([
+            UInt8(ascii: "l"), UInt8(ascii: "i"), UInt8(ascii: "n"), UInt8(ascii: "e"), UInt8(ascii: "1"),
+            13, 10,
+            UInt8(ascii: "l"), UInt8(ascii: "i"), UInt8(ascii: "n"), UInt8(ascii: "e"), UInt8(ascii: "2"),
+        ])
+        XCTAssertEqual(event, .output(paneID: 4, data: expected))
+    }
+
     // MARK: - Begin/End/Error Blocks
 
     func testBeginBlock() {
@@ -183,6 +299,13 @@ final class TmuxProtocolParserTests: XCTestCase {
         var parser = TmuxProtocolParser()
         let event = parser.parse(line: "%begin 1700000000 100 255")
         XCTAssertEqual(event, .beginBlock(id: 100, flags: 255))
+    }
+
+    func testLayoutChangeWithMissingFieldsFallsBackToUnknown() {
+        var parser = TmuxProtocolParser()
+        let line = "%layout-change @1 only-layout"
+        let event = parser.parse(line: line)
+        XCTAssertEqual(event, .unknown(line))
     }
 
     // MARK: - ID Parsing Helpers

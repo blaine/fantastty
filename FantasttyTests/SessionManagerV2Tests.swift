@@ -1,0 +1,707 @@
+import XCTest
+@testable import Fantastty
+import GhosttyKit
+
+@MainActor
+private enum SessionManagerV2TestSupport {
+    static let ghosttyApp = Fantastty.Ghostty.App()
+}
+
+final class SessionManagerV2Tests: XCTestCase {
+    func testAttachedTmuxSurfacesUseSilentLocalCommand() {
+        XCTAssertEqual(
+            SessionManagerV2.attachedTmuxSilentCommand,
+            "/bin/sh -lc 'stty raw -echo; exec /bin/cat >/dev/null'"
+        )
+    }
+
+    @MainActor
+    func testRegisterAttachedSessionCreatesBinding() {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-bind")
+
+        manager.registerAttachedSession(session)
+
+        XCTAssertTrue(manager.hasBinding(for: "v2-bind"))
+    }
+
+    @MainActor
+    func testDelegateEventsCreateWindowApplyLayoutAndFlushBufferedOutput() {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-layout")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var injected: [(paneID: Int, text: String)] = []
+        manager.tmuxOutputInjector = { surface, data in
+            guard let paneID = surface.tmuxPaneID,
+                  let text = String(data: data, encoding: .utf8) else {
+                return false
+            }
+            injected.append((paneID, text))
+            return true
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 1, name: "main", paneIDs: [], windowIndex: 0, isActive: true))
+        manager.controlClient(client, didReceiveOutput: Data("hello".utf8), forPaneID: 7)
+        XCTAssertTrue(injected.isEmpty)
+
+        manager.controlClient(client, didChangeLayoutForWindowID: 1, layout: "bb62,213x55,0,0,7")
+
+        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == 1 }) else {
+            return XCTFail("Expected tab for tmux window 1")
+        }
+        XCTAssertEqual(tab.surfaceTree?.root?.leaves().count, 1)
+        XCTAssertEqual(tab.surfaceTree?.root?.leaves().first?.tmuxPaneID, 7)
+        XCTAssertEqual(injected.count, 1)
+        XCTAssertEqual(injected.first?.paneID, 7)
+        XCTAssertEqual(injected.first?.text, "hello")
+    }
+
+    @MainActor
+    func testActiveWindowAndPaneEventsTrackSelectionAndFocus() {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-active")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 1, name: "one", paneIDs: [], windowIndex: 0, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 2, name: "two", paneIDs: [], windowIndex: 1, isActive: true))
+        manager.controlClient(client, didChangeLayoutForWindowID: 1, layout: "bb62,213x55,0,0,7")
+        manager.controlClient(client, didChangeLayoutForWindowID: 2, layout: "bb62,213x55,0,0,9")
+
+        manager.controlClient(client, didChangeActiveWindowID: 2)
+        manager.controlClient(client, didChangeActivePaneID: 9, inWindowID: 2)
+
+        guard let selected = session.selectedTab else {
+            return XCTFail("Expected selected tab")
+        }
+        XCTAssertEqual(selected.tmuxWindowID, 2)
+        XCTAssertEqual(selected.focusedSurface?.tmuxPaneID, 9)
+    }
+
+    @MainActor
+    func testLayoutRebindsReusedSurfacesToCurrentControlClient() {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-rebind")
+        guard let app = manager.ghosttyApp?.app else {
+            return XCTFail("Expected ghostty app")
+        }
+
+        let staleSurface = Ghostty.SurfaceView(app, baseConfig: nil)
+        staleSurface.tmuxPaneID = 7
+        staleSurface.tmuxControlClient = nil
+        let staleTab = TerminalTab(type: .local, surfaceView: staleSurface)
+        staleTab.tmuxWindowID = 1
+        staleTab.tmuxWindowIndex = 0
+        session.tabs = [staleTab]
+        session.selectedTabID = staleTab.id
+
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 1,
+                name: "main",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: true
+            )
+        )
+        manager.controlClient(client, didChangeLayoutForWindowID: 1, layout: "bb62,213x55,0,0,7")
+
+        guard let reboundSurface = session.tabs.first?.surfaceTree?.root?.leaves().first else {
+            return XCTFail("Expected a rebound surface")
+        }
+        XCTAssertTrue(reboundSurface === staleSurface)
+        XCTAssertTrue(reboundSurface.tmuxControlClient === client)
+    }
+
+    @MainActor
+    func testLayoutReplacesFocusedSurfaceWhenPreviouslyFocusedPaneDisappears() {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-focus-layout")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 1,
+                name: "main",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: true
+            )
+        )
+        manager.controlClient(client, didChangeLayoutForWindowID: 1, layout: "bb62,213x55,0,0,7")
+        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == 1 }) else {
+            return XCTFail("Expected tab for window")
+        }
+        XCTAssertEqual(tab.focusedSurface?.tmuxPaneID, 7)
+
+        manager.controlClient(client, didChangeLayoutForWindowID: 1, layout: "bb62,213x55,0,0,9")
+
+        XCTAssertEqual(tab.focusedSurface?.tmuxPaneID, 9)
+    }
+
+    @MainActor
+    func testUserTabSelectionRoutesToTmuxSelectWindow() async {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-select-window")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var selectedWindowIDs: [Int] = []
+        manager.tmuxWindowSelector = { sentClient, windowID in
+            XCTAssertTrue(sentClient === client)
+            selectedWindowIDs.append(windowID)
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 1,
+                name: "one",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: true
+            )
+        )
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 2,
+                name: "two",
+                paneIDs: [],
+                windowIndex: 1,
+                isActive: false
+            )
+        )
+
+        guard let secondTab = session.tabs.first(where: { $0.tmuxWindowID == 2 }) else {
+            return XCTFail("Expected second tab")
+        }
+
+        session.selectedTabID = secondTab.id
+        await Task.yield()
+
+        XCTAssertEqual(selectedWindowIDs, [2])
+    }
+
+    @MainActor
+    func testTmuxDrivenWindowSelectionDoesNotEchoSelectWindowCommand() async {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-select-window-echo")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var selectedWindowIDs: [Int] = []
+        manager.tmuxWindowSelector = { _, windowID in
+            selectedWindowIDs.append(windowID)
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 1,
+                name: "one",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: true
+            )
+        )
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 2,
+                name: "two",
+                paneIDs: [],
+                windowIndex: 1,
+                isActive: false
+            )
+        )
+
+        manager.controlClient(client, didChangeActiveWindowID: 2)
+        await Task.yield()
+
+        XCTAssertTrue(selectedWindowIDs.isEmpty)
+    }
+
+    @MainActor
+    func testBootstrapWindowAddsDoNotEchoSelectWindowCommand() async {
+        let manager = SessionManagerV2()
+        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-bootstrap-select-window-echo")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var selectedWindowIDs: [Int] = []
+        manager.tmuxWindowSelector = { _, windowID in
+            selectedWindowIDs.append(windowID)
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 10,
+                name: "one",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: false
+            )
+        )
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 11,
+                name: "two",
+                paneIDs: [],
+                windowIndex: 1,
+                isActive: true
+            )
+        )
+
+        await Task.yield()
+        XCTAssertTrue(selectedWindowIDs.isEmpty)
+    }
+
+    @MainActor
+    func testDidCloseWindowInvokesWindowClosedCallback() {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-close-callback")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var callbacks: [(ObjectIdentifier, Int)] = []
+        manager.onWindowClosed = { callbackClient, windowID in
+            callbacks.append((ObjectIdentifier(callbackClient), windowID))
+        }
+
+        manager.controlClient(client, didCloseWindowID: 42)
+
+        XCTAssertEqual(callbacks.count, 1)
+        XCTAssertEqual(callbacks.first?.0, ObjectIdentifier(client))
+        XCTAssertEqual(callbacks.first?.1, 42)
+    }
+
+    @MainActor
+    func testControlClientExitInvokesExitCallback() {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-exit-callback")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var exitedClientIDs: [ObjectIdentifier] = []
+        manager.onClientExit = { callbackClient in
+            exitedClientIDs.append(ObjectIdentifier(callbackClient))
+        }
+
+        manager.controlClientDidExit(client, reason: "test")
+
+        XCTAssertEqual(exitedClientIDs, [ObjectIdentifier(client)])
+    }
+
+    @MainActor
+    func testUpdateAttachedTmuxWindowSizeSendsOnlyOnGridChanges() {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-resize")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+            return XCTFail("Expected Ghostty app handle")
+        }
+
+        let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        surface.cellSize = CGSize(width: 8, height: 16)
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 120,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: surface)
+        tab.tmuxWindowID = 9
+        session.addTab(tab)
+
+        var resizes: [(windowID: Int, columns: Int, rows: Int)] = []
+        manager.tmuxWindowResizeSender = { sentClient, windowID, columns, rows in
+            XCTAssertTrue(sentClient === client)
+            resizes.append((windowID, columns, rows))
+        }
+
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 960, height: 640)
+        )
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 960, height: 640)
+        )
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 121,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 968, height: 640)
+        )
+
+        XCTAssertEqual(resizes.count, 2)
+        XCTAssertEqual(resizes[0].windowID, 9)
+        XCTAssertEqual(resizes[0].columns, 120)
+        XCTAssertEqual(resizes[0].rows, 40)
+        XCTAssertEqual(resizes[1].columns, 121)
+        XCTAssertEqual(resizes[1].rows, 40)
+    }
+
+    @MainActor
+    func testUpdateAttachedTmuxWindowSizeConvergesFromGeometryFallbackToSurfaceGrid() {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-leaf-fallback")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+            return XCTFail("Expected Ghostty app handle")
+        }
+
+        let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        surface.cellSize = CGSize(width: 8, height: 16)
+        surface.surfaceSize = nil
+
+        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: surface)
+        tab.tmuxWindowID = 9
+        session.addTab(tab)
+
+        var resizes: [(windowID: Int, columns: Int, rows: Int)] = []
+        manager.tmuxWindowResizeSender = { sentClient, windowID, columns, rows in
+            XCTAssertTrue(sentClient === client)
+            resizes.append((windowID, columns, rows))
+        }
+
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 808, height: 640)
+        )
+
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 100,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 808, height: 640)
+        )
+
+        XCTAssertEqual(resizes.count, 2)
+        XCTAssertEqual(resizes[0].windowID, 9)
+        XCTAssertEqual(resizes[0].columns, 101)
+        XCTAssertEqual(resizes[0].rows, 40)
+        XCTAssertEqual(resizes[1].windowID, 9)
+        XCTAssertEqual(resizes[1].columns, 100)
+        XCTAssertEqual(resizes[1].rows, 40)
+    }
+
+    @MainActor
+    func testUpdateAttachedTmuxWindowSizeSplitIgnoresLeafOscillationWhenContentGridStable() {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-split-stable")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+            return XCTFail("Expected Ghostty app handle")
+        }
+
+        let left = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        left.cellSize = CGSize(width: 8, height: 16)
+        left.surfaceSize = ghostty_surface_size_s(
+            columns: 35,
+            rows: 59,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        left.tmuxPaneID = 165
+
+        let right = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        right.cellSize = CGSize(width: 8, height: 16)
+        right.surfaceSize = ghostty_surface_size_s(
+            columns: 41,
+            rows: 59,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        right.tmuxPaneID = 166
+
+        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: left)
+        tab.tmuxWindowID = 9
+        tab.surfaceTree = Fantastty.SplitTree(
+            root: .split(.init(
+                direction: .horizontal,
+                ratio: 0.46,
+                left: .leaf(view: left),
+                right: .leaf(view: right)
+            )),
+            zoomed: nil
+        )
+        tab.focusedSurface = right
+        session.addTab(tab)
+
+        var resizes: [(windowID: Int, columns: Int, rows: Int)] = []
+        manager.tmuxWindowResizeSender = { sentClient, windowID, columns, rows in
+            XCTAssertTrue(sentClient === client)
+            resizes.append((windowID, columns, rows))
+        }
+
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 616, height: 944)
+        )
+
+        right.surfaceSize = ghostty_surface_size_s(
+            columns: 42,
+            rows: 59,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 616, height: 944)
+        )
+
+        XCTAssertEqual(resizes.count, 1)
+        XCTAssertEqual(resizes.first?.windowID, 9)
+        XCTAssertEqual(resizes.first?.columns, 77)
+        XCTAssertEqual(resizes.first?.rows, 59)
+    }
+
+    @MainActor
+    func testInitialAttachedTmuxWindowSizeDoesNotRequestRecaptureByDefault() async {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-capture-default")
+        manager.registerAttachedSession(session)
+        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+            return XCTFail("Expected Ghostty app handle")
+        }
+
+        manager.attachedTmuxWindowRecaptureDelay = 0
+
+        let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        surface.cellSize = CGSize(width: 8, height: 16)
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 120,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        surface.tmuxPaneID = 12
+        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: surface)
+        tab.tmuxWindowID = 9
+        session.addTab(tab)
+
+        var resizes: [(windowID: Int, columns: Int, rows: Int)] = []
+        var recaptures: [(windowID: Int, paneIDs: [Int])] = []
+        manager.tmuxWindowResizeSender = { _, windowID, columns, rows in
+            resizes.append((windowID, columns, rows))
+        }
+        manager.tmuxWindowInitialCaptureRequester = { _, windowID, paneIDs in
+            recaptures.append((windowID, paneIDs))
+        }
+
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 960, height: 640)
+        )
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 960, height: 640)
+        )
+        await Task.yield()
+
+        XCTAssertEqual(resizes.count, 1)
+        XCTAssertEqual(recaptures.count, 0)
+    }
+
+    @MainActor
+    func testAttachedTmuxWindowSizeDoesNotRequestRecaptureAfterGridChangeByDefault() async {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-capture-after-resize")
+        manager.registerAttachedSession(session)
+        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+            return XCTFail("Expected Ghostty app handle")
+        }
+
+        manager.attachedTmuxWindowRecaptureDelay = 0
+
+        let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        surface.cellSize = CGSize(width: 8, height: 16)
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 120,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        surface.tmuxPaneID = 12
+        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: surface)
+        tab.tmuxWindowID = 9
+        session.addTab(tab)
+
+        var recaptures: [(windowID: Int, paneIDs: [Int])] = []
+        manager.tmuxWindowResizeSender = { _, _, _, _ in }
+        manager.tmuxWindowInitialCaptureRequester = { _, windowID, paneIDs in
+            recaptures.append((windowID, paneIDs))
+        }
+
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 960, height: 640)
+        )
+
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 121,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 968, height: 640)
+        )
+        await Task.yield()
+
+        XCTAssertEqual(recaptures.count, 0)
+    }
+
+    @MainActor
+    func testAttachedTmuxWindowSizeForceRecaptureRequestsCapture() async {
+        let manager = SessionManagerV2()
+        let session = makeAttachedSession(workspaceID: "v2-force-recapture")
+        manager.registerAttachedSession(session)
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+            return XCTFail("Expected Ghostty app handle")
+        }
+
+        manager.attachedTmuxWindowRecaptureDelay = 0
+
+        let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
+        surface.cellSize = CGSize(width: 8, height: 16)
+        surface.surfaceSize = ghostty_surface_size_s(
+            columns: 120,
+            rows: 40,
+            width_px: 0,
+            height_px: 0,
+            cell_width_px: 0,
+            cell_height_px: 0
+        )
+        surface.tmuxPaneID = 12
+        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: surface)
+        tab.tmuxWindowID = 9
+        session.addTab(tab)
+
+        var recaptures: [(windowID: Int, paneIDs: [Int])] = []
+        manager.tmuxWindowResizeSender = { _, _, _, _ in }
+        manager.tmuxWindowInitialCaptureRequester = { sentClient, windowID, paneIDs in
+            XCTAssertTrue(sentClient === client)
+            recaptures.append((windowID, paneIDs))
+        }
+
+        manager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: CGSize(width: 960, height: 640),
+            forceRecapture: true
+        )
+        await Task.yield()
+
+        XCTAssertEqual(recaptures.count, 1)
+        XCTAssertEqual(recaptures.map(\.windowID), [9])
+        XCTAssertEqual(recaptures.map(\.paneIDs), [[12]])
+    }
+}
+
+@MainActor
+private extension SessionManagerV2Tests {
+    func makeAttachedSession(workspaceID: String) -> Session {
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "tmux-\(workspaceID)",
+            host: .local,
+            connectionState: .disconnected(reason: nil)
+        )
+        let session = Session(title: "Workspace \(workspaceID)", type: .local, workspaceID: workspaceID)
+        session.mode = .attached(info)
+        session.controlClient = Fantastty.TmuxControlClient(attachmentInfo: info)
+        return session
+    }
+}

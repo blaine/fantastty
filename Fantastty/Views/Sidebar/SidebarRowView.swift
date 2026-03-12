@@ -12,6 +12,10 @@ struct SidebarRowView: View {
         session.tabs.first?.sessionType ?? .local
     }
 
+    private var displayInfo: SessionDisplayInfo {
+        SessionDisplayInfo(mode: session.mode, backingState: session.backingState)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             // Attention indicator
@@ -32,6 +36,12 @@ struct SidebarRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .fontWeight(session.needsAttention ? .semibold : .regular)
+
+                    if displayInfo.isMissingBacking {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
 
                     // Show tab count if multiple tabs (hidden when tabs shown in sidebar)
                     if session.tabs.count > 1 && !tabsInSidebar {
@@ -54,6 +64,11 @@ struct SidebarRowView: View {
                     Text("sprite: \(name)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else if displayInfo.isMissingBacking {
+                    Text(displayInfo.disconnectReason ?? "Shell unavailable")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                         .lineLimit(1)
                 }
             }
