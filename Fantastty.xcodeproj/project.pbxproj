@@ -145,9 +145,9 @@
 		91A1B2C3D4E5F60718293A49 /* AttachedWorkspaceRuntimeV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A48 /* AttachedWorkspaceRuntimeV2.swift */; };
 		91A1B2C3D4E5F60718293A4B /* AttachedWorkspaceRuntimeV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A4A /* AttachedWorkspaceRuntimeV2Tests.swift */; };
 		91A1B2C3D4E5F60718293A4D /* AttachedWindowRuntimeV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A4C /* AttachedWindowRuntimeV2Tests.swift */; };
-		91A1B2C3D4E5F60718293A51 /* SessionManagerV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A50 /* SessionManagerV2.swift */; };
+		91A1B2C3D4E5F60718293A51 /* TmuxSessionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A50 /* TmuxSessionBridge.swift */; };
 		91A1B2C3D4E5F60718293A53 /* WorkspaceBindingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A52 /* WorkspaceBindingStore.swift */; };
-		91A1B2C3D4E5F60718293A55 /* SessionManagerV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A54 /* SessionManagerV2Tests.swift */; };
+		91A1B2C3D4E5F60718293A55 /* TmuxSessionBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A1B2C3D4E5F60718293A54 /* TmuxSessionBridgeTests.swift */; };
 		8168B4059B1851FBE5E28D93 /* TmuxPaneController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E3F550C31DA16A5BBD6A362 /* TmuxPaneController.swift */; };
 		60EB92210D7C1DFE0EED9B2B /* TmuxPaneControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C123129804DCF809CCA4CA /* TmuxPaneControllerTests.swift */; };
 		A7B3C4D5E6F708192A3B4C5D /* TmuxWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8C4D5E6F708192A3B4C5D6E /* TmuxWindowController.swift */; };
@@ -292,9 +292,9 @@
 		91A1B2C3D4E5F60718293A48 /* AttachedWorkspaceRuntimeV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachedWorkspaceRuntimeV2.swift; sourceTree = "<group>"; };
 		91A1B2C3D4E5F60718293A4A /* AttachedWorkspaceRuntimeV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachedWorkspaceRuntimeV2Tests.swift; sourceTree = "<group>"; };
 		91A1B2C3D4E5F60718293A4C /* AttachedWindowRuntimeV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachedWindowRuntimeV2Tests.swift; sourceTree = "<group>"; };
-		91A1B2C3D4E5F60718293A50 /* SessionManagerV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManagerV2.swift; sourceTree = "<group>"; };
+		91A1B2C3D4E5F60718293A50 /* TmuxSessionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSessionBridge.swift; sourceTree = "<group>"; };
 		91A1B2C3D4E5F60718293A52 /* WorkspaceBindingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceBindingStore.swift; sourceTree = "<group>"; };
-		91A1B2C3D4E5F60718293A54 /* SessionManagerV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManagerV2Tests.swift; sourceTree = "<group>"; };
+		91A1B2C3D4E5F60718293A54 /* TmuxSessionBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSessionBridgeTests.swift; sourceTree = "<group>"; };
 		92B67719DD878834E97C6521 /* WindowManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManagementTests.swift; sourceTree = "<group>"; };
 		4E3F550C31DA16A5BBD6A362 /* TmuxPaneController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxPaneController.swift; sourceTree = "<group>"; };
 		57C123129804DCF809CCA4CA /* TmuxPaneControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxPaneControllerTests.swift; sourceTree = "<group>"; };
@@ -385,7 +385,7 @@
 				5F1A2B3C4D5E6F708192A3B3 /* SessionBackingState.swift */,
 				DC71494450F49AF3C3EF59D6 /* Session.swift */,
 				6A288EE4B731A40F8A2C9450 /* SessionManager.swift */,
-				91A1B2C3D4E5F60718293A50 /* SessionManagerV2.swift */,
+				91A1B2C3D4E5F60718293A50 /* TmuxSessionBridge.swift */,
 				07DF09D816789200644A34F6 /* SessionMetadata.swift */,
 				44962312211B25188B179C46 /* SessionDisplayInfo.swift */,
 				CE7614C13A5B0B575404F8D0 /* SessionType.swift */,
@@ -574,7 +574,7 @@
 			children = (
 				91A1B2C3D4E5F60718293A4C /* AttachedWindowRuntimeV2Tests.swift */,
 				91A1B2C3D4E5F60718293A4A /* AttachedWorkspaceRuntimeV2Tests.swift */,
-				91A1B2C3D4E5F60718293A54 /* SessionManagerV2Tests.swift */,
+				91A1B2C3D4E5F60718293A54 /* TmuxSessionBridgeTests.swift */,
 				AB31AFD1D3887F14B4BA78F5 /* TmuxProtocolParserTests.swift */,
 				03B74E4E1E447068AC4F5325 /* TmuxLayoutParserTests.swift */,
 				C581C540401911AC2BCBCC39 /* CommandQueueTests.swift */,
@@ -777,7 +777,7 @@
 				B3F7A92D1E8C4D6F50A1E7C2 /* ShellIntegration.swift in Sources */,
 				E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */,
 				736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */,
-				91A1B2C3D4E5F60718293A51 /* SessionManagerV2.swift in Sources */,
+				91A1B2C3D4E5F60718293A51 /* TmuxSessionBridge.swift in Sources */,
 				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
 				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
 				442252375FE92C0781EE7F56 /* SessionType.swift in Sources */,
@@ -868,7 +868,7 @@
 				6512171B62F4BE5F52B06832 /* SessionDisplayInfoTests.swift in Sources */,
 				91A1B2C3D4E5F60718293A4D /* AttachedWindowRuntimeV2Tests.swift in Sources */,
 				91A1B2C3D4E5F60718293A4B /* AttachedWorkspaceRuntimeV2Tests.swift in Sources */,
-				91A1B2C3D4E5F60718293A55 /* SessionManagerV2Tests.swift in Sources */,
+				91A1B2C3D4E5F60718293A55 /* TmuxSessionBridgeTests.swift in Sources */,
 				25E2A85D63048EC7BB9C0608 /* WindowManagementTests.swift in Sources */,
 				60EB92210D7C1DFE0EED9B2B /* TmuxPaneControllerTests.swift in Sources */,
 				C9D5E6F708192A3B4C5D6E7F /* TmuxWindowControllerTests.swift in Sources */,

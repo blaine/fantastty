@@ -3,21 +3,21 @@ import XCTest
 import GhosttyKit
 
 @MainActor
-private enum SessionManagerV2TestSupport {
+private enum TmuxSessionBridgeTestSupport {
     static let ghosttyApp = Fantastty.Ghostty.App()
 }
 
-final class SessionManagerV2Tests: XCTestCase {
+final class TmuxSessionBridgeTests: XCTestCase {
     func testAttachedTmuxSurfacesUseSilentLocalCommand() {
         XCTAssertEqual(
-            SessionManagerV2.attachedTmuxSilentCommand,
+            TmuxSessionBridge.attachedTmuxSilentCommand,
             "/bin/sh -lc 'stty raw -echo; exec /bin/cat >/dev/null'"
         )
     }
 
     @MainActor
     func testRegisterAttachedSessionCreatesBinding() {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-bind")
 
         manager.registerAttachedSession(session)
@@ -27,8 +27,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testDelegateEventsCreateWindowApplyLayoutAndFlushBufferedOutput() {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-layout")
         manager.registerAttachedSession(session)
 
@@ -64,8 +64,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testActiveWindowAndPaneEventsTrackSelectionAndFocus() {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-active")
         manager.registerAttachedSession(session)
 
@@ -90,8 +90,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testLayoutRebindsReusedSurfacesToCurrentControlClient() {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-rebind")
         guard let app = manager.ghosttyApp?.app else {
             return XCTFail("Expected ghostty app")
@@ -132,8 +132,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testLayoutReplacesFocusedSurfaceWhenPreviouslyFocusedPaneDisappears() {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-focus-layout")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
@@ -163,8 +163,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testUserTabSelectionRoutesToTmuxSelectWindow() async {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-select-window")
         manager.registerAttachedSession(session)
 
@@ -211,8 +211,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testTmuxDrivenWindowSelectionDoesNotEchoSelectWindowCommand() async {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-select-window-echo")
         manager.registerAttachedSession(session)
 
@@ -254,8 +254,8 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testBootstrapWindowAddsDoNotEchoSelectWindowCommand() async {
-        let manager = SessionManagerV2()
-        manager.ghosttyApp = SessionManagerV2TestSupport.ghosttyApp
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
         let session = makeAttachedSession(workspaceID: "v2-bootstrap-select-window-echo")
         manager.registerAttachedSession(session)
 
@@ -295,7 +295,7 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testDidCloseWindowInvokesWindowClosedCallback() {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-close-callback")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
@@ -316,7 +316,7 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testControlClientExitInvokesExitCallback() {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-exit-callback")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
@@ -335,13 +335,13 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testUpdateAttachedTmuxWindowSizeSendsOnlyOnGridChanges() {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-resize")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
             return XCTFail("Expected control client")
         }
-        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+        guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
 
@@ -399,13 +399,13 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testUpdateAttachedTmuxWindowSizeConvergesFromGeometryFallbackToSurfaceGrid() {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-leaf-fallback")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
             return XCTFail("Expected control client")
         }
-        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+        guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
 
@@ -454,13 +454,13 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testUpdateAttachedTmuxWindowSizeSplitIgnoresLeafOscillationWhenContentGridStable() {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-split-stable")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
             return XCTFail("Expected control client")
         }
-        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+        guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
 
@@ -536,10 +536,10 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testInitialAttachedTmuxWindowSizeDoesNotRequestRecaptureByDefault() async {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-capture-default")
         manager.registerAttachedSession(session)
-        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+        guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
 
@@ -587,10 +587,10 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testAttachedTmuxWindowSizeDoesNotRequestRecaptureAfterGridChangeByDefault() async {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-capture-after-resize")
         manager.registerAttachedSession(session)
-        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+        guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
 
@@ -643,13 +643,13 @@ final class SessionManagerV2Tests: XCTestCase {
 
     @MainActor
     func testAttachedTmuxWindowSizeForceRecaptureRequestsCapture() async {
-        let manager = SessionManagerV2()
+        let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "v2-force-recapture")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
             return XCTFail("Expected control client")
         }
-        guard let app = SessionManagerV2TestSupport.ghosttyApp.app else {
+        guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
 
@@ -692,7 +692,7 @@ final class SessionManagerV2Tests: XCTestCase {
 }
 
 @MainActor
-private extension SessionManagerV2Tests {
+private extension TmuxSessionBridgeTests {
     func makeAttachedSession(workspaceID: String) -> Session {
         let info = Fantastty.TmuxAttachmentInfo(
             sessionName: "tmux-\(workspaceID)",

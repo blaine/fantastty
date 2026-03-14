@@ -8,8 +8,8 @@ import AppKit
 /// Routes libghostty notifications to the correct session/tab.
 class SessionManager: ObservableObject {
     typealias TmuxOutputInjector = (Ghostty.SurfaceView, Data) -> Bool
-    typealias TmuxWindowResizeSender = SessionManagerV2.TmuxWindowResizeSender
-    typealias TmuxWindowInitialCaptureRequester = SessionManagerV2.TmuxWindowInitialCaptureRequester
+    typealias TmuxWindowResizeSender = TmuxSessionBridge.TmuxWindowResizeSender
+    typealias TmuxWindowInitialCaptureRequester = TmuxSessionBridge.TmuxWindowInitialCaptureRequester
     typealias AttachedTmuxSplitSender = (TmuxControlClient, Int, Bool) async throws -> Void
     typealias AttachedTmuxNewWindowSender = (TmuxControlClient) async throws -> String
     typealias LiveTmuxWorkspaceProvider = () -> [String: TmuxWorkspaceInfo]
@@ -214,30 +214,30 @@ class SessionManager: ObservableObject {
     /// Reference to the Ghostty app state
     var ghosttyApp: Ghostty.App? {
         didSet {
-            attachedSessionManagerV2.ghosttyApp = ghosttyApp
+            attachedTmuxSessionBridge.ghosttyApp = ghosttyApp
         }
     }
 
     /// O(1) lookup: surface object identity → (Session, TerminalTab).
     /// Populated in setupTitleObserver; pruned in closeTab/closeSurface/closeSession.
     private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
-    private let attachedSessionManagerV2 = SessionManagerV2()
+    private let attachedTmuxSessionBridge = TmuxSessionBridge()
     var tmuxOutputInjector: TmuxOutputInjector = SessionManager.defaultTmuxOutputInjector {
         didSet {
-            attachedSessionManagerV2.tmuxOutputInjector = tmuxOutputInjector
+            attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
         }
     }
     var tmuxWindowResizeSender: TmuxWindowResizeSender {
-        get { attachedSessionManagerV2.tmuxWindowResizeSender }
-        set { attachedSessionManagerV2.tmuxWindowResizeSender = newValue }
+        get { attachedTmuxSessionBridge.tmuxWindowResizeSender }
+        set { attachedTmuxSessionBridge.tmuxWindowResizeSender = newValue }
     }
     var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester {
-        get { attachedSessionManagerV2.tmuxWindowInitialCaptureRequester }
-        set { attachedSessionManagerV2.tmuxWindowInitialCaptureRequester = newValue }
+        get { attachedTmuxSessionBridge.tmuxWindowInitialCaptureRequester }
+        set { attachedTmuxSessionBridge.tmuxWindowInitialCaptureRequester = newValue }
     }
     var attachedTmuxWindowRecaptureDelay: TimeInterval {
-        get { attachedSessionManagerV2.attachedTmuxWindowRecaptureDelay }
-        set { attachedSessionManagerV2.attachedTmuxWindowRecaptureDelay = newValue }
+        get { attachedTmuxSessionBridge.attachedTmuxWindowRecaptureDelay }
+        set { attachedTmuxSessionBridge.attachedTmuxWindowRecaptureDelay = newValue }
     }
     var attachedTmuxSplitSender: AttachedTmuxSplitSender = SessionManager.defaultAttachedTmuxSplitSender
     var attachedTmuxNewWindowSender: AttachedTmuxNewWindowSender = SessionManager.defaultAttachedTmuxNewWindowSender
@@ -282,7 +282,7 @@ class SessionManager: ObservableObject {
         liveTmuxWorkspaceProvider = { TmuxManager.shared.groupSessionsByWorkspace() }
         attachedSessionReconnectStarter = SessionManager.defaultAttachedSessionReconnectStarter
         workspaceMetadataProvider = { Array(SessionMetadataStore.shared.metadata.values) }
-        attachedSessionManagerV2.tmuxOutputInjector = tmuxOutputInjector
+        attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
 
         thumbnailRefreshController.onStateChange = { [weak self] isSuspended in
             DispatchQueue.main.async {
@@ -725,11 +725,11 @@ class SessionManager: ObservableObject {
     }
 
     private func configureAttachedSession(_ session: Session, with info: TmuxAttachmentInfo) {
-        attachedSessionManagerV2.unregisterSession(session)
+        attachedTmuxSessionBridge.unregisterSession(session)
         let client = TmuxControlClient(attachmentInfo: info)
         session.controlClient = client
         session.mode = .attached(info)
-        attachedSessionManagerV2.registerAttachedSession(session)
+        attachedTmuxSessionBridge.registerAttachedSession(session)
     }
 
     private func clearStaleTerminalTabsForRecovery(in session: Session) {
@@ -834,7 +834,7 @@ class SessionManager: ObservableObject {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
 
         let session = sessions[index]
-        attachedSessionManagerV2.unregisterSession(session)
+        attachedTmuxSessionBridge.unregisterSession(session)
         let metadataStore = SessionMetadataStore.shared
 
         metadataStore.update(
@@ -898,7 +898,7 @@ class SessionManager: ObservableObject {
     func archiveSession(id: UUID) {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[index]
-        attachedSessionManagerV2.unregisterSession(session)
+        attachedTmuxSessionBridge.unregisterSession(session)
 
         // Kill tmux sessions
         tmuxManager.killWorkspaceSessions(workspaceID: session.workspaceID)
@@ -1600,7 +1600,7 @@ class SessionManager: ObservableObject {
         contentSize: CGSize,
         forceRecapture: Bool = false
     ) {
-        attachedSessionManagerV2.updateAttachedTmuxWindowSize(
+        attachedTmuxSessionBridge.updateAttachedTmuxWindowSize(
             session: session,
             tab: tab,
             contentSize: contentSize,
@@ -1617,7 +1617,7 @@ class SessionManager: ObservableObject {
 
         let client = TmuxControlClient(attachmentInfo: info)
         session.controlClient = client
-        attachedSessionManagerV2.registerAttachedSession(session)
+        attachedTmuxSessionBridge.registerAttachedSession(session)
 
         return session
     }

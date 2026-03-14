@@ -2,7 +2,7 @@ import SwiftUI
 import GhosttyKit
 import Combine
 
-final class SessionManagerV2: ObservableObject {
+final class TmuxSessionBridge: ObservableObject {
     typealias TmuxOutputInjector = (Ghostty.SurfaceView, Data) -> Bool
     typealias TmuxWindowSelector = (TmuxControlClient, Int) -> Void
     typealias TmuxWindowResizeSender = (TmuxControlClient, Int, Int, Int) -> Void
@@ -19,9 +19,9 @@ final class SessionManagerV2: ObservableObject {
     }
 
     var ghosttyApp: Ghostty.App?
-    var tmuxOutputInjector: TmuxOutputInjector = SessionManagerV2.defaultTmuxOutputInjector
-    var tmuxWindowSelector: TmuxWindowSelector = SessionManagerV2.defaultTmuxWindowSelector
-    var tmuxWindowResizeSender: TmuxWindowResizeSender = SessionManagerV2.defaultTmuxWindowResizeSender
+    var tmuxOutputInjector: TmuxOutputInjector = TmuxSessionBridge.defaultTmuxOutputInjector
+    var tmuxWindowSelector: TmuxWindowSelector = TmuxSessionBridge.defaultTmuxWindowSelector
+    var tmuxWindowResizeSender: TmuxWindowResizeSender = TmuxSessionBridge.defaultTmuxWindowResizeSender
     var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester!
     var attachedTmuxWindowRecaptureDelay: TimeInterval = 0.12
     var onWindowClosed: ((TmuxControlClient, Int) -> Void)?
@@ -206,7 +206,7 @@ final class SessionManagerV2: ObservableObject {
     }
 }
 
-private extension SessionManagerV2 {
+private extension TmuxSessionBridge {
     static func attachedTmuxWindowSize(
         in node: SplitTree<Ghostty.SurfaceView>.Node?
     ) -> AttachedTmuxWindowSize? {
@@ -521,7 +521,7 @@ private extension SessionManagerV2 {
     }
 }
 
-extension SessionManagerV2: TmuxControlClientDelegate {
+extension TmuxSessionBridge: TmuxControlClientDelegate {
     func controlClient(_ client: TmuxControlClient, didAddWindow window: TmuxWindow) {
         route(.windowAdded(window), from: client)
     }
