@@ -104,11 +104,6 @@ class SessionManager: ObservableObject {
     /// Reference to tmux manager
     private let tmuxManager = TmuxManager.shared
 
-    /// Debug log — routed through os.Logger (async, zero-cost when not captured).
-    private static func debugLog(_ message: String) {
-        logger.debug("\(message, privacy: .public)")
-    }
-
     private static func defaultTmuxOutputInjector(_ surface: Ghostty.SurfaceView, _ data: Data) -> Bool {
         guard let cSurface = surface.surface else { return false }
         data.withUnsafeBytes { buffer in
@@ -1212,7 +1207,6 @@ class SessionManager: ObservableObject {
             return event
         }
 
-        Self.debugLog("setupNotificationObservers: All observers registered")
     }
 
     @objc private func handleNewTab(_ notification: Foundation.Notification) {
@@ -1366,58 +1360,22 @@ class SessionManager: ObservableObject {
     }
 
     @objc private func handleBellDidRing(_ notification: Foundation.Notification) {
-        Self.debugLog("NOTIFICATION: handleBellDidRing called!")
-
-        // Play the system bell sound so we can verify OUR handler was called
         NSSound.beep()
-        Self.debugLog("NOTIFICATION: NSSound.beep() called")
 
-        guard let surfaceView = notification.object as? Ghostty.SurfaceView else {
-            Self.debugLog("NOTIFICATION: ERROR - object is not SurfaceView (got: \(type(of: notification.object)))")
-            return
-        }
+        guard let surfaceView = notification.object as? Ghostty.SurfaceView,
+              let (session, _) = findSessionAndTab(for: surfaceView) else { return }
 
-        Self.debugLog("NOTIFICATION: SurfaceView id=\(surfaceView.id)")
-
-        guard let (session, tab) = findSessionAndTab(for: surfaceView) else {
-            Self.debugLog("NOTIFICATION: ERROR - could not find session/tab for surface")
-            return
-        }
-
-        Self.debugLog("NOTIFICATION: Found session=\(session.id), tab=\(tab.id)")
-
-        // Only set attention for background sessions
         if session.id != selectedSessionID {
             session.needsAttention = true
-            Self.debugLog("NOTIFICATION: ATTENTION FLAG SET for background session!")
-        } else {
-            Self.debugLog("NOTIFICATION: Skipping - session is currently selected (foreground)")
         }
     }
 
     @objc private func handleCommandFinished(_ notification: Foundation.Notification) {
-        Self.debugLog("NOTIFICATION: handleCommandFinished called!")
+        guard let surfaceView = notification.object as? Ghostty.SurfaceView,
+              let (session, _) = findSessionAndTab(for: surfaceView) else { return }
 
-        guard let surfaceView = notification.object as? Ghostty.SurfaceView else {
-            Self.debugLog("COMMAND_FINISHED: ERROR - object is not SurfaceView")
-            return
-        }
-
-        Self.debugLog("COMMAND_FINISHED: SurfaceView id=\(surfaceView.id)")
-
-        guard let (session, tab) = findSessionAndTab(for: surfaceView) else {
-            Self.debugLog("COMMAND_FINISHED: ERROR - could not find session/tab for surface")
-            return
-        }
-
-        Self.debugLog("COMMAND_FINISHED: Found session=\(session.id), tab=\(tab.id)")
-
-        // Only set attention for background sessions
         if session.id != selectedSessionID {
             session.needsAttention = true
-            Self.debugLog("COMMAND_FINISHED: ATTENTION FLAG SET for background session!")
-        } else {
-            Self.debugLog("COMMAND_FINISHED: Skipping - session is currently selected (foreground)")
         }
     }
 
@@ -1429,7 +1387,6 @@ class SessionManager: ObservableObject {
         // Clear attention when user types in this session
         if session.needsAttention {
             session.needsAttention = false
-            Self.debugLog("KEY_INPUT: Cleared attention for session \(session.id)")
         }
 
         // Record key input for idle detection
@@ -1437,35 +1394,14 @@ class SessionManager: ObservableObject {
     }
 
     @objc private func handleSessionNote(_ notification: Foundation.Notification) {
-        Self.debugLog("SESSION_NOTE: handleSessionNote called!")
+        guard let surfaceView = notification.object as? Ghostty.SurfaceView,
+              let content = notification.userInfo?["content"] as? String,
+              let (session, _) = findSessionAndTab(for: surfaceView) else { return }
 
-        guard let surfaceView = notification.object as? Ghostty.SurfaceView else {
-            Self.debugLog("SESSION_NOTE: ERROR - object is not SurfaceView")
-            return
-        }
-
-        guard let content = notification.userInfo?["content"] as? String else {
-            Self.debugLog("SESSION_NOTE: ERROR - no content in userInfo")
-            return
-        }
-
-        Self.debugLog("SESSION_NOTE: content='\(content)' surfaceView=\(surfaceView.id)")
-
-        guard let (session, _) = findSessionAndTab(for: surfaceView) else {
-            Self.debugLog("SESSION_NOTE: ERROR - could not find session for surface")
-            return
-        }
-
-        Self.debugLog("SESSION_NOTE: Found session=\(session.id)")
-
-        // Add the note entry to the session
         session.addNote(content: content, source: .terminal)
-        Self.debugLog("SESSION_NOTE: Note added to session")
 
-        // Set attention flag if this is a background session
         if session.id != selectedSessionID {
             session.needsAttention = true
-            Self.debugLog("SESSION_NOTE: ATTENTION FLAG SET for background session")
         }
     }
 
@@ -1474,7 +1410,6 @@ class SessionManager: ObservableObject {
               let url = notification.userInfo?["url"] as? String,
               let (session, _) = findSessionAndTab(for: surfaceView) else { return }
         session.ticketURL = url.isEmpty ? nil : url
-        Self.debugLog("TICKET_URL: Set '\(url)' for session \(session.id)")
     }
 
     @objc private func handlePullRequestURL(_ notification: Foundation.Notification) {
@@ -1482,7 +1417,6 @@ class SessionManager: ObservableObject {
               let url = notification.userInfo?["url"] as? String,
               let (session, _) = findSessionAndTab(for: surfaceView) else { return }
         session.pullRequestURL = url.isEmpty ? nil : url
-        Self.debugLog("PR_URL: Set '\(url)' for session \(session.id)")
     }
 
     // MARK: - Private Helpers
@@ -1504,8 +1438,6 @@ class SessionManager: ObservableObject {
     }
 
     private func setupTitleObserver(for tab: TerminalTab, surfaceView: Ghostty.SurfaceView, session: Session) {
-        Self.debugLog("setupTitleObserver: Setting up observers for surface \(surfaceView.id)")
-
         // Register in the O(1) lookup index
         surfaceIndex[ObjectIdentifier(surfaceView)] = (session, tab)
 
@@ -1528,23 +1460,13 @@ class SessionManager: ObservableObject {
             .filter { $0 }  // only act when bell rings; keyDown sets bell=false on every keypress
             .receive(on: DispatchQueue.main)
             .sink { [weak self, weak surfaceView] bellActive in
-                Self.debugLog("BELL STATE: \(bellActive)")
                 guard bellActive, let self = self, let surfaceView = surfaceView else { return }
-                Self.debugLog("BELL: Active! Looking for session...")
-                if let (session, _) = self.findSessionAndTab(for: surfaceView) {
-                    if session.id != self.selectedSessionID {
-                        session.needsAttention = true
-                        Self.debugLog("BELL: Set attention for BACKGROUND session \(session.id)")
-                    } else {
-                        Self.debugLog("BELL: Skipping - session is currently selected (foreground)")
-                    }
-                } else {
-                    Self.debugLog("BELL: ERROR - Could not find session for surface")
+                if let (session, _) = self.findSessionAndTab(for: surfaceView),
+                   session.id != self.selectedSessionID {
+                    session.needsAttention = true
                 }
             }
             .store(in: &tab.cancellables)
-
-        Self.debugLog("setupTitleObserver: Observers registered")
     }
 
     private func findSurface(in node: SplitTree<Ghostty.SurfaceView>.Node, uuid: UUID) -> Ghostty.SurfaceView? {
