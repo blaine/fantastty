@@ -218,6 +218,7 @@ class SessionManager: ObservableObject {
     /// Populated in setupTitleObserver; pruned in closeTab/closeSurface/closeSession.
     private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
     private let attachedTmuxSessionBridge = TmuxSessionBridge()
+    private var lifecycleRouterByWorkspaceID: [String: TerminalLifecycleRouter] = [:]
     var tmuxOutputInjector: TmuxOutputInjector = SessionManager.defaultTmuxOutputInjector {
         didSet {
             attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
@@ -671,6 +672,7 @@ class SessionManager: ObservableObject {
         session.controlClient = client
         session.mode = .attached(info)
         attachedTmuxSessionBridge.registerAttachedSession(session)
+        lifecycleRouterByWorkspaceID[session.workspaceID] = TerminalLifecycleRouter(commandSender: client)
     }
 
     private func clearStaleTerminalTabsForRecovery(in session: Session) {
@@ -788,6 +790,9 @@ class SessionManager: ObservableObject {
         for tab in session.tabs {
             deregisterSurfaces(in: tab)
         }
+
+        // Clean up lifecycle router for this workspace
+        lifecycleRouterByWorkspaceID.removeValue(forKey: session.workspaceID)
 
         // Kill tmux session if requested and session has one
         if killTmux {
@@ -950,8 +955,21 @@ class SessionManager: ObservableObject {
     }
 
     /// Close a tab within its session. If last tab, closes the session.
+    /// For terminal tabs in attached tmux sessions, sends kill-window through the
+    /// lifecycle router. The actual tab removal happens when tmux confirms via
+    /// %window-close. Browser tabs are still closed locally.
     func closeTab(id: UUID) {
         guard let session = sessions.first(where: { $0.tabs.contains { $0.id == id } }) else { return }
+
+        if let tab = session.tabs.first(where: { $0.id == id }),
+           tab.kind == .terminal,
+           let router = lifecycleRouterByWorkspaceID[session.workspaceID] {
+            Task {
+                await router.closeTerminalTab(tab, in: session)
+            }
+            // Tab removal happens when tmux sends %window-close back
+            return
+        }
 
         if let tab = session.tabs.first(where: { $0.id == id }) {
             // Remove tab's surfaces from the lookup index before the tab is removed
@@ -983,8 +1001,20 @@ class SessionManager: ObservableObject {
     }
 
     /// Close a surface within a tab's split tree.
+    /// For tmux panes in attached sessions, sends kill-pane through the lifecycle
+    /// router. The actual pane removal happens when tmux confirms via %layout-change.
     func closeSurface(_ surfaceView: Ghostty.SurfaceView) {
-        guard let (_, tab) = findSessionAndTab(for: surfaceView) else { return }
+        guard let (session, tab) = findSessionAndTab(for: surfaceView) else { return }
+
+        // Route tmux pane closures through the lifecycle router
+        if let paneID = surfaceView.tmuxPaneID,
+           let router = lifecycleRouterByWorkspaceID[session.workspaceID] {
+            Task {
+                await router.closePane(paneID: paneID, in: session)
+            }
+            return
+        }
+
         surfaceIndex.removeValue(forKey: ObjectIdentifier(surfaceView))
 
         guard let node = tab.surfaceTree?.root?.node(view: surfaceView) else { return }
