@@ -9,6 +9,7 @@ struct SidebarView: View {
     @State private var expandedSessions: Set<UUID> = []
     @State private var workspaceToDelete: String?
     @State private var deletingTrashedWorkspace = false
+    @State private var confirmingEmptyTrash = false
 
     var body: some View {
         List(selection: $sessionManager.selectedSessionID) {
@@ -129,21 +130,32 @@ struct SidebarView: View {
                 }
 
                 if !metadataStore.trashedWorkspaces.isEmpty {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showTrashed.toggle()
+                    HStack(spacing: 4) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                showTrashed.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash")
+                                Text("Trashed (\(metadataStore.trashedWorkspaces.count))")
+                                Spacer()
+                                Image(systemName: showTrashed ? "eye" : "eye.slash")
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "trash")
-                            Text("Trashed (\(metadataStore.trashedWorkspaces.count))")
-                            Spacer()
-                            Image(systemName: showTrashed ? "eye" : "eye.slash")
-                                .foregroundStyle(.tertiary)
+                        .buttonStyle(.plain)
+
+                        Button {
+                            confirmingEmptyTrash = true
+                        } label: {
+                            Image(systemName: "trash.slash")
+                                .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .buttonStyle(.plain)
+                        .help("Empty Trash")
                     }
-                    .buttonStyle(.plain)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                 }
@@ -194,6 +206,14 @@ struct SidebarView: View {
             }
         } message: {
             Text("This will permanently delete all metadata, notes, and URLs for this workspace. This cannot be undone.")
+        }
+        .alert("Empty Trash?", isPresented: $confirmingEmptyTrash) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty Trash", role: .destructive) {
+                sessionManager.emptyTrash()
+            }
+        } message: {
+            Text("This will permanently delete all \(metadataStore.trashedWorkspaces.count) trashed workspace(s). This cannot be undone.")
         }
     }
 }

@@ -541,21 +541,31 @@ class SessionManager: ObservableObject {
         in session: Session,
         selectedTabIndex: Int?
     ) {
-        let browserTabs = tabLayouts.enumerated().filter { $0.element.kind == .browser }
+        // Count terminal tabs preceding each browser tab so terminalInsertIndex
+        // can interleave tmux-created terminal tabs at the right positions.
+        var terminalCount = 0
+        var browserTabs: [TerminalTab] = []
+        for (i, layout) in tabLayouts.enumerated() {
+            switch layout.kind {
+            case .terminal:
+                terminalCount += 1
+            case .browser:
+                let tab = TerminalTab(url: layout.url ?? URL(string: "https://www.google.com")!)
+                tab.terminalTabsBefore = terminalCount
+                browserTabs.append(tab)
+            }
+        }
         guard !browserTabs.isEmpty else { return }
 
-        session.tabs = browserTabs.map { entry in
-            TerminalTab(url: entry.element.url ?? URL(string: "https://www.google.com")!)
-        }
+        session.tabs = browserTabs
 
         if let selectedTabIndex,
            tabLayouts.indices.contains(selectedTabIndex),
-           tabLayouts[selectedTabIndex].kind == .browser,
-           let remappedSelectedIndex = browserTabs.firstIndex(where: { $0.offset == selectedTabIndex }),
-           session.tabs.indices.contains(remappedSelectedIndex) {
-            session.selectedTabID = session.tabs[remappedSelectedIndex].id
-        } else {
-            session.selectedTabID = session.tabs.first?.id
+           tabLayouts[selectedTabIndex].kind == .browser {
+            let browserIndex = tabLayouts[..<selectedTabIndex].filter { $0.kind == .browser }.count
+            if session.tabs.indices.contains(browserIndex) {
+                session.selectedTabID = session.tabs[browserIndex].id
+            }
         }
     }
 
@@ -905,6 +915,13 @@ class SessionManager: ObservableObject {
     /// Permanently delete a trashed workspace's metadata.
     func deleteTrashedWorkspace(workspaceID: String) {
         SessionMetadataStore.shared.remove(forKey: workspaceID)
+    }
+
+    /// Permanently delete all trashed workspaces.
+    func emptyTrash() {
+        for meta in SessionMetadataStore.shared.trashedWorkspaces {
+            SessionMetadataStore.shared.remove(forKey: meta.workspaceID)
+        }
     }
 
     // MARK: - Tab Management (Top tabs within session)
@@ -1490,14 +1507,12 @@ class SessionManager: ObservableObject {
     func updateAttachedTmuxWindowSize(
         session: Session,
         tab: TerminalTab,
-        contentSize: CGSize,
-        forceRecapture: Bool = false
+        contentSize: CGSize
     ) {
         attachedTmuxSessionBridge.updateAttachedTmuxWindowSize(
             session: session,
             tab: tab,
-            contentSize: contentSize,
-            forceRecapture: forceRecapture
+            contentSize: contentSize
         )
     }
 

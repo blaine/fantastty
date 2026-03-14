@@ -18,7 +18,7 @@ final class LayoutPersistenceTests: XCTestCase {
 
     // MARK: - buildSnapshot
 
-    func testBuildSnapshotExcludesTerminalTabs() {
+    func testBuildSnapshotIncludesAllTabKinds() {
         let persistence = LayoutPersistence(layoutURL: tempURL)
 
         let info = Fantastty.TmuxAttachmentInfo(
@@ -40,9 +40,10 @@ final class LayoutPersistenceTests: XCTestCase {
         )
 
         let tabs = snapshot.workspaces.first?.tabs ?? []
-        XCTAssertEqual(tabs.count, 1)
-        XCTAssertEqual(tabs.first?.kind, .browser)
-        XCTAssertEqual(tabs.first?.url, URL(string: "https://example.com")!)
+        XCTAssertEqual(tabs.count, 2)
+        XCTAssertEqual(tabs[0].kind, .terminal)
+        XCTAssertEqual(tabs[1].kind, .browser)
+        XCTAssertEqual(tabs[1].url, URL(string: "https://example.com")!)
     }
 
     func testBuildSnapshotSkipsNonAttachedSessions() {
@@ -95,12 +96,12 @@ final class LayoutPersistenceTests: XCTestCase {
 
         let wsLayout = try XCTUnwrap(loaded.workspaces.first)
         XCTAssertEqual(wsLayout.workspaceID, "roundtrip")
-        // Only browser tabs are persisted
-        XCTAssertEqual(wsLayout.tabs.map(\.kind), [.browser, .browser])
-        XCTAssertEqual(wsLayout.tabs[0].url, browserURL1)
-        XCTAssertEqual(wsLayout.tabs[1].url, browserURL2)
-        // browserTab2 was the 2nd browser tab (index 1 among browsers)
-        XCTAssertEqual(wsLayout.selectedTabIndex, 1)
+        // All tabs are persisted to preserve relative ordering
+        XCTAssertEqual(wsLayout.tabs.map(\.kind), [.terminal, .browser, .browser])
+        XCTAssertEqual(wsLayout.tabs[1].url, browserURL1)
+        XCTAssertEqual(wsLayout.tabs[2].url, browserURL2)
+        // browserTab2 was at index 2 in the full tab array
+        XCTAssertEqual(wsLayout.selectedTabIndex, 2)
     }
 
     func testSaveWritesAttachedOnlySchemaVersion() throws {

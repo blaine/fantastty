@@ -110,7 +110,7 @@ struct TmuxAttachmentInfo: Codable, Equatable {
     /// Generate the command to create a new tmux session before attaching.
     /// This keeps the control-mode transport on the simpler attach path.
     func createSessionCommand(tmuxPath: String = "tmux") -> String {
-        let tmuxArgs = "\(tmuxPath) has-session -t '\(sessionName)' 2>/dev/null || \(tmuxPath) new-session -d -s '\(sessionName)'"
+        let tmuxArgs = "\(tmuxPath) has-session -t '\(sessionName)' 2>/dev/null || \(tmuxPath) new-session -d -s '\(sessionName)' -c ~"
         switch host {
         case .local:
             return tmuxArgs

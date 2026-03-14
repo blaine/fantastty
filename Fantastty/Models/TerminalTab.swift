@@ -36,6 +36,11 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     /// Tmux window index this tab represents (for attached-session ordering).
     var tmuxWindowIndex: Int?
 
+    /// For restored browser tabs: how many terminal tabs should precede this tab.
+    /// Used by `terminalInsertIndex` to interleave terminal tabs around browser tabs.
+    /// Reset to nil after restore is complete.
+    var terminalTabsBefore: Int?
+
     /// Combine subscriptions for this tab. Cancelled automatically when the tab deallocates.
     var cancellables = Set<AnyCancellable>()
 

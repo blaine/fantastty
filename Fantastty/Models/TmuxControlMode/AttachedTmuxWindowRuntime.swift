@@ -12,9 +12,21 @@ enum AttachedTmuxWindowRuntime {
             return tabs.endIndex
         }
 
-        for (index, tab) in tabs.enumerated() where tab.kind == .terminal {
-            let existingIndex = tab.tmuxWindowIndex ?? Int.max
-            if existingIndex > incomingIndex {
+        // Count how many terminal tabs already exist with a lower windowIndex
+        // to determine this window's ordinal position among terminals.
+        let terminalOrdinal = tabs.filter {
+            $0.kind == .terminal && ($0.tmuxWindowIndex ?? Int.max) < incomingIndex
+        }.count
+
+        for (index, tab) in tabs.enumerated() {
+            if tab.kind == .terminal {
+                let existingIndex = tab.tmuxWindowIndex ?? Int.max
+                if existingIndex > incomingIndex {
+                    return index
+                }
+            } else if let before = tab.terminalTabsBefore, before > terminalOrdinal {
+                // This browser tab expects more terminal tabs before it than
+                // we've placed so far — insert the terminal tab here.
                 return index
             }
         }

@@ -238,17 +238,11 @@ struct TabContentView: View {
                         tab.requestThumbnailRefresh()
                     }
                     .onReceive(attachedTmuxCellSizePublisher) { _ in
-                        updateAttachedTmuxWindowSize(
-                            contentSize: geometry.size,
-                            forceRecapture: true
-                        )
+                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
                         tab.requestThumbnailRefresh()
                     }
                     .onReceive(attachedTmuxSurfaceSizePublisher) { _ in
-                        updateAttachedTmuxWindowSize(
-                            contentSize: geometry.size,
-                            forceRecapture: true
-                        )
+                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
                         tab.requestThumbnailRefresh()
                     }
                 }
@@ -313,12 +307,11 @@ struct TabContentView: View {
             .eraseToAnyPublisher()
     }
 
-    private func updateAttachedTmuxWindowSize(contentSize: CGSize, forceRecapture: Bool = false) {
+    private func updateAttachedTmuxWindowSize(contentSize: CGSize) {
         sessionManager.updateAttachedTmuxWindowSize(
             session: session,
             tab: tab,
-            contentSize: contentSize,
-            forceRecapture: forceRecapture
+            contentSize: contentSize
         )
     }
 

@@ -164,8 +164,7 @@ final class TmuxSessionBridge: ObservableObject {
     func updateAttachedTmuxWindowSize(
         session: Session,
         tab: TerminalTab,
-        contentSize: CGSize,
-        forceRecapture: Bool = false
+        contentSize: CGSize
     ) {
         guard case .attached = session.mode,
               let client = session.controlClient,
@@ -198,17 +197,19 @@ final class TmuxSessionBridge: ObservableObject {
             tmuxWindowResizeSender(client, windowID, size.columns, size.rows)
         }
 
-        let paneIDs = Set(
+        // After the first resize, complete the deferred bootstrap: capture pane
+        // content at the now-correct dimensions and resume %output delivery.
+        let paneIDs = Array(
             tab.surfaceTree?.root?.leaves().compactMap(\.tmuxPaneID) ?? []
-        )
-        guard !paneIDs.isEmpty else { return }
-        guard forceRecapture else { return }
-        scheduleAttachedTmuxWindowRecapture(
-            client: client,
-            windowID: windowID,
-            paneIDs: Array(paneIDs).sorted(),
-            expectedSize: attachedTmuxWindowSizes[key] ?? size
-        )
+        ).sorted()
+        if !paneIDs.isEmpty {
+            Task {
+                let pausedPanes = await client.pausedPanes(among: paneIDs)
+                if !pausedPanes.isEmpty {
+                    await client.continueDeferredBootstrap(paneIDs: pausedPanes)
+                }
+            }
+        }
     }
 }
 

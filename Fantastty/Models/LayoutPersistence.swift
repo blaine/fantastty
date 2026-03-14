@@ -26,9 +26,9 @@ final class LayoutPersistence {
 
     /// Build a LayoutSnapshot from the current set of sessions.
     ///
-    /// Only sessions in `.attached` mode are included.  Within each session only
-    /// browser tabs are persisted; terminal tabs are omitted (tmux recreates them
-    /// on reconnect).
+    /// Only sessions in `.attached` mode are included.  All tabs are persisted
+    /// (terminal tabs as kind-only placeholders, browser tabs with URLs) so that
+    /// browser tab positions relative to terminal tabs are preserved on restore.
     func buildSnapshot(sessions: [Session], selectedWorkspaceID: String?) -> LayoutSnapshot {
         var workspaces: [WorkspaceLayout] = []
 
@@ -40,28 +40,29 @@ final class LayoutPersistence {
                 continue
             }
 
-            let browserTabs = session.tabs.compactMap { tab -> WorkspaceTabLayout? in
-                guard tab.kind == .browser else { return nil }
-                return WorkspaceTabLayout(kind: .browser, url: tab.url)
+            let allTabs = session.tabs.map { tab -> WorkspaceTabLayout in
+                switch tab.kind {
+                case .browser:
+                    return WorkspaceTabLayout(kind: .browser, url: tab.url)
+                case .terminal:
+                    return WorkspaceTabLayout(kind: .terminal)
+                }
             }
 
-            let selectedBrowserIndex: Int?
+            let selectedTabIndex: Int?
             if let selectedID = session.selectedTabID,
-               let selectedIndex = session.tabs.firstIndex(where: { $0.id == selectedID }),
-               session.tabs[selectedIndex].kind == .browser {
-                selectedBrowserIndex = session.tabs[..<selectedIndex]
-                    .filter { $0.kind == .browser }
-                    .count
+               let idx = session.tabs.firstIndex(where: { $0.id == selectedID }) {
+                selectedTabIndex = idx
             } else {
-                selectedBrowserIndex = nil
+                selectedTabIndex = nil
             }
 
             workspaces.append(WorkspaceLayout(
                 workspaceID: session.workspaceID,
-                selectedTabIndex: selectedBrowserIndex,
+                selectedTabIndex: selectedTabIndex,
                 sessionType: session.type == .local ? nil : session.type,
                 attachment: persistedAttachmentInfo(from: info),
-                tabs: browserTabs
+                tabs: allTabs
             ))
         }
 

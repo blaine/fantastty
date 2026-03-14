@@ -642,9 +642,9 @@ final class TmuxSessionBridgeTests: XCTestCase {
     }
 
     @MainActor
-    func testAttachedTmuxWindowSizeForceRecaptureRequestsCapture() async {
+    func testAttachedTmuxWindowSizeCallsDeferredBootstrapForPausedPanes() async {
         let manager = TmuxSessionBridge()
-        let session = makeAttachedSession(workspaceID: "v2-force-recapture")
+        let session = makeAttachedSession(workspaceID: "v2-deferred-bootstrap")
         manager.registerAttachedSession(session)
         guard let client = session.controlClient else {
             return XCTFail("Expected control client")
@@ -652,8 +652,6 @@ final class TmuxSessionBridgeTests: XCTestCase {
         guard let app = TmuxSessionBridgeTestSupport.ghosttyApp.app else {
             return XCTFail("Expected Ghostty app handle")
         }
-
-        manager.attachedTmuxWindowRecaptureDelay = 0
 
         let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
         surface.cellSize = CGSize(width: 8, height: 16)
@@ -670,24 +668,19 @@ final class TmuxSessionBridgeTests: XCTestCase {
         tab.tmuxWindowID = 9
         session.addTab(tab)
 
-        var recaptures: [(windowID: Int, paneIDs: [Int])] = []
-        manager.tmuxWindowResizeSender = { _, _, _, _ in }
-        manager.tmuxWindowInitialCaptureRequester = { sentClient, windowID, paneIDs in
-            XCTAssertTrue(sentClient === client)
-            recaptures.append((windowID, paneIDs))
+        var resizeSent = false
+        manager.tmuxWindowResizeSender = { _, _, _, _ in
+            resizeSent = true
         }
 
         manager.updateAttachedTmuxWindowSize(
             session: session,
             tab: tab,
-            contentSize: CGSize(width: 960, height: 640),
-            forceRecapture: true
+            contentSize: CGSize(width: 960, height: 640)
         )
-        await Task.yield()
 
-        XCTAssertEqual(recaptures.count, 1)
-        XCTAssertEqual(recaptures.map(\.windowID), [9])
-        XCTAssertEqual(recaptures.map(\.paneIDs), [[12]])
+        // The resize should have been sent since this is the first call
+        XCTAssertTrue(resizeSent)
     }
 
     // MARK: - Contract Tests

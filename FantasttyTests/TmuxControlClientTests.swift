@@ -1131,26 +1131,14 @@ final class TmuxConnectFSMTests: XCTestCase {
             }
         }
 
+        // Bootstrap now defers content capture until after the first resize.
+        // During connect(), only pause is issued — no capture-pane or continue.
         let commands = issuedCommands.withLock { $0 }
         let captureCommands = commands.filter { $0.hasPrefix("capture-pane -p -e") }
-        XCTAssertEqual(captureCommands.count, 2)
-        XCTAssertTrue(captureCommands.contains(where: { $0.hasPrefix("capture-pane -p -e -a -t %1") }))
-        XCTAssertTrue(captureCommands.contains(where: { $0.hasPrefix("capture-pane -p -e -t %2") }))
+        XCTAssertEqual(captureCommands.count, 0, "Bootstrap should not capture panes (deferred until first resize)")
         let outputStateCommands = commands.filter { $0.hasPrefix("refresh-client -A ") }
-        XCTAssertEqual(outputStateCommands.count, 2)
+        XCTAssertEqual(outputStateCommands.count, 1, "Bootstrap should only pause, not continue")
         XCTAssertTrue(outputStateCommands.contains("refresh-client -A '%1:pause' -A '%2:pause'"))
-        XCTAssertTrue(outputStateCommands.contains("refresh-client -A '%1:continue' -A '%2:continue'"))
-
-        let offIndex = commands.firstIndex(of: "refresh-client -A '%1:pause' -A '%2:pause'")
-        let captureIndex = commands.firstIndex(where: { $0.hasPrefix("capture-pane -p -e -a -t %1") })
-        let continueIndex = commands.firstIndex(of: "refresh-client -A '%1:continue' -A '%2:continue'")
-        XCTAssertNotNil(offIndex)
-        XCTAssertNotNil(captureIndex)
-        XCTAssertNotNil(continueIndex)
-        if let offIndex, let captureIndex, let continueIndex {
-            XCTAssertLessThan(offIndex, captureIndex)
-            XCTAssertLessThan(captureIndex, continueIndex)
-        }
 
         XCTAssertFalse(commands.contains(where: { $0 == "refresh-client" || $0.hasPrefix("refresh-client -C ") }))
     }

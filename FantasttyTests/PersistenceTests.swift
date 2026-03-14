@@ -286,10 +286,10 @@ final class PersistenceTests: XCTestCase {
         let snapshot = try decoder.decode(Fantastty.LayoutSnapshot.self, from: data)
         let savedWorkspace = try XCTUnwrap(snapshot.workspaces.first { $0.workspaceID == "mixed-browser-workspace" })
 
-        XCTAssertEqual(savedWorkspace.tabs.map(\.kind), [.browser, .browser])
-        XCTAssertEqual(savedWorkspace.tabs[0].url, browserURL1)
-        XCTAssertEqual(savedWorkspace.tabs[1].url, browserURL2)
-        XCTAssertEqual(savedWorkspace.selectedTabIndex, 1)
+        XCTAssertEqual(savedWorkspace.tabs.map(\.kind), [.terminal, .browser, .browser])
+        XCTAssertEqual(savedWorkspace.tabs[1].url, browserURL1)
+        XCTAssertEqual(savedWorkspace.tabs[2].url, browserURL2)
+        XCTAssertEqual(savedWorkspace.selectedTabIndex, 2)
     }
 
     @MainActor

@@ -352,6 +352,9 @@ actor TmuxControlClient {
     private var transportEventContinuation: AsyncStream<TransportEvent>.Continuation?
     private var transportEventTask: Task<Void, Never>?
     private var paneOutputSanitizers: [Int: ScreenTitleSequenceSanitizer] = [:]
+    /// Pane IDs paused during bootstrap, awaiting deferred content capture after first resize.
+    /// Access from nonisolated context via `hasPausedPanes()`.
+    private var _pausedPaneIDs: Set<Int> = []
     private var initialGreetingState: InitialGreetingState = .idle
     private var initialGreetingContinuation: CheckedContinuation<Void, any Error>?
     #if DEBUG
@@ -577,16 +580,11 @@ actor TmuxControlClient {
             )
         ).sorted()
         if !paneIDs.isEmpty {
-            // Prefer pause/continue so tmux keeps reading pane output while we
-            // recapture; turning panes fully off can drop transitional output.
+            // Pause %output delivery so nothing flows until the client has had
+            // a chance to size the window correctly. Content capture is deferred
+            // until after the first resize (see continueDeferredBootstrap).
             _ = try await send(Self.clientPaneOutputStateCommand(paneIDs: paneIDs, state: "pause"))
-            do {
-                try await bootstrapPaneContent(for: paneIDs)
-            } catch {
-                _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: paneIDs, state: "continue"))
-                throw error
-            }
-            _ = try await send(Self.clientPaneOutputStateCommand(paneIDs: paneIDs, state: "continue"))
+            _pausedPaneIDs = Set(paneIDs)
         }
     }
 
@@ -595,6 +593,28 @@ actor TmuxControlClient {
         for pane in captured {
             await delegate?.controlClient(self, didReceiveOutput: pane.data, forPaneID: pane.paneID)
         }
+    }
+
+    /// Complete the deferred bootstrap: capture pane content at the correct size, then resume %output.
+    /// Called after the first resize is sent so content is captured at the right dimensions.
+    /// Returns the subset of `paneIDs` that are currently paused awaiting deferred bootstrap.
+    func pausedPanes(among paneIDs: [Int]) -> [Int] {
+        paneIDs.filter { _pausedPaneIDs.contains($0) }
+    }
+
+    func continueDeferredBootstrap(paneIDs: [Int]) async {
+        let toCapture = paneIDs.filter { _pausedPaneIDs.contains($0) }
+        guard !toCapture.isEmpty else { return }
+
+        do {
+            try await bootstrapPaneContent(for: toCapture)
+        } catch {}
+
+        // Resume %output for captured panes
+        let toContinue = toCapture.filter { _pausedPaneIDs.contains($0) }
+        guard !toContinue.isEmpty else { return }
+        _pausedPaneIDs.subtract(toContinue)
+        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "continue"))
     }
 
     func disconnect() async {
