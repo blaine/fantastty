@@ -19,6 +19,7 @@ DerivedData/
 
 # Built xcframework
 xcframework/
+.derivedData
 
 # macOS
 .DS_Store
@@ -26,3 +27,7 @@ xcframework/
 # Swift Package Manager
 .build/
 Packages/
+
+# Local development artifacts
+*.profraw
+test_attention.sh
