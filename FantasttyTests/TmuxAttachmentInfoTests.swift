@@ -112,7 +112,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
 
         XCTAssertEqual(
             info.createSessionCommand(),
-            "tmux has-session -t 'fresh' 2>/dev/null || tmux new-session -d -s 'fresh'"
+            "tmux has-session -t 'fresh' 2>/dev/null || tmux new-session -d -s 'fresh' -c ~"
         )
     }
 

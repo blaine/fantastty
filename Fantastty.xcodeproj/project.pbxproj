@@ -13,6 +13,8 @@
 		1E87AA3043F57B80B2B4DBAE /* Ghostty.App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643BB302F69D3B8BC81BCC1A /* Ghostty.App.swift */; };
 		2060EC4E6EC93BB627DB0155 /* Ghostty.Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFE659E6897E04F9A3290A0 /* Ghostty.Action.swift */; };
 		213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF09D816789200644A34F6 /* SessionMetadata.swift */; };
+		AA11BB22CC33DD44EE55FF66 /* AppearanceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF67 /* AppearanceMode.swift */; };
+		BB22CC33DD44EE55FF660011 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB22CC33DD44EE55FF660012 /* ThemeManager.swift */; };
 		25C133A6066C09E29CF27024 /* fantastty.sh in Resources */ = {isa = PBXBuildFile; fileRef = 140C34BE75F8E35B9803CA1B /* fantastty.sh */; };
 		260BDF277FF320CC7296AD69 /* BrowserTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */; };
 		270CF7EB5133E34801DC6A33 /* String+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */; };
@@ -174,6 +176,8 @@
 		04E2DF833F359BF737FCCDE8 /* WorkspaceOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceOverviewView.swift; sourceTree = "<group>"; };
 		05FDE6EECD20438D68A96708 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		07DF09D816789200644A34F6 /* SessionMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMetadata.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF67 /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceMode.swift; sourceTree = "<group>"; };
+		BB22CC33DD44EE55FF660012 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		0F1CBEA07E655200AF4652D7 /* SurfaceView+Transferable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SurfaceView+Transferable.swift"; sourceTree = "<group>"; };
 		129BF3056DB01E547854EE11 /* SurfaceView_AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceView_AppKit.swift; sourceTree = "<group>"; };
 		140C34BE75F8E35B9803CA1B /* fantastty.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = fantastty.sh; sourceTree = "<group>"; };
@@ -404,6 +408,8 @@
 				A0B1C2D3E4F5A6B7C8D9E0F1 /* TmuxControlMode */,
 				0FA6DBB8656EE803773A9FD5 /* TerminalLifecycleRouter.swift */,
 				3CA7EBE1EA384B63C22342AF /* LayoutPersistence.swift */,
+				AA11BB22CC33DD44EE55FF67 /* AppearanceMode.swift */,
+				BB22CC33DD44EE55FF660012 /* ThemeManager.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -790,6 +796,8 @@
 				736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */,
 				91A1B2C3D4E5F60718293A51 /* TmuxSessionBridge.swift in Sources */,
 				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
+				AA11BB22CC33DD44EE55FF66 /* AppearanceMode.swift in Sources */,
+				BB22CC33DD44EE55FF660011 /* ThemeManager.swift in Sources */,
 				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
 				442252375FE92C0781EE7F56 /* SessionType.swift in Sources */,
 				F2E1D0C9B8A7F6E5D4C3B2A1 /* SpriteManager.swift in Sources */,
