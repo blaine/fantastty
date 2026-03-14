@@ -154,6 +154,8 @@
 		C9D5E6F708192A3B4C5D6E7F /* TmuxWindowControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E6F708192A3B4C5D6E7F80 /* TmuxWindowControllerTests.swift */; };
 		D49A1C3D10AD54BB2389990D /* TerminalLifecycleRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FA6DBB8656EE803773A9FD5 /* TerminalLifecycleRouter.swift */; };
 		4F873AEF4608ADA493BDA433 /* TerminalLifecycleRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1EC59EF5E86B222607BB72B /* TerminalLifecycleRouterTests.swift */; };
+		CBE9A4F332C829FFB746320E /* LayoutPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA7EBE1EA384B63C22342AF /* LayoutPersistence.swift */; };
+		1B664125EF72E1CBEDC293D7 /* LayoutPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6ACCDCD188E543A3F28FB9 /* LayoutPersistenceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -304,6 +306,8 @@
 		D0E6F708192A3B4C5D6E7F80 /* TmuxWindowControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxWindowControllerTests.swift; sourceTree = "<group>"; };
 		0FA6DBB8656EE803773A9FD5 /* TerminalLifecycleRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLifecycleRouter.swift; sourceTree = "<group>"; };
 		D1EC59EF5E86B222607BB72B /* TerminalLifecycleRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLifecycleRouterTests.swift; sourceTree = "<group>"; };
+		3CA7EBE1EA384B63C22342AF /* LayoutPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutPersistence.swift; sourceTree = "<group>"; };
+		6C6ACCDCD188E543A3F28FB9 /* LayoutPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutPersistenceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -348,7 +352,6 @@
 			isa = PBXGroup;
 			children = (
 				05FDE6EECD20438D68A96708 /* SettingsView.swift */,
-				F4E5D6C7B8A9BAADA4B5C6D7 /* FantasttyTests.xctest */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -400,6 +403,7 @@
 				91A1B2C3D4E5F60718293A56 /* V2 */,
 				A0B1C2D3E4F5A6B7C8D9E0F1 /* TmuxControlMode */,
 				0FA6DBB8656EE803773A9FD5 /* TerminalLifecycleRouter.swift */,
+				3CA7EBE1EA384B63C22342AF /* LayoutPersistence.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -594,6 +598,7 @@
 				57C123129804DCF809CCA4CA /* TmuxPaneControllerTests.swift */,
 				D0E6F708192A3B4C5D6E7F80 /* TmuxWindowControllerTests.swift */,
 				D1EC59EF5E86B222607BB72B /* TerminalLifecycleRouterTests.swift */,
+				6C6ACCDCD188E543A3F28FB9 /* LayoutPersistenceTests.swift */,
 			);
 			path = FantasttyTests;
 			sourceTree = "<group>";
@@ -840,6 +845,7 @@
 				8168B4059B1851FBE5E28D93 /* TmuxPaneController.swift in Sources */,
 				A7B3C4D5E6F708192A3B4C5D /* TmuxWindowController.swift in Sources */,
 				D49A1C3D10AD54BB2389990D /* TerminalLifecycleRouter.swift in Sources */,
+				CBE9A4F332C829FFB746320E /* LayoutPersistence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -880,6 +886,7 @@
 				60EB92210D7C1DFE0EED9B2B /* TmuxPaneControllerTests.swift in Sources */,
 				C9D5E6F708192A3B4C5D6E7F /* TmuxWindowControllerTests.swift in Sources */,
 				4F873AEF4608ADA493BDA433 /* TerminalLifecycleRouterTests.swift in Sources */,
+				1B664125EF72E1CBEDC293D7 /* LayoutPersistenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

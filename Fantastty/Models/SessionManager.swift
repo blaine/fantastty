@@ -96,10 +96,6 @@ class SessionManager: ObservableObject {
         subsystem: Bundle.main.bundleIdentifier ?? "com.blainecook.fantastty",
         category: "session-manager"
     )
-    private static let defaultLayoutURL: URL = {
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        return homeDir.appendingPathComponent(".fantastty/layout.json")
-    }()
     static var layoutURLOverride: URL?
 
     /// Whether persistent tmux sessions are enabled
@@ -341,9 +337,8 @@ class SessionManager: ObservableObject {
 
     // MARK: - Layout Persistence
 
-    /// Path to the layout snapshot file.
-    private static var layoutURL: URL {
-        layoutURLOverride ?? defaultLayoutURL
+    private var layoutPersistence: LayoutPersistence {
+        LayoutPersistence(layoutURL: Self.layoutURLOverride)
     }
 
     private func tmuxHost(for sessionType: SessionType) -> TmuxHost {
@@ -358,75 +353,21 @@ class SessionManager: ObservableObject {
     /// Save the current layout (sidebar order, tab order, selections) to disk.
     func saveLayout() {
         guard persistentSessionsEnabled else { return }
-
-        var workspaces: [WorkspaceLayout] = []
-
-        for session in sessions {
-            guard case .attached(let info) = session.mode else {
-                Self.logger.error("Skipping non-attached session during save: \(session.workspaceID, privacy: .public)")
-                continue
-            }
-
-            let browserTabs = session.tabs.compactMap { tab -> WorkspaceTabLayout? in
-                guard tab.kind == .browser else { return nil }
-                return WorkspaceTabLayout(kind: .browser, url: tab.url)
-            }
-            let selectedBrowserIndex: Int?
-            if let selectedID = session.selectedTabID,
-               let selectedIndex = session.tabs.firstIndex(where: { $0.id == selectedID }),
-               session.tabs[selectedIndex].kind == .browser {
-                selectedBrowserIndex = session.tabs[..<selectedIndex]
-                    .filter { $0.kind == .browser }
-                    .count
-            } else {
-                selectedBrowserIndex = nil
-            }
-
-            workspaces.append(WorkspaceLayout(
-                workspaceID: session.workspaceID,
-                selectedTabIndex: selectedBrowserIndex,
-                sessionType: session.type == .local ? nil : session.type,
-                attachment: persistedAttachmentInfo(from: info),
-                tabs: browserTabs
-            ))
-        }
-
-        let snapshot = LayoutSnapshot(
-            workspaces: workspaces,
-            selectedWorkspaceID: selectedSession?.workspaceID,
-            savedAt: Date()
+        let snapshot = layoutPersistence.buildSnapshot(
+            sessions: sessions,
+            selectedWorkspaceID: selectedSession?.workspaceID
         )
-
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            encoder.dateEncodingStrategy = .iso8601
-            let data = try encoder.encode(snapshot)
-            try data.write(to: Self.layoutURL, options: .atomic)
-            Self.logger.info("Saved layout snapshot with \(workspaces.count) workspaces")
-        } catch {
-            Self.logger.error("Failed to save layout: \(error)")
-        }
+        layoutPersistence.save(snapshot)
     }
 
     /// Load a layout snapshot from disk. Returns nil if missing or corrupt.
     private func loadLayout() -> LayoutSnapshot? {
-        guard FileManager.default.fileExists(atPath: Self.layoutURL.path) else { return nil }
-
-        do {
-            let data = try Data(contentsOf: Self.layoutURL)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(LayoutSnapshot.self, from: data)
-        } catch {
-            Self.logger.warning("Failed to load layout snapshot: \(error)")
-            return nil
-        }
+        layoutPersistence.load()
     }
 
     /// Delete the layout snapshot file after consumption.
     private func deleteLayout() {
-        try? FileManager.default.removeItem(at: Self.layoutURL)
+        layoutPersistence.delete()
     }
 
     // MARK: - Session Restoration
