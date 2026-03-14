@@ -689,6 +689,158 @@ final class TmuxSessionBridgeTests: XCTestCase {
         XCTAssertEqual(recaptures.map(\.windowID), [9])
         XCTAssertEqual(recaptures.map(\.paneIDs), [[12]])
     }
+
+    // MARK: - Contract Tests
+
+    @MainActor
+    func testWindowAddCreatesTabAtCorrectIndexOrder() {
+        let manager = TmuxSessionBridge()
+        let session = makeAttachedSession(workspaceID: "contract-order")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        // Add 3 windows out of order by windowIndex
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 30, name: "third", paneIDs: [], windowIndex: 2, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 10, name: "first", paneIDs: [], windowIndex: 0, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 20, name: "second", paneIDs: [], windowIndex: 1, isActive: false))
+
+        XCTAssertEqual(session.tabs.count, 3)
+        let indices = session.tabs.compactMap { $0.tmuxWindowIndex }
+        XCTAssertEqual(indices, indices.sorted(), "Tabs should be ordered by tmuxWindowIndex")
+        XCTAssertEqual(session.tabs.map { $0.tmuxWindowID }, [10, 20, 30])
+    }
+
+    @MainActor
+    func testWindowCloseRemovesTabAndSelectsAdjacent() {
+        let manager = TmuxSessionBridge()
+        let session = makeAttachedSession(workspaceID: "contract-close")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 1, name: "first", paneIDs: [], windowIndex: 0, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 2, name: "second", paneIDs: [], windowIndex: 1, isActive: true))
+
+        XCTAssertEqual(session.tabs.count, 2)
+
+        manager.controlClient(client, didCloseWindowID: 2)
+
+        XCTAssertEqual(session.tabs.count, 1)
+        XCTAssertEqual(session.tabs.first?.tmuxWindowID, 1)
+        XCTAssertNotNil(session.selectedTabID, "A tab should be selected after close")
+    }
+
+    @MainActor
+    func testActiveWindowChangeDoesNotEchoSelectWindow() async {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "contract-no-echo")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var selectedWindowIDs: [Int] = []
+        manager.tmuxWindowSelector = { _, windowID in
+            selectedWindowIDs.append(windowID)
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 1, name: "one", paneIDs: [], windowIndex: 0, isActive: true))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 2, name: "two", paneIDs: [], windowIndex: 1, isActive: false))
+
+        // Tmux-driven active window change should not echo a select-window back
+        manager.controlClient(client, didChangeActiveWindowID: 1)
+        await Task.yield()
+
+        XCTAssertTrue(selectedWindowIDs.isEmpty, "Tmux-driven window activation should not echo select-window back to tmux")
+    }
+
+    @MainActor
+    func testClientExitTearsDownAndSetsDisconnected() {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "contract-exit")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 1, name: "main", paneIDs: [], windowIndex: 0, isActive: true))
+        manager.controlClient(client, didChangeLayoutForWindowID: 1, layout: "bb62,213x55,0,0,7")
+
+        manager.controlClientDidExit(client, reason: "connection lost")
+
+        guard case .attached(let info) = session.mode else {
+            return XCTFail("Expected session to remain in attached mode")
+        }
+        guard case .disconnected(let reason) = info.connectionState else {
+            return XCTFail("Expected disconnected state after client exit")
+        }
+        XCTAssertEqual(reason, "connection lost")
+    }
+
+    @MainActor
+    func testWindowRenamedUpdatesTabTitle() {
+        let manager = TmuxSessionBridge()
+        let session = makeAttachedSession(workspaceID: "contract-rename")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 5, name: "original", paneIDs: [], windowIndex: 0, isActive: true))
+
+        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == 5 }) else {
+            return XCTFail("Expected tab for window 5")
+        }
+        XCTAssertEqual(tab.title, "original")
+
+        manager.controlClient(client, didRenameWindowID: 5, to: "renamed")
+
+        XCTAssertEqual(tab.title, "renamed", "Tab title should update after window rename event")
+    }
+
+    @MainActor
+    func testOutputBeforeWindowAddIsBufferedAndFlushed() {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "contract-buffer")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var injected: [(paneID: Int, text: String)] = []
+        manager.tmuxOutputInjector = { surface, data in
+            guard let paneID = surface.tmuxPaneID,
+                  let text = String(data: data, encoding: .utf8) else {
+                return false
+            }
+            injected.append((paneID, text))
+            return true
+        }
+
+        // Send output before window-add — should not be delivered yet
+        manager.controlClient(client, didReceiveOutput: Data("buffered".utf8), forPaneID: 42)
+        XCTAssertTrue(injected.isEmpty, "Output should be buffered before the window and layout are established")
+
+        // Add window and apply layout containing pane 42
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 7, name: "win", paneIDs: [], windowIndex: 0, isActive: true))
+        manager.controlClient(client, didChangeLayoutForWindowID: 7, layout: "bb62,213x55,0,0,42")
+
+        XCTAssertEqual(injected.count, 1, "Buffered output should be flushed after layout is applied")
+        XCTAssertEqual(injected.first?.paneID, 42)
+        XCTAssertEqual(injected.first?.text, "buffered")
+    }
 }
 
 @MainActor
