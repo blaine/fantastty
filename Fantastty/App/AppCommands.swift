@@ -112,6 +112,13 @@ struct AppCommands: Commands {
 
             Divider()
 
+            Button("Clear Screen") {
+                sessionManager.clearScreen()
+            }
+            .keyboardShortcut("k", modifiers: .command)
+
+            Divider()
+
             Button("Close Tab") {
                 sessionManager.closeSelectedTab()
             }

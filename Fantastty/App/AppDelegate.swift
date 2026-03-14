@@ -103,4 +103,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, GhosttyApp
     func findSurface(forUUID uuid: UUID) -> Ghostty.SurfaceView? {
         return sessionManager.findSurface(forUUID: uuid)
     }
+
+    func handleOpenURL(_ url: URL) -> Bool {
+        return false
+    }
 }

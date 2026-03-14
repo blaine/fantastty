@@ -7,6 +7,10 @@ protocol GhosttyAppDelegate: AnyObject {
     /// Called when a callback needs access to a specific surface. This should return nil
     /// when the surface is no longer valid.
     func findSurface(forUUID uuid: UUID) -> Ghostty.SurfaceView?
+
+    /// Called when Ghostty wants to open a URL (e.g. clicking a link in the terminal).
+    /// Return true if the delegate handled the URL, false to fall back to default behavior.
+    func handleOpenURL(_ url: URL) -> Bool
     #endif
 }
 
@@ -744,7 +748,22 @@ extension Ghostty {
                 break
             }
             
-            // Open with the default application for the URL
+            // Route web URLs through a notification so SessionManager can open
+            // them in the embedded browser. The action callback may fire off the
+            // main thread, so dispatch to main for the UI mutation.
+            if let scheme = url.scheme?.lowercased(),
+               (scheme == "http" || scheme == "https") {
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .ghosttyOpenURL,
+                        object: nil,
+                        userInfo: ["url": url]
+                    )
+                }
+                return true
+            }
+
+            // Fall back to opening with the default application
             NSWorkspace.shared.open(url)
             return true
         }

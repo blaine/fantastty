@@ -1002,6 +1002,35 @@ class SessionManager: ObservableObject {
         closeTab(id: tab.id)
     }
 
+    /// Clear the terminal screen for the focused surface.
+    /// In attached tmux mode, sends Ctrl-L to the active pane.
+    /// In regular mode, triggers Ghostty's clear_screen binding.
+    func clearScreen() {
+        guard let session = selectedSession,
+              let surface = selectedTab?.focusedSurface else { return }
+
+        if case .attached = session.mode,
+           let paneID = surface.tmuxPaneID,
+           let client = surface.tmuxControlClient {
+            Task {
+                // Send Ctrl-L (form feed / clear) to the pane
+                await client.sendKeyToken(paneID: paneID, keyToken: "C-l")
+            }
+        } else if let s = surface.surface {
+            let action = "clear_screen"
+            ghostty_surface_binding_action(s, action, UInt(action.lengthOfBytes(using: .utf8)))
+        }
+    }
+
+    /// Open a URL in the session's embedded browser, or in the system default browser.
+    func openURL(_ url: URL, inEmbeddedBrowser: Bool = true) {
+        if inEmbeddedBrowser {
+            createBrowserTab(url: url)
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     // MARK: - Split Management
 
     /// Create a new split in the currently selected tab.
@@ -1185,6 +1214,14 @@ class SessionManager: ObservableObject {
             self,
             selector: #selector(handlePullRequestURL(_:)),
             name: .fantasttyPullRequestURL,
+            object: nil
+        )
+
+        // Open URL notification (terminal link clicks)
+        center.addObserver(
+            self,
+            selector: #selector(handleOpenURL(_:)),
+            name: .ghosttyOpenURL,
             object: nil
         )
 
@@ -1434,6 +1471,11 @@ class SessionManager: ObservableObject {
               let url = notification.userInfo?["url"] as? String,
               let (session, _) = findSessionAndTab(for: surfaceView) else { return }
         session.pullRequestURL = url.isEmpty ? nil : url
+    }
+
+    @objc private func handleOpenURL(_ notification: Foundation.Notification) {
+        guard let url = notification.userInfo?["url"] as? URL else { return }
+        openURL(url)
     }
 
     // MARK: - Private Helpers
