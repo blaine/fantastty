@@ -29,6 +29,7 @@ final class TmuxSessionBridge: ObservableObject {
 
     private let bindingStore = WorkspaceBindingStore()
     private var runtimeByWorkspaceID: [String: AttachedWorkspaceRuntimeV2] = [:]
+    private var windowControllersByWorkspace: [String: [Int: TmuxWindowController]] = [:]
     private var tabSelectionCancellables: [String: AnyCancellable] = [:]
     private var activeWindowIDByWorkspaceID: [String: Int] = [:]
     private var tabSelectionSyncSuppressionWorkspaceIDs: Set<String> = []
@@ -67,6 +68,11 @@ final class TmuxSessionBridge: ObservableObject {
 
     func unregisterSession(_ session: Session) {
         cleanupAttachedTmuxWindowState(for: session)
+        if let controllers = windowControllersByWorkspace.removeValue(forKey: session.workspaceID) {
+            for (_, controller) in controllers {
+                controller.teardown()
+            }
+        }
         session.controlClient?.delegate = nil
         bindingStore.unbind(session: session)
         runtimeByWorkspaceID.removeValue(forKey: session.workspaceID)
@@ -375,10 +381,13 @@ private extension TmuxSessionBridge {
         for action in actions {
             switch action {
             case .upsertWindow(let snapshot):
-                upsertWindow(snapshot, in: session)
+                upsertWindow(snapshot, in: session, client: client)
 
             case .removeWindow(let windowID):
                 cleanupAttachedTmuxWindowState(for: client, windowID: windowID)
+                if let controller = windowControllersByWorkspace[session.workspaceID]?.removeValue(forKey: windowID) {
+                    controller.teardown()
+                }
                 if let index = session.tabs.firstIndex(where: { $0.tmuxWindowID == windowID }) {
                     let removed = session.tabs.remove(at: index)
                     if session.selectedTabID == removed.id {
@@ -403,26 +412,44 @@ private extension TmuxSessionBridge {
                 }
 
             case .applyLayout(let windowID, let layout, _):
-                applyLayout(layout, windowID: windowID, session: session, client: client)
+                if let controller = windowControllersByWorkspace[session.workspaceID]?[windowID] {
+                    controller.applyLayout(layout)
+                    // Rebind surfaces to current client for key routing after reconnects
+                    let leaves = controller.tab.surfaceTree?.root?.leaves() ?? []
+                    for surface in leaves {
+                        surface.tmuxControlClient = client
+                    }
+                    controller.tab.requestThumbnailRefresh()
+                } else {
+                    applyLayout(layout, windowID: windowID, session: session, client: client)
+                }
 
             case .setActivePane(let windowID, let paneID):
-                guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }),
-                      let surface = tab.surfaceTree?.root?.leaves().first(where: { $0.tmuxPaneID == paneID }) else {
-                    continue
+                if let controller = windowControllersByWorkspace[session.workspaceID]?[windowID] {
+                    controller.setActivePane(paneID)
+                } else {
+                    guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }),
+                          let surface = tab.surfaceTree?.root?.leaves().first(where: { $0.tmuxPaneID == paneID }) else {
+                        continue
+                    }
+                    tab.focusedSurface = surface
                 }
-                tab.focusedSurface = surface
 
-            case .deliverPaneOutput(_, let paneID, let data):
-                guard let surface = AttachedTmuxWindowRuntime.surface(forPaneID: paneID, tabs: session.tabs),
-                      tmuxOutputInjector(surface, data) else {
-                    continue
+            case .deliverPaneOutput(let windowID, let paneID, let data):
+                if let controller = windowControllersByWorkspace[session.workspaceID]?[windowID] {
+                    controller.deliverOutput(paneID: paneID, data: data)
+                } else {
+                    guard let surface = AttachedTmuxWindowRuntime.surface(forPaneID: paneID, tabs: session.tabs),
+                          tmuxOutputInjector(surface, data) else {
+                        continue
+                    }
+                    tabContainingPane(paneID, in: session)?.requestThumbnailRefresh()
                 }
-                tabContainingPane(paneID, in: session)?.requestThumbnailRefresh()
             }
         }
     }
 
-    func upsertWindow(_ snapshot: AttachedWindowSnapshotV2, in session: Session) {
+    func upsertWindow(_ snapshot: AttachedWindowSnapshotV2, in session: Session, client: TmuxControlClient) {
         if let existing = session.tabs.first(where: { $0.tmuxWindowID == snapshot.windowID }) {
             existing.title = snapshot.title
             existing.tmuxWindowIndex = snapshot.windowIndex
@@ -435,9 +462,35 @@ private extension TmuxSessionBridge {
             return
         }
 
-        let tab = TerminalTab(type: session.type, title: snapshot.title)
-        tab.tmuxWindowID = snapshot.windowID
-        tab.tmuxWindowIndex = snapshot.windowIndex
+        let controller = TmuxWindowController(
+            windowID: snapshot.windowID,
+            title: snapshot.title,
+            windowIndex: snapshot.windowIndex ?? 0,
+            surfaceFactory: { [weak self] paneID in
+                guard let app = self?.ghosttyApp?.app else {
+                    fatalError("Ghostty app not available")
+                }
+                let surface = Ghostty.SurfaceView(app, baseConfig: Self.attachedTmuxSurfaceConfiguration())
+                surface.tmuxPaneID = paneID
+                surface.tmuxControlClient = client
+                return surface
+            },
+            paneInjectorFactory: { [weak self] paneID in
+                return { [weak self, weak session] data -> Bool in
+                    guard let self, let session else { return false }
+                    guard let surface = AttachedTmuxWindowRuntime.surface(forPaneID: paneID, tabs: session.tabs) else {
+                        return false
+                    }
+                    let result = self.tmuxOutputInjector(surface, data)
+                    if result {
+                        self.tabContainingPane(paneID, in: session)?.requestThumbnailRefresh()
+                    }
+                    return result
+                }
+            }
+        )
+        windowControllersByWorkspace[session.workspaceID, default: [:]][snapshot.windowID] = controller
+        let tab = controller.tab
 
         let window = TmuxWindow(
             windowID: snapshot.windowID,
@@ -579,6 +632,12 @@ extension TmuxSessionBridge: TmuxControlClientDelegate {
     func controlClientDidExit(_ client: TmuxControlClient, reason: String?) {
         route(.clientExited, from: client)
         cleanupAttachedTmuxWindowState(for: client)
+        if let session = session(for: client),
+           let controllers = windowControllersByWorkspace.removeValue(forKey: session.workspaceID) {
+            for (_, controller) in controllers {
+                controller.teardown()
+            }
+        }
         onClientExit?(client)
         guard let session = session(for: client),
               case .attached(var info) = session.mode else {

@@ -1,7 +1,6 @@
 import Foundation
 import GhosttyKit
 
-@MainActor
 final class TmuxWindowController {
     typealias SurfaceFactory = (Int) -> Ghostty.SurfaceView
     typealias PaneInjectorFactory = (Int) -> TmuxPaneController.Injector
