@@ -812,7 +812,17 @@ actor TmuxControlClient {
             do {
                 response = try blockTracker.end(id: id, flags: flags)
             } catch {
-                await handleProtocolViolation(error)
+                // Block tracker out of sync — dequeue the pending command
+                // with whatever we have rather than killing the connection.
+                commandQueue.dequeue()
+                if initialGreetingState == .waiting {
+                    initialGreetingState = .completed
+                    initialGreetingContinuation?.resume()
+                    initialGreetingContinuation = nil
+                }
+                #if DEBUG
+                recordDebugTrace("event:end-no-begin id=\(id) flags=\(flags)")
+                #endif
                 return
             }
 
@@ -832,7 +842,18 @@ actor TmuxControlClient {
             do {
                 response = try blockTracker.error(id: id, flags: flags)
             } catch {
-                await handleProtocolViolation(error)
+                // Some tmux versions send %error without a preceding %begin.
+                // Treat as a command error rather than a fatal protocol violation.
+                let cmdError = TmuxControlError.serverError("tmux error (command \(id))")
+                commandQueue.dequeueWithError(cmdError)
+                if initialGreetingState == .waiting {
+                    initialGreetingState = .idle
+                    initialGreetingContinuation?.resume(throwing: cmdError)
+                    initialGreetingContinuation = nil
+                }
+                #if DEBUG
+                recordDebugTrace("event:error-block-no-begin id=\(id) flags=\(flags)")
+                #endif
                 return
             }
 

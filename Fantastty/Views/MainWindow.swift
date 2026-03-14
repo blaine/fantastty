@@ -28,9 +28,12 @@ struct MainWindow: View {
             SpriteConnectionSheet()
         }
         .sheet(isPresented: $sessionManager.showTmuxAttachSheet) {
-            TmuxAttachSheet(onAttach: { info in
-                sessionManager.attachToTmuxSession(info: info)
-            })
+            TmuxAttachSheet(
+                attachedSessionKeys: sessionManager.attachedTmuxSessionKeys,
+                onAttach: { info in
+                    sessionManager.attachToTmuxSession(info: info)
+                }
+            )
         }
     }
 }

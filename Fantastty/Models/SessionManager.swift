@@ -196,6 +196,17 @@ class SessionManager: ObservableObject {
     /// Whether to show the tmux attach sheet
     @Published var showTmuxAttachSheet: Bool = false
 
+    /// The set of tmux sessions currently attached in the app.
+    var attachedTmuxSessionKeys: Set<TmuxAttachSheet.AttachedSessionKey> {
+        var keys = Set<TmuxAttachSheet.AttachedSessionKey>()
+        for session in sessions {
+            if case .attached(let info) = session.mode {
+                keys.insert(.init(sessionName: info.sessionName, host: info.host))
+            }
+        }
+        return keys
+    }
+
     /// Whether the notes panel is expanded
     @Published var notesExpanded: Bool = false
 

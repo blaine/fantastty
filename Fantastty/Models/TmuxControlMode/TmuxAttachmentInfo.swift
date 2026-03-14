@@ -115,7 +115,8 @@ struct TmuxAttachmentInfo: Codable, Equatable {
         case .local:
             return tmuxArgs
         case .ssh(let info):
-            return "\(info.sshCommandPrefix) \(tmuxArgs)"
+            // Wrap in quotes so the entire expression runs on the remote host
+            return "\(info.sshCommandPrefix) \"\(tmuxArgs)\""
         }
     }
 

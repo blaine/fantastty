@@ -116,6 +116,21 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         )
     }
 
+    func testCreateSessionCommandRemote() {
+        let sshInfo = SSHHostInfo(user: "alice", hostname: "example.com", port: 2222)
+        let info = TmuxAttachmentInfo(
+            sessionName: "work",
+            host: .ssh(sshInfo),
+            connectionState: .connecting,
+            launchMode: .create
+        )
+
+        XCTAssertEqual(
+            info.createSessionCommand(),
+            "ssh -t -p 2222 alice@example.com \"tmux has-session -t 'work' 2>/dev/null || tmux new-session -d -s 'work' -c ~\""
+        )
+    }
+
     // MARK: - Codable Round-Trips: SSHHostInfo
 
     func testSSHHostInfoCodableRoundTrip() throws {

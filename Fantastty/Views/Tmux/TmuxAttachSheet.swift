@@ -16,6 +16,9 @@ struct TmuxAttachSheet: View {
     @State private var isDiscovering: Bool = false
     @State private var discoveryTask: Task<Void, Never>?
 
+    /// Set of (sessionName, host) pairs already attached in the app.
+    var attachedSessionKeys: Set<AttachedSessionKey> = []
+
     var onAttach: ((TmuxAttachmentInfo) -> Void)?
 
     var body: some View {
@@ -123,7 +126,8 @@ struct TmuxAttachSheet: View {
     }
 
     private var filteredSessions: [DiscoveredSession] {
-        Self.filterSessions(discoveredSessions, by: sessionFilter)
+        let filtered = Self.filterSessions(discoveredSessions, by: sessionFilter)
+        return filtered.filter { !attachedSessionKeys.contains($0.sessionKey) }
     }
 
     private func attach(to session: DiscoveredSession) {
@@ -143,6 +147,15 @@ struct TmuxAttachSheet: View {
         let name: String
         let host: TmuxHost
         let windowCount: Int
+
+        var sessionKey: AttachedSessionKey {
+            AttachedSessionKey(sessionName: name, host: host)
+        }
+    }
+
+    struct AttachedSessionKey: Hashable {
+        let sessionName: String
+        let host: TmuxHost
     }
 
     nonisolated static func parseHostString(_ s: String) -> SSHHostInfo? {
