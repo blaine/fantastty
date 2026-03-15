@@ -258,12 +258,11 @@ private extension TmuxSessionBridge {
         treeSize: AttachedTmuxWindowSize?,
         contentSize: AttachedTmuxWindowSize?
     ) -> AttachedTmuxWindowSize? {
-        switch root {
-        case .leaf:
-            return treeSize ?? contentSize
-        case .split:
-            return contentSize ?? treeSize
-        }
+        // Always prefer treeSize (derived from actual Ghostty surface grid sizes)
+        // over contentSize (derived from container pixel dimensions / cell size).
+        // contentSize can overcount by 1 column due to pixel rounding, causing
+        // tmux panes to be wider than the Ghostty surface grid.
+        return treeSize ?? contentSize
     }
 
     func firstLeafView(in node: SplitTree<Ghostty.SurfaceView>.Node) -> Ghostty.SurfaceView? {

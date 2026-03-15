@@ -180,7 +180,10 @@ class SurfaceScrollView: NSView {
         synchronizeSurfaceView()
         // Skip resizing the core surface during live resize to prevent tmux reflow on every
         // frame. viewDidEndLiveResize() fires once when the drag finishes.
-        if !inLiveResize {
+        // Exception: tmux control mode surfaces must stay in sync because the window size
+        // is sent to tmux continuously (refresh-client -C) and output arrives formatted
+        // for the new size. Without this, the surface grid is stale during live resize.
+        if !inLiveResize || surfaceView.tmuxPaneID != nil {
             synchronizeCoreSurface()
         }
     }

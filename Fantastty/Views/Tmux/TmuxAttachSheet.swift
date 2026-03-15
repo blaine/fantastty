@@ -110,6 +110,7 @@ struct TmuxAttachSheet: View {
         listLocal: () -> [TmuxSessionInfo],
         listRemote: (SSHHostInfo) -> [TmuxSessionInfo]
     ) -> [DiscoveredSession] {
+        logger.info("discoverSessions: isLocal=\(isLocal) hostString='\(hostString, privacy: .public)'")
         if isLocal {
             return listLocal().map {
                 DiscoveredSession(name: $0.name, host: .local, windowCount: $0.windowCount)
@@ -117,8 +118,10 @@ struct TmuxAttachSheet: View {
         }
 
         guard let hostInfo = parseHostString(hostString) else {
+            logger.info("discoverSessions: parseHostString returned nil for hostString='\(hostString, privacy: .public)'")
             return []
         }
+        logger.info("discoverSessions: parsed host=\(hostInfo.hostname, privacy: .public) user=\(hostInfo.user ?? "nil", privacy: .public)")
 
         return listRemote(hostInfo).map {
             DiscoveredSession(name: $0.name, host: .ssh(hostInfo), windowCount: $0.windowCount)
