@@ -35,6 +35,12 @@ final class TmuxSessionBridge: ObservableObject {
     private var tabSelectionSyncSuppressionWorkspaceIDs: Set<String> = []
     private var attachedTmuxWindowSizes: [AttachedTmuxWindowSizeKey: AttachedTmuxWindowSize] = [:]
     private var attachedTmuxWindowRecaptureTasks: [AttachedTmuxWindowSizeKey: Task<Void, Never>] = [:]
+    /// Windows that recently had a layout applied from tmux. Resize updates
+    /// are suppressed while set to break the feedback loop: we send
+    /// refresh-client → tmux sends %layout-change → tree rebuild → geometry
+    /// update → would send another refresh-client. The flag is cleared on
+    /// the next run loop iteration, allowing user-initiated resizes through.
+    private var layoutAppliedSuppression: Set<AttachedTmuxWindowSizeKey> = []
     static let attachedTmuxSilentCommand = "/bin/sh -lc 'stty raw -echo; exec /bin/cat >/dev/null'"
 
     init() {
@@ -178,6 +184,15 @@ final class TmuxSessionBridge: ObservableObject {
             clientID: ObjectIdentifier(client),
             windowID: windowID
         )
+
+        // Suppress resize feedback: after a %layout-change rebuilds the tree,
+        // the resulting geometry updates would send another refresh-client.
+        // The flag is cleared on the next run loop iteration so user-initiated
+        // resizes still go through.
+        if layoutAppliedSuppression.remove(key) != nil {
+            return
+        }
+
         let previousSize = attachedTmuxWindowSizes[key]
         let treeSize = Self.attachedTmuxWindowSize(in: root)
         let contentGridSize = Self.attachedTmuxWindowSize(
@@ -423,6 +438,14 @@ private extension TmuxSessionBridge {
                 } else {
                     applyLayout(layout, windowID: windowID, session: session, client: client)
                 }
+                // Suppress the resize feedback that the tree rebuild will cause.
+                // The flag is consumed (removed) on the next updateAttachedTmuxWindowSize
+                // call, allowing subsequent user-initiated resizes through.
+                let layoutKey = AttachedTmuxWindowSizeKey(
+                    clientID: ObjectIdentifier(client),
+                    windowID: windowID
+                )
+                layoutAppliedSuppression.insert(layoutKey)
 
             case .setActivePane(let windowID, let paneID):
                 if let controller = windowControllersByWorkspace[session.workspaceID]?[windowID] {

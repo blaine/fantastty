@@ -12,6 +12,7 @@ final class TmuxWindowController {
     private let paneInjectorFactory: PaneInjectorFactory?
     private(set) var paneControllers: [Int: TmuxPaneController] = [:]
     private var pendingOutput: [Int: [Data]] = [:]
+    private var lastAppliedLayout: String?
 
     init(
         windowID: Int,
@@ -30,6 +31,13 @@ final class TmuxWindowController {
     }
 
     func applyLayout(_ layout: String) {
+        // Skip tree rebuild if the layout string is identical to the last one.
+        // This breaks the resize feedback loop: we send refresh-client → tmux
+        // responds with %layout-change → we'd rebuild the tree → trigger another
+        // resize. By skipping identical layouts, the loop stops here.
+        guard layout != lastAppliedLayout else { return }
+        lastAppliedLayout = layout
+
         let buildResult = AttachedTmuxWindowRuntime.buildLayoutTree(
             layout: layout,
             existingTree: tab.surfaceTree
