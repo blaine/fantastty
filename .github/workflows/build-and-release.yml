@@ -105,7 +105,7 @@ jobs:
           DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
           CODE_SIGN_STYLE=Manual \
           ENABLE_HARDENED_RUNTIME=YES \
-          OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
+          OTHER_CODE_SIGN_FLAGS="--keychain build.keychain --timestamp" \
           build 2>&1 | tee /tmp/xcodebuild.log | grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true
 
         # Show full build summary on failure
