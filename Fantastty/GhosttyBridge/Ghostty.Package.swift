@@ -408,6 +408,9 @@ extension Notification.Name {
     /// Ring the bell
     static let ghosttyBellDidRing = Notification.Name("com.mitchellh.ghostty.ghosttyBellDidRing")
 
+    /// Open a URL (e.g. terminal link click)
+    static let ghosttyOpenURL = Notification.Name("com.mitchellh.ghostty.openURL")
+
     /// Command finished (shell integration)
     static let ghosttyCommandFinished = Notification.Name("com.mitchellh.ghostty.commandFinished")
 

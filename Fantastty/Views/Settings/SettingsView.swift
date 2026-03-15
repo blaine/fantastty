@@ -1,8 +1,11 @@
 import SwiftUI
+import GhosttyKit
 
 struct SettingsView: View {
+    @AppStorage(AppearanceMode.userDefaultsKey) private var appearance: AppearanceMode = .system
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @AppStorage("persistentSessions") private var persistentSessions = false
+    @EnvironmentObject private var ghosttyApp: Ghostty.App
 
     private var tmuxAvailable: Bool {
         TmuxManager.shared.isTmuxAvailable
@@ -10,6 +13,24 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Theme", selection: $appearance) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appearance) {
+                    AppearanceMode.applyCurrent()
+                    let scheme: ghostty_color_scheme_e = AppearanceMode.current.isDark
+                        ? GHOSTTY_COLOR_SCHEME_DARK
+                        : GHOSTTY_COLOR_SCHEME_LIGHT
+                    if let app = ghosttyApp.app {
+                        ghostty_app_set_color_scheme(app, scheme)
+                    }
+                }
+            }
+
             Section("Sidebar") {
                 Toggle("Show tab thumbnails in sidebar", isOn: $tabsInSidebar)
             }

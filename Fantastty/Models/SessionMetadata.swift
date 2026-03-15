@@ -87,11 +87,20 @@ struct SessionMetadata: Codable, Identifiable {
     /// When the workspace was archived
     var archivedAt: Date?
 
+    /// Whether this workspace is trashed (closed and hidden from restore)
+    var isTrashed: Bool
+
+    /// When the workspace was moved to trash
+    var trashedAt: Date?
+
     /// Ticket/task URL associated with this workspace
     var ticketURL: String?
 
     /// Pull request URL associated with this workspace
     var pullRequestURL: String?
+
+    /// Persisted tmux attachment identity for attached-only restore.
+    var attachment: TmuxAttachmentInfo?
 
     /// Creation date
     var createdAt: Date
@@ -111,8 +120,11 @@ struct SessionMetadata: Codable, Identifiable {
         tags: [String] = [],
         isArchived: Bool = false,
         archivedAt: Date? = nil,
+        isTrashed: Bool = false,
+        trashedAt: Date? = nil,
         ticketURL: String? = nil,
         pullRequestURL: String? = nil,
+        attachment: TmuxAttachmentInfo? = nil,
         totalActiveSeconds: Double = 0.0
     ) {
         self.id = id
@@ -124,8 +136,11 @@ struct SessionMetadata: Codable, Identifiable {
         self.tags = tags
         self.isArchived = isArchived
         self.archivedAt = archivedAt
+        self.isTrashed = isTrashed
+        self.trashedAt = trashedAt
         self.ticketURL = ticketURL
         self.pullRequestURL = pullRequestURL
+        self.attachment = attachment
         self.totalActiveSeconds = totalActiveSeconds
         self.createdAt = Date()
         self.modifiedAt = Date()
@@ -143,54 +158,31 @@ struct SessionMetadata: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, workspaceID, name, noteEntries
         case needsAttention, attentionFlaggedAt, tags, createdAt, modifiedAt
-        case isArchived, archivedAt, ticketURL, pullRequestURL
-        case totalActiveSeconds
-        // Legacy keys for migration
-        case stableKey, notes, description, basePath, remoteHost
-        case tmuxSessionName, tmuxTabSessions
+        case isArchived, archivedAt, isTrashed, trashedAt, ticketURL, pullRequestURL
+        case totalActiveSeconds, attachment
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        id = try container.decode(UUID.self, forKey: .id)
-
-        // Try new workspaceID first, fall back to legacy stableKey
-        if let wsID = try container.decodeIfPresent(String.self, forKey: .workspaceID) {
-            workspaceID = wsID
-        } else {
-            workspaceID = try container.decodeIfPresent(String.self, forKey: .stableKey) ?? ""
-        }
-
-        // Try new 'name' key first, fall back to legacy 'description'
-        if let nameValue = try container.decodeIfPresent(String.self, forKey: .name) {
-            name = nameValue
-        } else {
-            name = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
-        }
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        workspaceID = try container.decode(String.self, forKey: .workspaceID)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
 
         needsAttention = try container.decodeIfPresent(Bool.self, forKey: .needsAttention) ?? false
         attentionFlaggedAt = try container.decodeIfPresent(Date.self, forKey: .attentionFlaggedAt)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         archivedAt = try container.decodeIfPresent(Date.self, forKey: .archivedAt)
+        isTrashed = try container.decodeIfPresent(Bool.self, forKey: .isTrashed) ?? false
+        trashedAt = try container.decodeIfPresent(Date.self, forKey: .trashedAt)
         ticketURL = try container.decodeIfPresent(String.self, forKey: .ticketURL)
         pullRequestURL = try container.decodeIfPresent(String.self, forKey: .pullRequestURL)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
         totalActiveSeconds = (try? container.decodeIfPresent(Double.self, forKey: .totalActiveSeconds)) ?? 0
-
-        // Try to decode new noteEntries format first
-        if let entries = try container.decodeIfPresent([SessionNoteEntry].self, forKey: .noteEntries) {
-            noteEntries = entries
-        } else if let legacyNotes = try container.decodeIfPresent(String.self, forKey: .notes), !legacyNotes.isEmpty {
-            // Migrate legacy notes string to a single system entry
-            noteEntries = [SessionNoteEntry(content: legacyNotes, source: .system)]
-        } else {
-            noteEntries = []
-        }
-
-        // Ignore legacy keys (basePath, remoteHost, tmuxSessionName, tmuxTabSessions)
+        attachment = try container.decodeIfPresent(TmuxAttachmentInfo.self, forKey: .attachment)
+        noteEntries = try container.decodeIfPresent([SessionNoteEntry].self, forKey: .noteEntries) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -205,12 +197,14 @@ struct SessionMetadata: Codable, Identifiable {
         try container.encode(tags, forKey: .tags)
         try container.encode(isArchived, forKey: .isArchived)
         try container.encodeIfPresent(archivedAt, forKey: .archivedAt)
+        try container.encode(isTrashed, forKey: .isTrashed)
+        try container.encodeIfPresent(trashedAt, forKey: .trashedAt)
         try container.encodeIfPresent(ticketURL, forKey: .ticketURL)
         try container.encodeIfPresent(pullRequestURL, forKey: .pullRequestURL)
+        try container.encodeIfPresent(attachment, forKey: .attachment)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(modifiedAt, forKey: .modifiedAt)
         try container.encode(totalActiveSeconds, forKey: .totalActiveSeconds)
-        // Don't encode legacy keys
     }
 }
 
@@ -273,6 +267,7 @@ class SessionMetadataStore: ObservableObject {
         needsAttention: Bool? = nil,
         tags: [String]? = nil,
         isArchived: Bool? = nil,
+        isTrashed: Bool? = nil,
         ticketURL: String? = nil,
         pullRequestURL: String? = nil
     ) {
@@ -296,6 +291,10 @@ class SessionMetadataStore: ObservableObject {
             meta.isArchived = isArchived
             meta.archivedAt = isArchived ? Date() : nil
         }
+        if let isTrashed = isTrashed {
+            meta.isTrashed = isTrashed
+            meta.trashedAt = isTrashed ? Date() : nil
+        }
         if let ticketURL = ticketURL {
             meta.ticketURL = ticketURL
         }
@@ -311,6 +310,13 @@ class SessionMetadataStore: ObservableObject {
         metadata.values
             .filter { $0.isArchived }
             .sorted { ($0.archivedAt ?? .distantPast) > ($1.archivedAt ?? .distantPast) }
+    }
+
+    /// All trashed workspace metadata, sorted by trashedAt descending.
+    var trashedWorkspaces: [SessionMetadata] {
+        metadata.values
+            .filter { $0.isTrashed }
+            .sorted { ($0.trashedAt ?? .distantPast) > ($1.trashedAt ?? .distantPast) }
     }
 
     /// Append a note entry to a workspace's log.

@@ -28,6 +28,17 @@ struct BrowserTabView: View {
                 }
                 .buttonStyle(.plain)
 
+                Button {
+                    if let url = tab.url {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                }
+                .buttonStyle(.plain)
+                .disabled(tab.url == nil)
+                .help("Open in system browser")
+
                 // URL text field
                 TextField("Enter URL...", text: $urlText)
                     .textFieldStyle(.roundedBorder)

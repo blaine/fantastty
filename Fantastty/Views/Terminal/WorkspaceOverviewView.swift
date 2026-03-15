@@ -43,8 +43,6 @@ struct OverviewTileView: View {
     @State private var isHovered = false
     @State private var snapshot: NSImage?
 
-    private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Thumbnail
@@ -90,14 +88,18 @@ struct OverviewTileView: View {
         .onTapGesture { onSelect() }
         .onHover { isHovered = $0 }
         .onAppear { captureSnapshot() }
-        .onReceive(timer) { _ in captureSnapshot() }
+        .onReceive(tab.thumbnailRefreshes.debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
+            captureSnapshot()
+        }
     }
 
     private func captureSnapshot() {
         switch tab.kind {
         case .terminal:
-            guard let surface = firstSurface(in: tab.surfaceTree?.root),
-                  let image = surface.asImage else { return }
+            guard let image = TerminalThumbnailRenderer.thumbnailImage(
+                for: tab.surfaceTree?.root,
+                targetSize: NSSize(width: 320, height: 200)
+            ) else { return }
             snapshot = image
         case .browser:
             guard let webView = tab.webView else { return }
@@ -107,11 +109,4 @@ struct OverviewTileView: View {
         }
     }
 
-    private func firstSurface(in node: SplitTree<Ghostty.SurfaceView>.Node?) -> Ghostty.SurfaceView? {
-        guard let node = node else { return nil }
-        switch node {
-        case .leaf(let view): return view
-        case .split(let split): return firstSurface(in: split.left)
-        }
-    }
 }

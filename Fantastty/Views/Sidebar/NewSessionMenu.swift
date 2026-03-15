@@ -16,6 +16,12 @@ struct NewSessionMenu: View {
             Button("New Sprite Workspace...") {
                 sessionManager.showSpriteSheet = true
             }
+
+            Divider()
+
+            Button("Attach to tmux Session...") {
+                sessionManager.showTmuxAttachSheet = true
+            }
         } label: {
             Image(systemName: "plus")
         }

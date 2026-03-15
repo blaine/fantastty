@@ -5,8 +5,11 @@ struct SidebarView: View {
     @ObservedObject private var metadataStore = SessionMetadataStore.shared
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @AppStorage("showArchivedSessions") private var showArchived = false
+    @AppStorage("showTrashedSessions") private var showTrashed = false
     @State private var expandedSessions: Set<UUID> = []
     @State private var workspaceToDelete: String?
+    @State private var deletingTrashedWorkspace = false
+    @State private var confirmingEmptyTrash = false
 
     var body: some View {
         List(selection: $sessionManager.selectedSessionID) {
@@ -69,6 +72,32 @@ struct SidebarView: View {
                                 sessionManager.unarchiveSession(workspaceID: meta.workspaceID)
                             }
                             Button("Delete Permanently", role: .destructive) {
+                                deletingTrashedWorkspace = false
+                                workspaceToDelete = meta.workspaceID
+                            }
+                        }
+                    }
+                }
+            }
+
+            if showTrashed && !metadataStore.trashedWorkspaces.isEmpty {
+                Section("Trashed") {
+                    ForEach(metadataStore.trashedWorkspaces, id: \.workspaceID) { meta in
+                        HStack {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 16)
+                            Text(meta.name.isEmpty ? meta.workspaceID : meta.name)
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .contextMenu {
+                            Button("Restore") {
+                                sessionManager.restoreTrashedWorkspace(workspaceID: meta.workspaceID)
+                            }
+                            Button("Delete Permanently", role: .destructive) {
+                                deletingTrashedWorkspace = true
                                 workspaceToDelete = meta.workspaceID
                             }
                         }
@@ -100,13 +129,53 @@ struct SidebarView: View {
                     .padding(.vertical, 6)
                 }
 
-                Button {
-                    sessionManager.createSession()
+                if !metadataStore.trashedWorkspaces.isEmpty {
+                    HStack(spacing: 4) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                showTrashed.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash")
+                                Text("Trashed (\(metadataStore.trashedWorkspaces.count))")
+                                Spacer()
+                                Image(systemName: showTrashed ? "eye" : "eye.slash")
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            confirmingEmptyTrash = true
+                        } label: {
+                            Image(systemName: "trash.slash")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Empty Trash")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+
+                Menu {
+                    Button("New Workspace") {
+                        sessionManager.createSession()
+                    }
+                    Button("New SSH Workspace...") {
+                        sessionManager.showSSHSheet = true
+                    }
+                    Divider()
+                    Button("Attach to tmux Session...") {
+                        sessionManager.showTmuxAttachSheet = true
+                    }
                 } label: {
                     Label("New Workspace", systemImage: "plus")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             }
@@ -114,19 +183,37 @@ struct SidebarView: View {
         }
         .alert("Delete Workspace?", isPresented: Binding(
             get: { workspaceToDelete != nil },
-            set: { if !$0 { workspaceToDelete = nil } }
+            set: {
+                if !$0 {
+                    workspaceToDelete = nil
+                    deletingTrashedWorkspace = false
+                }
+            }
         )) {
             Button("Cancel", role: .cancel) {
                 workspaceToDelete = nil
             }
             Button("Delete", role: .destructive) {
                 if let id = workspaceToDelete {
-                    sessionManager.deleteArchivedWorkspace(workspaceID: id)
+                    if deletingTrashedWorkspace {
+                        sessionManager.deleteTrashedWorkspace(workspaceID: id)
+                    } else {
+                        sessionManager.deleteArchivedWorkspace(workspaceID: id)
+                    }
                 }
                 workspaceToDelete = nil
+                deletingTrashedWorkspace = false
             }
         } message: {
             Text("This will permanently delete all metadata, notes, and URLs for this workspace. This cannot be undone.")
+        }
+        .alert("Empty Trash?", isPresented: $confirmingEmptyTrash) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty Trash", role: .destructive) {
+                sessionManager.emptyTrash()
+            }
+        } message: {
+            Text("This will permanently delete all \(metadataStore.trashedWorkspaces.count) trashed workspace(s). This cannot be undone.")
         }
     }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import GhosttyKit
+import Combine
 
 /// Renders the selected session with its tab bar, notes panel, and terminal content.
 struct SessionDetailView: View {
@@ -42,6 +43,10 @@ struct SessionDetailView: View {
                             .id(tab.id) // Force recreation when tab changes
                     } else if !session.tabs.isEmpty {
                         WorkspaceOverviewView(session: session)
+                    } else if case .attached = session.mode {
+                        PlaceholderRecoveryView(session: session)
+                    } else if session.backingState != .available {
+                        PlaceholderRecoveryView(session: session)
                     } else {
                         Text("No tab selected")
                             .foregroundStyle(.secondary)
@@ -116,6 +121,95 @@ struct SessionDetailView: View {
     }
 }
 
+private struct PlaceholderRecoveryView: View {
+    @ObservedObject var session: Session
+    @EnvironmentObject var sessionManager: SessionManager
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Workspace Restored")
+                .font(.title3.weight(.semibold))
+
+            Text(message)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+
+            if isConnecting {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            HStack(spacing: 10) {
+                if shouldShowRecoveryAction,
+                   case .attached(let info) = session.mode {
+                    if info.host == .local {
+                        Button("Create Shell") {
+                            sessionManager.createShell(for: session)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    } else {
+                        Button("Reattach") {
+                            sessionManager.reattachPlaceholderSession(session)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
+    }
+
+    private var message: String {
+        if case .attached(let info) = session.mode {
+            switch info.connectionState {
+            case .connecting:
+                return "Connecting to tmux session..."
+            case .connected:
+                return "Connected to tmux session. Waiting for windows..."
+            case .disconnected(let reason):
+                if let reason, !reason.isEmpty {
+                    return "This workspace was restored, but its tmux session is unavailable: \(reason)"
+                }
+                return "This workspace was restored, but its tmux session is unavailable."
+            }
+        }
+
+        switch session.backingState {
+        case .missingAttachedBacking(let reason):
+            if let reason, !reason.isEmpty {
+                return "This workspace was restored, but its tmux session is unavailable: \(reason)"
+            }
+            return "This workspace was restored, but its tmux session is unavailable."
+        case .available:
+            return "This workspace is ready."
+        }
+    }
+
+    private var isConnecting: Bool {
+        if case .attached(let info) = session.mode,
+           case .connecting = info.connectionState {
+            return true
+        }
+        return false
+    }
+
+    private var shouldShowRecoveryAction: Bool {
+        if case .attached(let info) = session.mode {
+            if case .disconnected = info.connectionState {
+                return true
+            }
+        }
+
+        if case .missingAttachedBacking = session.backingState {
+            return true
+        }
+
+        return false
+    }
+}
+
 /// Renders a single tab's split tree content.
 struct TabContentView: View {
     @ObservedObject var tab: TerminalTab
@@ -126,13 +220,30 @@ struct TabContentView: View {
         switch tab.kind {
         case .terminal:
             if let tree = tab.surfaceTree {
-                TerminalSplitTreeView(
-                    tree: tree,
-                    action: handleSplitOperation
-                )
-                .onAppear {
-                    if let focused = tab.focusedSurface {
-                        Ghostty.moveFocus(to: focused)
+                GeometryReader { geometry in
+                    TerminalSplitTreeView(
+                        tree: tree,
+                        action: handleSplitOperation
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .onAppear {
+                        if let focused = tab.focusedSurface {
+                            Ghostty.moveFocus(to: focused)
+                        }
+                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
+                        tab.requestThumbnailRefresh()
+                    }
+                    .onChange(of: geometry.size) { _, newSize in
+                        updateAttachedTmuxWindowSize(contentSize: newSize)
+                        tab.requestThumbnailRefresh()
+                    }
+                    .onReceive(attachedTmuxCellSizePublisher) { _ in
+                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
+                        tab.requestThumbnailRefresh()
+                    }
+                    .onReceive(attachedTmuxSurfaceSizePublisher) { _ in
+                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
+                        tab.requestThumbnailRefresh()
                     }
                 }
             }
@@ -166,6 +277,59 @@ struct TabContentView: View {
             if let result = try? tempTree.inserting(view: drop.payload, at: drop.destination, direction: direction) {
                 tab.surfaceTree = result
             }
+        }
+    }
+
+    private var attachedTmuxCellSizePublisher: AnyPublisher<CGSize, Never> {
+        guard case .attached = session.mode,
+              let surface = attachedTmuxSizingSurface() else {
+            return Empty(completeImmediately: false).eraseToAnyPublisher()
+        }
+
+        return surface.$cellSize
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+    }
+
+    private var attachedTmuxSurfaceSizePublisher: AnyPublisher<ghostty_surface_size_s?, Never> {
+        guard case .attached = session.mode,
+              let surface = attachedTmuxSizingSurface() else {
+            return Empty(completeImmediately: false).eraseToAnyPublisher()
+        }
+
+        return surface.$surfaceSize
+            .removeDuplicates { lhs, rhs in
+                lhs?.columns == rhs?.columns &&
+                lhs?.rows == rhs?.rows &&
+                lhs?.width_px == rhs?.width_px &&
+                lhs?.height_px == rhs?.height_px
+            }
+            .eraseToAnyPublisher()
+    }
+
+    private func updateAttachedTmuxWindowSize(contentSize: CGSize) {
+        sessionManager.updateAttachedTmuxWindowSize(
+            session: session,
+            tab: tab,
+            contentSize: contentSize
+        )
+    }
+
+    private func attachedTmuxSizingSurface() -> Ghostty.SurfaceView? {
+        if let root = tab.surfaceTree?.root {
+            return firstLeafSurface(in: root)
+        }
+        return tab.focusedSurface
+    }
+
+    private func firstLeafSurface(
+        in node: SplitTree<Ghostty.SurfaceView>.Node
+    ) -> Ghostty.SurfaceView? {
+        switch node {
+        case .leaf(let view):
+            return view
+        case .split(let split):
+            return firstLeafSurface(in: split.left)
         }
     }
 

@@ -166,36 +166,6 @@ class SpriteManager: ObservableObject {
         }
     }
 
-    // MARK: - Remote Tmux Setup
-
-    /// Fire-and-forget: ensure tmux is installed on the sprite and configure auto-attach.
-    func setupRemoteTmux(spriteName: String, workspaceID: String) {
-        guard isSpriteCliAvailable else { return }
-
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let script = """
-            command -v tmux >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq tmux >/dev/null 2>&1; }; \
-            printf '[ -z "$TMUX" ] && exec tmux new-session -A -s "fantastty-\(workspaceID)"\\n' \
-              > /etc/profile.d/fantastty.sh
-            """
-
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: self.spritePath)
-            process.arguments = ["exec", "-s", spriteName, "--", "sh", "-c", script]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-
-            do {
-                try process.run()
-                process.waitUntilExit()
-                Self.logger.info("Remote tmux setup completed for sprite \(spriteName) (exit: \(process.terminationStatus))")
-            } catch {
-                Self.logger.error("Failed to setup remote tmux on sprite \(spriteName): \(error)")
-            }
-        }
-    }
 }
 
 // MARK: - Supporting Types

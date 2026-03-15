@@ -77,11 +77,14 @@ extension Ghostty {
             }
 
             ghostty_config_load_recursive_files(cfg);
-#endif
 
-            // TODO: we'd probably do some config loading here... for now we'd
-            // have to do this synchronously. When we support config updating we can do
-            // this async and update later.
+            // If the user has no Ghostty config, load Fantastty's default theme
+            // overlay so that light/dark color scheme switching works out of the box.
+            ThemeManager.shared.ensureInstalled()
+            if let overlayPath = ThemeManager.shared.configOverlayPath {
+                ghostty_config_load_file(cfg, overlayPath)
+            }
+#endif
 
             if finalize {
                 // Finalize will make our defaults available.

@@ -1,6 +1,38 @@
 import Cocoa
 
 extension NSImage {
+    func resized(toFit maxSize: NSSize) -> NSImage {
+        guard size.width > 0, size.height > 0 else { return self }
+        guard maxSize.width > 0, maxSize.height > 0 else { return self }
+
+        let scale = min(
+            maxSize.width / size.width,
+            maxSize.height / size.height,
+            1
+        )
+        guard scale < 1 else { return self }
+
+        let resizedSize = NSSize(
+            width: floor(size.width * scale),
+            height: floor(size.height * scale)
+        )
+        let resized = NSImage(size: resizedSize)
+
+        resized.lockFocus()
+        if let context = NSGraphicsContext.current {
+            context.imageInterpolation = .high
+        }
+        draw(
+            in: NSRect(origin: .zero, size: resizedSize),
+            from: NSRect(origin: .zero, size: size),
+            operation: .copy,
+            fraction: 1
+        )
+        resized.unlockFocus()
+
+        return resized
+    }
+
     /// Combine multiple images with the given blend modes. This is useful given a set
     /// of layers to create a final rasterized image.
     static func combine(images: [NSImage], blendingModes: [CGBlendMode]) -> NSImage? {

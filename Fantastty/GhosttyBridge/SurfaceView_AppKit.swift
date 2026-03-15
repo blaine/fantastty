@@ -5,6 +5,189 @@ import CoreText
 import UserNotifications
 import GhosttyKit
 
+enum AttachedTmuxInputEncoder {
+    private static let functionKeyScalarsToTmuxTokens: [UInt32: String] = [
+        0xF700: "Up",
+        0xF701: "Down",
+        0xF702: "Left",
+        0xF703: "Right",
+        0xF727: "IC",
+        0xF728: "DC",
+        0xF729: "Home",
+        0xF72B: "End",
+        0xF72C: "PageUp",
+        0xF72D: "PageDown",
+    ]
+
+    private static let keyCodeToTmuxTokens: [UInt16: String] = [
+        123: "Left",
+        124: "Right",
+        125: "Down",
+        126: "Up",
+        115: "Home",
+        119: "End",
+        116: "PageUp",
+        121: "PageDown",
+        114: "IC",
+        117: "DC",
+    ]
+
+    private static let commandSelectorToKeyCode: [Selector: UInt16] = [
+        #selector(NSResponder.moveLeft(_:)): 123,
+        #selector(NSResponder.moveRight(_:)): 124,
+        #selector(NSResponder.moveDown(_:)): 125,
+        #selector(NSResponder.moveUp(_:)): 126,
+        #selector(NSResponder.moveToBeginningOfLine(_:)): 115,
+        #selector(NSResponder.moveToEndOfLine(_:)): 119,
+        #selector(NSResponder.pageUp(_:)): 116,
+        #selector(NSResponder.pageDown(_:)): 121,
+    ]
+
+    static func eventCharacters(for event: NSEvent) -> String? {
+        switch event.type {
+        case .keyDown, .keyUp:
+            return event.characters
+        default:
+            return nil
+        }
+    }
+
+    static func inputData(
+        isRelease: Bool,
+        text: String?,
+        eventCharacters: String?,
+        modifierFlags: NSEvent.ModifierFlags = []
+    ) -> Data? {
+        guard !isRelease else { return nil }
+
+        if modifierFlags.contains(.control),
+           let eventCharacters,
+           eventCharacters.count == 1,
+           let scalar = eventCharacters.unicodeScalars.first,
+           let controlByte = controlByte(for: scalar) {
+            return Data([controlByte])
+        }
+
+        if let eventCharacters,
+           eventCharacters.count == 1,
+           let scalar = eventCharacters.unicodeScalars.first,
+           scalar.value < 0x20 || scalar.value == 0x7f {
+            return Data([UInt8(scalar.value)])
+        }
+
+        if let eventCharacters,
+           eventCharacters.count == 1,
+           let scalar = eventCharacters.unicodeScalars.first,
+           functionKeyScalarsToTmuxTokens[scalar.value] != nil {
+            return nil
+        }
+
+        guard let text, !text.isEmpty else { return nil }
+        return Data(text.utf8)
+    }
+
+    static func inputKeyToken(
+        isRelease: Bool,
+        eventCharacters: String?,
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags = []
+    ) -> String? {
+        guard !isRelease else { return nil }
+        guard let baseToken = baseKeyToken(eventCharacters: eventCharacters, keyCode: keyCode) else {
+            return nil
+        }
+
+        var prefixes: [String] = []
+        if modifierFlags.contains(.control) {
+            prefixes.append("C")
+        }
+        if modifierFlags.contains(.option) {
+            prefixes.append("M")
+        }
+        if modifierFlags.contains(.shift) {
+            prefixes.append("S")
+        }
+
+        if prefixes.isEmpty {
+            return baseToken
+        }
+        return prefixes.joined(separator: "-") + "-" + baseToken
+    }
+
+    static func commandSelectorKeyToken(
+        _ selector: Selector,
+        modifierFlags: NSEvent.ModifierFlags = []
+    ) -> String? {
+        guard let keyCode = commandSelectorToKeyCode[selector] else {
+            return nil
+        }
+        return inputKeyToken(
+            isRelease: false,
+            eventCharacters: nil,
+            keyCode: keyCode,
+            modifierFlags: modifierFlags
+        )
+    }
+
+    private static func baseKeyToken(
+        eventCharacters: String?,
+        keyCode: UInt16
+    ) -> String? {
+        if let eventCharacters,
+           eventCharacters.count == 1,
+           let scalar = eventCharacters.unicodeScalars.first,
+           let token = functionKeyScalarsToTmuxTokens[scalar.value] {
+            return token
+        }
+        return keyCodeToTmuxTokens[keyCode]
+    }
+
+    private static func controlByte(for scalar: UnicodeScalar) -> UInt8? {
+        let value = scalar.value
+        if value >= 0x61, value <= 0x7a {
+            return UInt8(value - 0x60)
+        }
+        if value >= 0x41, value <= 0x5a {
+            return UInt8(value - 0x40)
+        }
+
+        switch scalar {
+        case "@", " ":
+            return 0x00
+        case "[":
+            return 0x1b
+        case "\\":
+            return 0x1c
+        case "]":
+            return 0x1d
+        case "^":
+            return 0x1e
+        case "_":
+            return 0x1f
+        case "?":
+            return 0x7f
+        default:
+            return nil
+        }
+    }
+}
+
+enum AttachedTmuxInputRouter {
+    static func shouldHandleLocally(
+        bindingFlags: Ghostty.Input.BindingFlags?,
+        event: NSEvent
+    ) -> Bool {
+        // In attached tmux mode, route keys remotely by default so terminal apps
+        // (vim, shell readline, etc.) receive full input fidelity. Keep App-level
+        // command shortcuts local.
+        if event.modifierFlags.contains(.command) {
+            return true
+        }
+        _ = bindingFlags
+        return false
+    }
+}
+
 extension Ghostty {
     /// The NSView implementation for a terminal surface.
     class SurfaceView: OSView, ObservableObject, Codable, Identifiable {
@@ -207,6 +390,11 @@ extension Ghostty {
         // Notification identifiers associated with this surface
         var notificationIdentifiers: Set<String> = []
 
+        /// Tmux control mode: pane ID this surface represents.
+        var tmuxPaneID: Int?
+        /// Tmux control mode: weak ref to control client for input routing.
+        weak var tmuxControlClient: TmuxControlClient?
+
         private var markedText: NSMutableAttributedString
         private(set) var focused: Bool = true
         private var prevPressureStage: Int = 0
@@ -214,6 +402,10 @@ extension Ghostty {
 
         // This is set to non-null during keyDown to accumulate insertText contents
         private var keyTextAccumulator: [String]? = nil
+
+        // When AppKit routes a non-text key via doCommand during keyDown, we set
+        // this to skip duplicate remote key forwarding from keyAction.
+        private var routedTmuxCommandSelectorDuringKeyDown = false
 
         // A small delay that is introduced before a title change to avoid flickers
         private var titleChangeTimer: Timer?
@@ -1085,6 +1277,7 @@ extension Ghostty {
             // we call interpretKeyEvents so that we can handle complex input such as Korean
             // language.
             keyTextAccumulator = []
+            routedTmuxCommandSelectorDuringKeyDown = false
             defer { keyTextAccumulator = nil }
 
             // We need to know what the length of marked text was before this event to
@@ -1117,6 +1310,11 @@ extension Ghostty {
             // do this and the key event callbacks below doesn't matter since
             // we control the preedit state only through the preedit API.
             syncPreedit(clearIfNeeded: markedTextBefore)
+
+            if routedTmuxCommandSelectorDuringKeyDown {
+                routedTmuxCommandSelectorDuringKeyDown = false
+                return
+            }
 
             if let list = keyTextAccumulator, list.count > 0 {
                 // If we have text, then we've composed a character, send that down.
@@ -1368,11 +1566,82 @@ extension Ghostty {
             // Without this, `ctrl+enter` does the wrong thing.
             if let text, text.count > 0,
                let codepoint = text.utf8.first, codepoint >= 0x20 {
-                return text.withCString { ptr in
+                let textResult = text.withCString { ptr in
                     key_ev.text = ptr
+                    if let paneID = tmuxPaneID,
+                       let client = tmuxControlClient,
+                       !AttachedTmuxInputRouter.shouldHandleLocally(
+                       bindingFlags: surfaceModel?.keyIsBinding(key_ev),
+                       event: event
+                       ),
+                       let data = AttachedTmuxInputEncoder.inputData(
+                        isRelease: action == GHOSTTY_ACTION_RELEASE,
+                        text: text,
+                        eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: event),
+                        modifierFlags: event.modifierFlags
+                       ) {
+                        Task { await client.sendKeys(paneID: paneID, data: data) }
+                        return true
+                    }
+                    if let paneID = tmuxPaneID,
+                       let client = tmuxControlClient,
+                       !AttachedTmuxInputRouter.shouldHandleLocally(
+                        bindingFlags: surfaceModel?.keyIsBinding(key_ev),
+                        event: event
+                       ),
+                       let keyToken = AttachedTmuxInputEncoder.inputKeyToken(
+                        isRelease: action == GHOSTTY_ACTION_RELEASE,
+                        eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: event),
+                        keyCode: event.keyCode,
+                        modifierFlags: event.modifierFlags
+                       ) {
+                        Task { await client.sendKeyToken(paneID: paneID, keyToken: keyToken) }
+                        return true
+                    }
+                    if tmuxPaneID != nil, tmuxControlClient != nil {
+                        // Attached tmux panes must not forward key events into
+                        // the local Ghostty child process.
+                        return true
+                    }
                     return ghostty_surface_key(surface, key_ev)
                 }
+                return textResult
             } else {
+                if let paneID = tmuxPaneID,
+                   let client = tmuxControlClient,
+                   !AttachedTmuxInputRouter.shouldHandleLocally(
+                   bindingFlags: surfaceModel?.keyIsBinding(key_ev),
+                   event: event
+                   ),
+                   let data = AttachedTmuxInputEncoder.inputData(
+                    isRelease: action == GHOSTTY_ACTION_RELEASE,
+                    text: text,
+                    eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: event),
+                    modifierFlags: event.modifierFlags
+                   ) {
+                    Task { await client.sendKeys(paneID: paneID, data: data) }
+                    return true
+                }
+                if let paneID = tmuxPaneID,
+                   let client = tmuxControlClient,
+                   !AttachedTmuxInputRouter.shouldHandleLocally(
+                    bindingFlags: surfaceModel?.keyIsBinding(key_ev),
+                    event: event
+                   ),
+                   let keyToken = AttachedTmuxInputEncoder.inputKeyToken(
+                    isRelease: action == GHOSTTY_ACTION_RELEASE,
+                    eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: event),
+                    keyCode: event.keyCode,
+                    modifierFlags: event.modifierFlags
+                   ) {
+                    Task { await client.sendKeyToken(paneID: paneID, keyToken: keyToken) }
+                    return true
+                }
+                if tmuxPaneID != nil, tmuxControlClient != nil {
+                    // Attached tmux panes must not forward key events into
+                    // the local Ghostty child process.
+                    return true
+                }
                 return ghostty_surface_key(surface, key_ev)
             }
         }
@@ -1909,7 +2178,7 @@ extension Ghostty.SurfaceView: NSTextInputClient {
 
     func insertText(_ string: Any, replacementRange: NSRange) {
         // We must have an associated event
-        guard NSApp.currentEvent != nil else { return }
+        guard let currentEvent = NSApp.currentEvent else { return }
         guard let surfaceModel else { return }
 
         // We want the string view of the any value
@@ -1934,22 +2203,48 @@ extension Ghostty.SurfaceView: NSTextInputClient {
             return
         }
 
+        if let paneID = tmuxPaneID,
+           let client = tmuxControlClient,
+           let data = AttachedTmuxInputEncoder.inputData(
+            isRelease: false,
+            text: chars,
+            eventCharacters: nil,
+            modifierFlags: currentEvent.modifierFlags
+           ) {
+            Task { await client.sendKeys(paneID: paneID, data: data) }
+            return
+        }
+
         surfaceModel.sendText(chars)
     }
 
     /// This function needs to exist for two reasons:
     /// 1. Prevents an audible NSBeep for unimplemented actions.
     /// 2. Allows us to properly encode super+key input events that we don't handle
-    override func doCommand(by selector: Selector) {
-        // If we are being processed by performKeyEquivalent with a command binding,
-        // we send it back through the event system so it can be encoded.
-        if let lastPerformKeyEvent,
-           let current = NSApp.currentEvent,
+        override func doCommand(by selector: Selector) {
+            // If we are being processed by performKeyEquivalent with a command binding,
+            // we send it back through the event system so it can be encoded.
+            if let lastPerformKeyEvent,
+               let current = NSApp.currentEvent,
            lastPerformKeyEvent == current.timestamp
         {
             NSApp.sendEvent(current)
-            return
-        }
+                return
+            }
+
+            if let paneID = tmuxPaneID,
+               let client = tmuxControlClient,
+               let current = NSApp.currentEvent,
+               current.type == .keyDown,
+               !AttachedTmuxInputRouter.shouldHandleLocally(bindingFlags: nil, event: current),
+               let keyToken = AttachedTmuxInputEncoder.commandSelectorKeyToken(
+                selector,
+                modifierFlags: current.modifierFlags
+               ) {
+                routedTmuxCommandSelectorDuringKeyDown = true
+                Task { await client.sendKeyToken(paneID: paneID, keyToken: keyToken) }
+                return
+            }
 
 		guard let surfaceModel else { return }
         // Process MacOS native scroll events
@@ -1961,8 +2256,6 @@ extension Ghostty.SurfaceView: NSTextInputClient {
         default:
             break
         }
-
-        print("SEL: \(selector)")
     }
 
     /// Sync the preedit state based on the markedText value to libghostty

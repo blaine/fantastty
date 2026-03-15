@@ -1,3 +1,4 @@
+import Foundation
 import GhosttyKit
 
 extension Ghostty {
@@ -24,14 +25,17 @@ extension Ghostty {
         }
 
         deinit {
-            // deinit is not guaranteed to happen on the main actor and our API
-            // calls into libghostty must happen there so we capture the surface
-            // value so we don't capture `self` and then we detach it in a task.
-            // We can't wait for the task to succeed so this will happen sometime
-            // but that's okay.
+            // `ghostty_surface_free` can synchronously emit callbacks that still
+            // reference the SurfaceView userdata. Freeing asynchronously after
+            // SurfaceView teardown introduces a use-after-free window.
+            // Keep teardown synchronous on the main thread to avoid callback races.
             let surface = self.surface
-            Task.detached { @MainActor in
+            if Thread.isMainThread {
                 ghostty_surface_free(surface)
+            } else {
+                DispatchQueue.main.sync {
+                    ghostty_surface_free(surface)
+                }
             }
         }
 
