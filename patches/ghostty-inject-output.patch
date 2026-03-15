@@ -1,0 +1,34 @@
+diff --git a/include/ghostty.h b/include/ghostty.h
+index 3d3973084..ec1e80788 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1078,6 +1078,7 @@ bool ghostty_surface_key_is_binding(ghostty_surface_t,
+                                     ghostty_input_key_s,
+                                     ghostty_binding_flags_e*);
+ void ghostty_surface_text(ghostty_surface_t, const char*, uintptr_t);
++void ghostty_surface_inject_output(ghostty_surface_t, const char*, uintptr_t);
+ void ghostty_surface_preedit(ghostty_surface_t, const char*, uintptr_t);
+ bool ghostty_surface_mouse_captured(ghostty_surface_t);
+ bool ghostty_surface_mouse_button(ghostty_surface_t,
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index dcf8a6357..d73047a66 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1780,6 +1780,17 @@ pub const CAPI = struct {
+         surface.textCallback(ptr[0..len]);
+     }
+ 
++    /// Inject raw terminal output data into the surface's terminal
++    /// emulator, bypassing the PTY. This is used for tmux control mode
++    /// where output arrives over a control connection rather than a PTY.
++    export fn ghostty_surface_inject_output(
++        surface: *Surface,
++        ptr: [*]const u8,
++        len: usize,
++    ) void {
++        surface.core_surface.io.processOutput(ptr[0..len]);
++    }
++
+     /// Set the preedit text for the surface. This is used for IME
+     /// composition. If the length is 0, then the preedit text is cleared.
+     export fn ghostty_surface_preedit(

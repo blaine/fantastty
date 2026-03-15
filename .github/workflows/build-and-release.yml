@@ -57,7 +57,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: xcframework/
-        key: ghosttykit-${{ runner.os }}-${{ hashFiles('vendor/ghostty/**/*.zig', 'vendor/ghostty/**/*.zon', 'Fantastty/BridgingHeader.h', 'Fantastty/**/*.h') }}
+        key: ghosttykit-${{ runner.os }}-${{ hashFiles('vendor/ghostty/**/*.zig', 'vendor/ghostty/**/*.zon', 'Fantastty/BridgingHeader.h', 'Fantastty/**/*.h', 'patches/*.patch') }}
 
     - name: Build GhosttyKit xcframework
       if: steps.cache-xcframework.outputs.cache-hit != 'true'

@@ -409,114 +409,145 @@ extension Ghostty {
         
         var body: some View {
             GeometryReader { geo in
-                HStack(spacing: 4) {
-                    TextField("Search", text: $searchState.needle)
-                    .textFieldStyle(.plain)
-                    .frame(width: 180)
-                    .padding(.leading, 8)
-                    .padding(.trailing, 50)
-                    .padding(.vertical, 6)
-                    .background(Color.primary.opacity(0.1))
-                    .cornerRadius(6)
-                    .focused($isSearchFieldFocused)
-                    .overlay(alignment: .trailing) {
-                        if let selected = searchState.selected {
-                            Text("\(selected + 1)/\(searchState.total, default: "?")")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .monospacedDigit()
-                                .padding(.trailing, 8)
-                        } else if let total = searchState.total {
-                            Text("-/\(total)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .monospacedDigit()
-                                .padding(.trailing, 8)
-                        }
-                    }
-#if canImport(AppKit)
-                    .onExitCommand {
-                        if searchState.needle.isEmpty {
-                            onClose()
-                        } else {
-                            Ghostty.moveFocus(to: surfaceView)
-                        }
-                    }
-#endif
-                    .backport.onKeyPress(.return) { modifiers in
-                        guard let surface = surfaceView.surface else { return .ignored }
-                        let action = modifiers.contains(.shift)
-                        ? "navigate_search:previous"
-                        : "navigate_search:next"
-                        ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
-                        return .handled
-                    }
-
-                    Button(action: {
-                        guard let surface = surfaceView.surface else { return }
-                        let action = "navigate_search:next"
-                        ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
-                    }) {
-                        Image(systemName: "chevron.up")
-                    }
-                    .buttonStyle(SearchButtonStyle())
-                    
-                    Button(action: {
-                        guard let surface = surfaceView.surface else { return }
-                        let action = "navigate_search:previous"
-                        ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
-                    }) {
-                        Image(systemName: "chevron.down")
-                    }
-                    .buttonStyle(SearchButtonStyle())
-                    
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(SearchButtonStyle())
-                }
-                .padding(8)
-                .background(.background)
-                .clipShape(clipShape)
-                .shadow(radius: 4)
-                .onAppear {
-                    isSearchFieldFocused = true
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .ghosttySearchFocus)) { notification in
-                    guard notification.object as? SurfaceView === surfaceView else { return }
-                    DispatchQueue.main.async {
-                        isSearchFieldFocused = true
-                    }
-                }
-                .background(
-                    GeometryReader { barGeo in
-                        Color.clear.onAppear {
-                            barSize = barGeo.size
-                        }
-                    }
-                )
+                searchBar
                 .padding(padding)
                 .offset(dragOffset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: corner.alignment)
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            dragOffset = value.translation
-                        }
-                        .onEnded { value in
-                            let centerPos = centerPosition(for: corner, in: geo.size, barSize: barSize)
-                            let newCenter = CGPoint(
-                                x: centerPos.x + value.translation.width,
-                                y: centerPos.y + value.translation.height
-                            )
-                            let newCorner = closestCorner(to: newCenter, in: geo.size)
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                corner = newCorner
-                                dragOffset = .zero
-                            }
-                        }
-                )
+                .gesture(dragGesture(in: geo.size))
             }
+        }
+
+        private var searchBar: some View {
+            HStack(spacing: 4) {
+                searchField
+                navigationButtons
+            }
+            .padding(8)
+            .background(.background)
+            .clipShape(clipShape)
+            .shadow(radius: 4)
+            .onAppear {
+                isSearchFieldFocused = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ghosttySearchFocus)) { notification in
+                guard notification.object as? SurfaceView === surfaceView else { return }
+                DispatchQueue.main.async {
+                    isSearchFieldFocused = true
+                }
+            }
+            .background(
+                GeometryReader { barGeo in
+                    Color.clear.onAppear {
+                        barSize = barGeo.size
+                    }
+                }
+            )
+        }
+
+        @ViewBuilder
+        private var searchField: some View {
+            let field = TextField("Search", text: $searchState.needle)
+                .textFieldStyle(.plain)
+                .frame(width: 180)
+                .padding(.leading, 8)
+                .padding(.trailing, 50)
+                .padding(.vertical, 6)
+                .background(Color.primary.opacity(0.1))
+                .cornerRadius(6)
+                .focused($isSearchFieldFocused)
+                .overlay(alignment: .trailing) {
+                    searchCountLabel
+                }
+#if canImport(AppKit)
+            field
+                .onExitCommand {
+                    if searchState.needle.isEmpty {
+                        onClose()
+                    } else {
+                        Ghostty.moveFocus(to: surfaceView)
+                    }
+                }
+                .backport.onKeyPress(.return) { modifiers in
+                    guard let surface = surfaceView.surface else { return .ignored }
+                    let action = modifiers.contains(.shift)
+                    ? "navigate_search:previous"
+                    : "navigate_search:next"
+                    ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+                    return .handled
+                }
+#else
+            field
+                .backport.onKeyPress(.return) { modifiers in
+                    guard let surface = surfaceView.surface else { return .ignored }
+                    let action = modifiers.contains(.shift)
+                    ? "navigate_search:previous"
+                    : "navigate_search:next"
+                    ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+                    return .handled
+                }
+#endif
+        }
+
+        @ViewBuilder
+        private var searchCountLabel: some View {
+            if let selected = searchState.selected {
+                Text("\(selected + 1)/\(searchState.total, default: "?")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .monospacedDigit()
+                    .padding(.trailing, 8)
+            } else if let total = searchState.total {
+                Text("-/\(total)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .monospacedDigit()
+                    .padding(.trailing, 8)
+            }
+        }
+
+        @ViewBuilder
+        private var navigationButtons: some View {
+            Button(action: {
+                guard let surface = surfaceView.surface else { return }
+                let action = "navigate_search:next"
+                ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+            }) {
+                Image(systemName: "chevron.up")
+            }
+            .buttonStyle(SearchButtonStyle())
+
+            Button(action: {
+                guard let surface = surfaceView.surface else { return }
+                let action = "navigate_search:previous"
+                ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+            }) {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(SearchButtonStyle())
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(SearchButtonStyle())
+        }
+
+        private func dragGesture(in geoSize: CGSize) -> some Gesture {
+            DragGesture()
+                .onChanged { value in
+                    dragOffset = value.translation
+                }
+                .onEnded { value in
+                    let centerPos = centerPosition(for: corner, in: geoSize, barSize: barSize)
+                    let newCenter = CGPoint(
+                        x: centerPos.x + value.translation.width,
+                        y: centerPos.y + value.translation.height
+                    )
+                    let newCorner = closestCorner(to: newCenter, in: geoSize)
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        corner = newCorner
+                        dragOffset = .zero
+                    }
+                }
         }
 
         private var clipShape: some Shape {
