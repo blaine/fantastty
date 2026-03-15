@@ -104,7 +104,14 @@ jobs:
           CODE_SIGN_STYLE=Manual \
           ENABLE_HARDENED_RUNTIME=YES \
           OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
-          build 2>&1 | tail -20
+          build 2>&1 | tee /tmp/xcodebuild.log | grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true
+
+        # Show full build summary on failure
+        if grep -q 'BUILD FAILED' /tmp/xcodebuild.log; then
+          echo "::group::Full build output (last 200 lines)"
+          tail -200 /tmp/xcodebuild.log
+          echo "::endgroup::"
+        fi
 
         # Verify build output exists
         APP_PATH="build/DerivedData/Build/Products/Release/Fantastty.app"
