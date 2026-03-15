@@ -777,10 +777,13 @@ class SessionManager: ObservableObject {
         }
 
         let metadataStore = SessionMetadataStore.shared
-        let meta = metadataStore.getOrCreate(forKey: workspaceID)
+        var meta = metadataStore.getOrCreate(forKey: workspaceID)
         if meta.name.isEmpty {
             metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
+            meta = metadataStore.getOrCreate(forKey: workspaceID)
         }
+        meta.attachment = persistedAttachmentInfo(from: info)
+        metadataStore.update(meta)
 
         Self.logger.info("Created attached session \(session.id) type=\(type.displayName)")
         return session
@@ -1573,7 +1576,15 @@ class SessionManager: ObservableObject {
 
     func makeAttachedSession(info: TmuxAttachmentInfo, workspaceID: String? = nil) -> Session {
         let wsID = workspaceID ?? String(UUID().uuidString.prefix(8)).lowercased()
-        let session = Session(title: info.sessionName, type: .local, workspaceID: wsID)
+        let sessionType: SessionType = {
+            switch info.host {
+            case .local:
+                return .local
+            case .ssh(let sshInfo):
+                return .ssh(host: sshInfo.hostname, user: sshInfo.user, port: sshInfo.port)
+            }
+        }()
+        let session = Session(title: info.sessionName, type: sessionType, workspaceID: wsID)
         session.mode = .attached(info)
 
         let client = TmuxControlClient(attachmentInfo: info)
@@ -1591,6 +1602,17 @@ class SessionManager: ObservableObject {
         selectedSessionID = session.id
 
         startAttachedSessionReconnect(session)
+
+        // Persist metadata so the session survives across restarts even if
+        // layout.json is lost or corrupt.
+        let metadataStore = SessionMetadataStore.shared
+        var meta = metadataStore.getOrCreate(forKey: session.workspaceID)
+        if meta.name.isEmpty {
+            metadataStore.update(forKey: session.workspaceID, name: Self.generateWorkspaceName())
+            meta = metadataStore.getOrCreate(forKey: session.workspaceID)
+        }
+        meta.attachment = persistedAttachmentInfo(from: info)
+        metadataStore.update(meta)
     }
 
 }

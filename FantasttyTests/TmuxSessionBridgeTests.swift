@@ -528,10 +528,16 @@ final class TmuxSessionBridgeTests: XCTestCase {
             contentSize: CGSize(width: 616, height: 944)
         )
 
-        XCTAssertEqual(resizes.count, 1)
-        XCTAssertEqual(resizes.first?.windowID, 9)
-        XCTAssertEqual(resizes.first?.columns, 77)
-        XCTAssertEqual(resizes.first?.rows, 59)
+        // treeSize is always preferred (accurate), so when the right leaf
+        // changes from 41→42 columns the tree total goes from 77→78, triggering
+        // a second resize.
+        XCTAssertEqual(resizes.count, 2)
+        XCTAssertEqual(resizes[0].windowID, 9)
+        XCTAssertEqual(resizes[0].columns, 77)
+        XCTAssertEqual(resizes[0].rows, 59)
+        XCTAssertEqual(resizes[1].windowID, 9)
+        XCTAssertEqual(resizes[1].columns, 78)
+        XCTAssertEqual(resizes[1].rows, 59)
     }
 
     @MainActor
