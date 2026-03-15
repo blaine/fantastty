@@ -491,7 +491,7 @@ extension Ghostty {
         @ViewBuilder
         private var searchCountLabel: some View {
             if let selected = searchState.selected {
-                Text("\(selected + 1)/\(searchState.total, default: "?")")
+                Text("\(selected + 1)/\(searchState.total.map(String.init) ?? "?")")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .monospacedDigit()
