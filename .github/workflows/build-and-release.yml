@@ -97,6 +97,8 @@ jobs:
           -scheme Fantastty \
           -configuration Release \
           -derivedDataPath build/DerivedData \
+          -arch arm64 \
+          ONLY_ACTIVE_ARCH=NO \
           MARKETING_VERSION="$VERSION" \
           CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
           CODE_SIGN_IDENTITY="$DEVELOPER_ID_NAME" \
