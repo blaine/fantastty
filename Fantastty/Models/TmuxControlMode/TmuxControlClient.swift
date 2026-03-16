@@ -665,6 +665,13 @@ actor TmuxControlClient {
         sendFireAndForget(Self.clientSizeCommand(windowID: windowID, width: width, height: height))
     }
 
+    /// Tells tmux the exact grid size of a single pane.
+    /// Fire-and-forget: errors are silently ignored.
+    func resizePane(paneID: Int, columns: Int, rows: Int) {
+        guard columns > 0, rows > 0 else { return }
+        sendFireAndForget(Self.resizePaneCommand(paneID: paneID, columns: columns, rows: rows))
+    }
+
     func capturePaneContents(paneIDs: [Int]) async throws -> [TmuxCapturedPane] {
         var captured: [TmuxCapturedPane] = []
         for paneID in paneIDs {
@@ -1062,6 +1069,10 @@ actor TmuxControlClient {
             return "refresh-client -C @\(windowID):\(width)x\(height)"
         }
         return "refresh-client -C \(width)x\(height)"
+    }
+
+    static func resizePaneCommand(paneID: Int, columns: Int, rows: Int) -> String {
+        "resize-pane -t %\(paneID) -x \(columns) -y \(rows)"
     }
 
     static func sendKeyTokenCommand(paneID: Int, keyToken: String) -> String {

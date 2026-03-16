@@ -675,6 +675,11 @@ final class TmuxControlClientTests: XCTestCase {
         )
     }
 
+    func testResizePaneCommandFormat() {
+        let command = TmuxControlClient.resizePaneCommand(paneID: 5, columns: 80, rows: 24)
+        XCTAssertEqual(command, "resize-pane -t %5 -x 80 -y 24")
+    }
+
     func testAlternateScreenStateCommandFormat() {
         XCTAssertEqual(
             TmuxControlClient.alternateScreenStateCommand(paneID: 7),
