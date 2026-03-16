@@ -230,19 +230,11 @@ struct TabContentView: View {
                         if let focused = tab.focusedSurface {
                             Ghostty.moveFocus(to: focused)
                         }
-                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
+                        sendRefreshClient(containerSize: geometry.size)
                         tab.requestThumbnailRefresh()
                     }
                     .onChange(of: geometry.size) { _, newSize in
-                        updateAttachedTmuxWindowSize(contentSize: newSize)
-                        tab.requestThumbnailRefresh()
-                    }
-                    .onReceive(attachedTmuxCellSizePublisher) { _ in
-                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
-                        tab.requestThumbnailRefresh()
-                    }
-                    .onReceive(attachedTmuxSurfaceSizePublisher) { _ in
-                        updateAttachedTmuxWindowSize(contentSize: geometry.size)
+                        sendRefreshClient(containerSize: newSize)
                         tab.requestThumbnailRefresh()
                     }
                 }
@@ -280,57 +272,23 @@ struct TabContentView: View {
         }
     }
 
-    private var attachedTmuxCellSizePublisher: AnyPublisher<CGSize, Never> {
-        guard case .attached = session.mode,
-              let surface = attachedTmuxSizingSurface() else {
-            return Empty(completeImmediately: false).eraseToAnyPublisher()
+    /// Sends refresh-client to set tmux window bounds from container pixel size.
+    /// This is intentionally a rough ceiling — per-surface resize-pane sets exact sizes.
+    private func sendRefreshClient(containerSize: CGSize) {
+        guard let client = session.controlClient,
+              let windowID = tab.tmuxWindowID,
+              let surface = tab.surfaceTree?.root?.leftmostLeaf() else {
+            return
         }
 
-        return surface.$cellSize
-            .removeDuplicates()
-            .eraseToAnyPublisher()
-    }
+        let cellSize = surface.cellSize
+        guard cellSize.width > 0, cellSize.height > 0 else { return }
 
-    private var attachedTmuxSurfaceSizePublisher: AnyPublisher<ghostty_surface_size_s?, Never> {
-        guard case .attached = session.mode,
-              let surface = attachedTmuxSizingSurface() else {
-            return Empty(completeImmediately: false).eraseToAnyPublisher()
-        }
+        let cols = Int(floor(containerSize.width / cellSize.width))
+        let rows = Int(floor(containerSize.height / cellSize.height))
+        guard cols > 0, rows > 0 else { return }
 
-        return surface.$surfaceSize
-            .removeDuplicates { lhs, rhs in
-                lhs?.columns == rhs?.columns &&
-                lhs?.rows == rhs?.rows &&
-                lhs?.width_px == rhs?.width_px &&
-                lhs?.height_px == rhs?.height_px
-            }
-            .eraseToAnyPublisher()
-    }
-
-    private func updateAttachedTmuxWindowSize(contentSize: CGSize) {
-        sessionManager.updateAttachedTmuxWindowSize(
-            session: session,
-            tab: tab,
-            contentSize: contentSize
-        )
-    }
-
-    private func attachedTmuxSizingSurface() -> Ghostty.SurfaceView? {
-        if let root = tab.surfaceTree?.root {
-            return firstLeafSurface(in: root)
-        }
-        return tab.focusedSurface
-    }
-
-    private func firstLeafSurface(
-        in node: SplitTree<Ghostty.SurfaceView>.Node
-    ) -> Ghostty.SurfaceView? {
-        switch node {
-        case .leaf(let view):
-            return view
-        case .split(let split):
-            return firstLeafSurface(in: split.left)
-        }
+        Task { await client.refreshClientSize(windowID: windowID, width: cols, height: rows) }
     }
 
     /// Replace a specific node in the tree with a new node.
