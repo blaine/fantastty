@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import GhosttyKit
 
@@ -13,6 +14,7 @@ final class TmuxWindowController {
     private(set) var paneControllers: [Int: TmuxPaneController] = [:]
     private var pendingOutput: [Int: [Data]] = [:]
     private var lastAppliedLayout: String?
+    private var surfaceSizeSubscriptions: [Int: AnyCancellable] = [:]  // keyed by paneID
 
     init(
         windowID: Int,
@@ -51,6 +53,7 @@ final class TmuxWindowController {
         for (paneID, controller) in paneControllers where !newPaneIDs.contains(paneID) {
             controller.teardown()
             paneControllers.removeValue(forKey: paneID)
+            surfaceSizeSubscriptions.removeValue(forKey: paneID)
         }
 
         // Add controllers for new panes
@@ -68,6 +71,13 @@ final class TmuxWindowController {
         }
 
         tab.surfaceTree = SplitTree(root: buildResult.root, zoomed: nil)
+
+        // Subscribe to size changes for newly added panes
+        for paneID in newPaneIDs where surfaceSizeSubscriptions[paneID] == nil {
+            if let surface = tab.surfaceTree?.root?.leaves().first(where: { $0.tmuxPaneID == paneID }) {
+                subscribeSurfaceSize(paneID: paneID, surface: surface)
+            }
+        }
 
         // Set initial focus
         let leaves = tab.surfaceTree?.root?.leaves() ?? []
@@ -93,7 +103,23 @@ final class TmuxWindowController {
         tab.focusedSurface = surface
     }
 
+    /// Subscribes to a surface's grid size changes and sends resize-pane to tmux.
+    private func subscribeSurfaceSize(paneID: Int, surface: Ghostty.SurfaceView) {
+        surfaceSizeSubscriptions[paneID] = surface.$surfaceSize
+            .compactMap { $0 }  // skip nil (surface hasn't rendered yet)
+            .removeDuplicates { $0.columns == $1.columns && $0.rows == $1.rows }
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .sink { [weak surface] size in
+                guard let client = surface?.tmuxControlClient else { return }
+                let cols = Int(size.columns)
+                let rows = Int(size.rows)
+                guard cols > 0, rows > 0 else { return }
+                Task { await client.resizePane(paneID: paneID, columns: cols, rows: rows) }
+            }
+    }
+
     func teardown() {
+        surfaceSizeSubscriptions.removeAll()
         for (_, controller) in paneControllers {
             controller.teardown()
         }
