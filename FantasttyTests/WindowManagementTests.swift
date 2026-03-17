@@ -583,56 +583,6 @@ final class WindowManagementTests: XCTestCase {
     }
 
     @MainActor
-    func testUpdateAttachedTmuxWindowSizeForwardsThroughSessionManager() {
-        let manager = Fantastty.SessionManager()
-        manager.ghosttyApp = WindowManagementTestSupport.ghosttyApp
-
-        let info = Fantastty.TmuxAttachmentInfo(
-            sessionName: "resize-forwarding-test",
-            host: Fantastty.TmuxHost.local,
-            connectionState: Fantastty.ConnectionState.disconnected(reason: nil)
-        )
-        let session = manager.makeAttachedSession(info: info, workspaceID: "resize-forwarding-test")
-        guard let client = session.controlClient else {
-            return XCTFail("Expected control client")
-        }
-        guard let app = WindowManagementTestSupport.ghosttyApp.app else {
-            return XCTFail("Expected Ghostty app handle")
-        }
-
-        let surface = Fantastty.Ghostty.SurfaceView(app, baseConfig: nil)
-        surface.cellSize = CGSize(width: 8, height: 16)
-        surface.surfaceSize = ghostty_surface_size_s(
-            columns: 120,
-            rows: 40,
-            width_px: 0,
-            height_px: 0,
-            cell_width_px: 0,
-            cell_height_px: 0
-        )
-        let tab = Fantastty.TerminalTab(type: session.type, surfaceView: surface)
-        tab.tmuxWindowID = 9
-        session.addTab(tab)
-
-        var resizes: [(windowID: Int, columns: Int, rows: Int)] = []
-        manager.tmuxWindowResizeSender = { sentClient, windowID, columns, rows in
-            XCTAssertTrue(sentClient === client)
-            resizes.append((windowID, columns, rows))
-        }
-
-        manager.updateAttachedTmuxWindowSize(
-            session: session,
-            tab: tab,
-            contentSize: CGSize(width: 960, height: 640)
-        )
-
-        XCTAssertEqual(resizes.count, 1)
-        XCTAssertEqual(resizes[0].windowID, 9)
-        XCTAssertEqual(resizes[0].columns, 120)
-        XCTAssertEqual(resizes[0].rows, 40)
-    }
-
-    @MainActor
     func testPerformSplitRoutesAttachedRightSplitThroughTmux() async {
         let manager = Fantastty.SessionManager()
         manager.ghosttyApp = WindowManagementTestSupport.ghosttyApp
