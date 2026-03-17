@@ -272,8 +272,11 @@ struct TabContentView: View {
         }
     }
 
-    /// Sends refresh-client to set tmux window bounds from container pixel size.
-    /// This is intentionally a rough ceiling — per-surface resize-pane sets exact sizes.
+    /// Sends refresh-client to set tmux window bounds from the container size.
+    /// We derive the effective per-side padding (in points) from the surface's
+    /// own backing-pixel data, then subtract it from the container before dividing
+    /// by cell size. This accounts for Ghostty's window-padding (and balance)
+    /// while still computing the total window dimensions (not a single pane's).
     private func sendRefreshClient(containerSize: CGSize) {
         guard let client = session.controlClient,
               let windowID = tab.tmuxWindowID,
@@ -281,12 +284,32 @@ struct TabContentView: View {
             return
         }
 
+        guard let surfaceSize = surface.surfaceSize else { return }
         let cellSize = surface.cellSize
         guard cellSize.width > 0, cellSize.height > 0 else { return }
 
-        let cols = Int(floor(containerSize.width / cellSize.width))
-        let rows = Int(floor(containerSize.height / cellSize.height))
+        // Derive the total horizontal and vertical padding (in backing pixels)
+        // from the surface's own numbers: screen_px - (columns * cell_px).
+        let hPaddingBacking = CGFloat(surfaceSize.width_px) - CGFloat(surfaceSize.columns) * CGFloat(surfaceSize.cell_width_px)
+        let vPaddingBacking = CGFloat(surfaceSize.height_px) - CGFloat(surfaceSize.rows) * CGFloat(surfaceSize.cell_height_px)
+
+        // Convert to points (cellSize is already in points; cell_*_px is backing)
+        let scaleFactor = CGFloat(surfaceSize.cell_width_px) / cellSize.width
+        let hPaddingPts = hPaddingBacking / scaleFactor
+        let vPaddingPts = vPaddingBacking / scaleFactor
+
+        let containerCols = Int(floor((containerSize.width - hPaddingPts) / cellSize.width))
+        let containerRows = Int(floor((containerSize.height - vPaddingPts) / cellSize.height))
+
+        // Cap to the surface's current grid size so we never tell tmux the window
+        // is larger than surfaces can currently render (prevents overflow during
+        // the ~100ms gap before resize-pane catches up when growing).
+        let cols = min(containerCols, Int(surfaceSize.columns))
+        let rows = min(containerRows, Int(surfaceSize.rows))
         guard cols > 0, rows > 0 else { return }
+
+        // DIAGNOSTIC: log all values for verification
+        TmuxSizingLog.write("refresh-client @\(windowID): container=\(containerCols)x\(containerRows) capped=\(cols)x\(rows) surfCols=\(surfaceSize.columns) surfRows=\(surfaceSize.rows) hPad=\(String(format: "%.1f", hPaddingPts))pt")
 
         Task { await client.refreshClientSize(windowID: windowID, width: cols, height: rows) }
     }

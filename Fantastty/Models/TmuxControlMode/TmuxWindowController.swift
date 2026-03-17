@@ -124,6 +124,7 @@ final class TmuxWindowController {
                 let cols = Int(size.columns)
                 let rows = Int(size.rows)
                 guard cols > 0, rows > 0 else { return }
+                TmuxSizingLog.write("resize-pane %\(paneID): \(cols)x\(rows) (cell=\(size.cell_width_px)x\(size.cell_height_px) screen=\(size.width_px)x\(size.height_px))")
                 Task { await client.resizePane(paneID: paneID, columns: cols, rows: rows) }
             }
     }
