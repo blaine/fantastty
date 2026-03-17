@@ -15,6 +15,9 @@ final class TmuxWindowController {
     private var pendingOutput: [Int: [Data]] = [:]
     private var currentPaneIDs: Set<Int> = []
     private var surfaceSizeSubscriptions: [Int: AnyCancellable] = [:]  // keyed by paneID
+    private var panesWithReportedSize: Set<Int> = []
+    private var bootstrapCompleted: Bool = false
+    var onBootstrapReady: (() -> Void)?
 
     init(
         windowID: Int,
@@ -109,6 +112,12 @@ final class TmuxWindowController {
         surfaceSizeSubscriptions[paneID] = surface.$surfaceSize
             .compactMap { $0 }  // skip nil (surface hasn't rendered yet)
             .removeDuplicates { $0.columns == $1.columns && $0.rows == $1.rows }
+            .handleEvents(receiveOutput: { [weak self] _ in
+                // Track immediately (before debounce) for bootstrap readiness
+                if self?.panesWithReportedSize.insert(paneID).inserted == true {
+                    self?.checkBootstrapReadiness()
+                }
+            })
             .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
             .sink { [weak surface] size in
                 guard let client = surface?.tmuxControlClient else { return }
@@ -117,6 +126,14 @@ final class TmuxWindowController {
                 guard cols > 0, rows > 0 else { return }
                 Task { await client.resizePane(paneID: paneID, columns: cols, rows: rows) }
             }
+    }
+
+    private func checkBootstrapReadiness() {
+        guard !bootstrapCompleted else { return }
+        let allPaneIDs = Set(paneControllers.keys)
+        guard !allPaneIDs.isEmpty, panesWithReportedSize.isSuperset(of: allPaneIDs) else { return }
+        bootstrapCompleted = true
+        onBootstrapReady?()
     }
 
     func teardown() {

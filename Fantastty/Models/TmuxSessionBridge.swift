@@ -253,6 +253,14 @@ private extension TmuxSessionBridge {
                 }
             }
         )
+        controller.onBootstrapReady = { [weak controller, weak client] in
+            guard let controller, let client else { return }
+            let paneIDs = Array(controller.paneControllers.keys).sorted()
+            guard !paneIDs.isEmpty else { return }
+            Task {
+                await client.continueDeferredBootstrap(paneIDs: paneIDs)
+            }
+        }
         windowControllersByWorkspace[session.workspaceID, default: [:]][snapshot.windowID] = controller
         let tab = controller.tab
 
