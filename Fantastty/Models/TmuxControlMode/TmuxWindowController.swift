@@ -107,8 +107,10 @@ final class TmuxWindowController {
         tab.focusedSurface = surface
     }
 
-    /// Subscribes to a surface's grid size changes and sends resize-pane to tmux.
+    /// Subscribes to a surface's grid size changes and sends both refresh-client
+    /// and resize-pane to tmux in one shot — no race between the two commands.
     private func subscribeSurfaceSize(paneID: Int, surface: Ghostty.SurfaceView) {
+        let windowID = self.windowID
         surfaceSizeSubscriptions[paneID] = surface.$surfaceSize
             .compactMap { $0 }  // skip nil (surface hasn't rendered yet)
             .removeDuplicates { $0.columns == $1.columns && $0.rows == $1.rows }
@@ -124,8 +126,11 @@ final class TmuxWindowController {
                 let cols = Int(size.columns)
                 let rows = Int(size.rows)
                 guard cols > 0, rows > 0 else { return }
-                TmuxSizingLog.write("resize-pane %\(paneID): \(cols)x\(rows) (cell=\(size.cell_width_px)x\(size.cell_height_px) screen=\(size.width_px)x\(size.height_px))")
-                Task { await client.resizePane(paneID: paneID, columns: cols, rows: rows) }
+                TmuxSizingLog.write("size %\(paneID) @\(windowID): \(cols)x\(rows) (cell=\(size.cell_width_px)x\(size.cell_height_px) screen=\(size.width_px)x\(size.height_px))")
+                Task {
+                    await client.refreshClientSize(windowID: windowID, width: cols, height: rows)
+                    await client.resizePane(paneID: paneID, columns: cols, rows: rows)
+                }
             }
     }
 
