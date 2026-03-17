@@ -13,7 +13,7 @@ final class TmuxWindowController {
     private let paneInjectorFactory: PaneInjectorFactory?
     private(set) var paneControllers: [Int: TmuxPaneController] = [:]
     private var pendingOutput: [Int: [Data]] = [:]
-    private var lastAppliedLayout: String?
+    private var currentPaneIDs: Set<Int> = []
     private var surfaceSizeSubscriptions: [Int: AnyCancellable] = [:]  // keyed by paneID
 
     init(
@@ -33,12 +33,15 @@ final class TmuxWindowController {
     }
 
     func applyLayout(_ layout: String) {
-        // Skip tree rebuild if the layout string is identical to the last one.
-        // This breaks the resize feedback loop: we send refresh-client → tmux
-        // responds with %layout-change → we'd rebuild the tree → trigger another
-        // resize. By skipping identical layouts, the loop stops here.
-        guard layout != lastAppliedLayout else { return }
-        lastAppliedLayout = layout
+        // Only rebuild for structural changes (panes added/removed).
+        // Non-structural layout changes (tmux responding to our resize-pane
+        // or refresh-client) are ignored since per-surface subscribers
+        // handle sizing.
+        let newPaneIDs = Set(TmuxLayoutParser.parse(layout).allPaneIDs())
+        if newPaneIDs == currentPaneIDs, !currentPaneIDs.isEmpty {
+            return
+        }
+        currentPaneIDs = newPaneIDs
 
         let buildResult = AttachedTmuxWindowRuntime.buildLayoutTree(
             layout: layout,
@@ -46,8 +49,6 @@ final class TmuxWindowController {
         ) { [surfaceFactory] paneID in
             surfaceFactory(paneID)
         }
-
-        let newPaneIDs = buildResult.paneIDs
 
         // Remove controllers for panes no longer in layout
         for (paneID, controller) in paneControllers where !newPaneIDs.contains(paneID) {
