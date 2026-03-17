@@ -5,25 +5,12 @@ import Combine
 final class TmuxSessionBridge: ObservableObject {
     typealias TmuxOutputInjector = (Ghostty.SurfaceView, Data) -> Bool
     typealias TmuxWindowSelector = (TmuxControlClient, Int) -> Void
-    typealias TmuxWindowResizeSender = (TmuxControlClient, Int, Int, Int) -> Void
     typealias TmuxWindowInitialCaptureRequester = (TmuxControlClient, Int, [Int]) -> Void
-
-    struct AttachedTmuxWindowSize: Equatable {
-        let columns: Int
-        let rows: Int
-    }
-
-    private struct AttachedTmuxWindowSizeKey: Hashable {
-        let clientID: ObjectIdentifier
-        let windowID: Int
-    }
 
     var ghosttyApp: Ghostty.App?
     var tmuxOutputInjector: TmuxOutputInjector = TmuxSessionBridge.defaultTmuxOutputInjector
     var tmuxWindowSelector: TmuxWindowSelector = TmuxSessionBridge.defaultTmuxWindowSelector
-    var tmuxWindowResizeSender: TmuxWindowResizeSender = TmuxSessionBridge.defaultTmuxWindowResizeSender
     var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester!
-    var attachedTmuxWindowRecaptureDelay: TimeInterval = 0.12
     var onWindowClosed: ((TmuxControlClient, Int) -> Void)?
     var onClientExit: ((TmuxControlClient) -> Void)?
 
@@ -33,14 +20,6 @@ final class TmuxSessionBridge: ObservableObject {
     private var tabSelectionCancellables: [String: AnyCancellable] = [:]
     private var activeWindowIDByWorkspaceID: [String: Int] = [:]
     private var tabSelectionSyncSuppressionWorkspaceIDs: Set<String> = []
-    private var attachedTmuxWindowSizes: [AttachedTmuxWindowSizeKey: AttachedTmuxWindowSize] = [:]
-    private var attachedTmuxWindowRecaptureTasks: [AttachedTmuxWindowSizeKey: Task<Void, Never>] = [:]
-    /// Windows that recently had a layout applied from tmux. Resize updates
-    /// are suppressed while set to break the feedback loop: we send
-    /// refresh-client → tmux sends %layout-change → tree rebuild → geometry
-    /// update → would send another refresh-client. The flag is cleared on
-    /// the next run loop iteration, allowing user-initiated resizes through.
-    private var layoutAppliedSuppression: Set<AttachedTmuxWindowSizeKey> = []
     static let attachedTmuxSilentCommand = "/bin/sh -lc 'stty raw -echo; exec /bin/cat >/dev/null'"
 
     init() {
@@ -56,10 +35,6 @@ final class TmuxSessionBridge: ObservableObject {
         }
     }
 
-    deinit {
-        attachedTmuxWindowRecaptureTasks.values.forEach { $0.cancel() }
-    }
-
     func registerAttachedSession(_ session: Session) {
         guard case .attached = session.mode,
               let client = session.controlClient else {
@@ -73,7 +48,6 @@ final class TmuxSessionBridge: ObservableObject {
     }
 
     func unregisterSession(_ session: Session) {
-        cleanupAttachedTmuxWindowState(for: session)
         if let controllers = windowControllersByWorkspace.removeValue(forKey: session.workspaceID) {
             for (_, controller) in controllers {
                 controller.teardown()
@@ -106,17 +80,6 @@ final class TmuxSessionBridge: ObservableObject {
         }
     }
 
-    private static func defaultTmuxWindowResizeSender(
-        _ client: TmuxControlClient,
-        _ windowID: Int,
-        _ columns: Int,
-        _ rows: Int
-    ) {
-        Task {
-            await client.refreshClientSize(windowID: windowID, width: columns, height: rows)
-        }
-    }
-
     private static func attachedTmuxSurfaceConfiguration() -> Ghostty.SurfaceConfiguration {
         var config = Ghostty.SurfaceConfiguration()
         // Attached tmux panes render injected control-mode output, so the local
@@ -124,171 +87,9 @@ final class TmuxSessionBridge: ObservableObject {
         config.command = attachedTmuxSilentCommand
         return config
     }
-
-    static func attachedTmuxWindowSize(
-        surfaceSize: ghostty_surface_size_s?,
-        contentSize: CGSize,
-        cellSize: CGSize
-    ) -> AttachedTmuxWindowSize? {
-        if let surfaceSize,
-           surfaceSize.columns > 0,
-           surfaceSize.rows > 0 {
-            return AttachedTmuxWindowSize(
-                columns: Int(surfaceSize.columns),
-                rows: Int(surfaceSize.rows)
-            )
-        }
-
-        guard contentSize.width > 0,
-              contentSize.height > 0,
-              cellSize.width > 0,
-              cellSize.height > 0 else {
-            return nil
-        }
-
-        let columns = max(Int(floor(contentSize.width / cellSize.width)), 1)
-        let rows = max(Int(floor(contentSize.height / cellSize.height)), 1)
-        return AttachedTmuxWindowSize(columns: columns, rows: rows)
-    }
-
-    static func attachedTmuxWindowSize(
-        tree: SplitTree<Ghostty.SurfaceView>,
-        contentSize: CGSize,
-        cellSize: CGSize
-    ) -> AttachedTmuxWindowSize? {
-        if let contentGrid = attachedTmuxWindowSize(
-            surfaceSize: nil,
-            contentSize: contentSize,
-            cellSize: cellSize
-        ) {
-            return contentGrid
-        }
-
-        return attachedTmuxWindowSize(in: tree.root)
-    }
-
-    func updateAttachedTmuxWindowSize(
-        session: Session,
-        tab: TerminalTab,
-        contentSize: CGSize
-    ) {
-        guard case .attached = session.mode,
-              let client = session.controlClient,
-              let windowID = tab.tmuxWindowID,
-              let root = tab.surfaceTree?.root,
-              let surface = firstLeafView(in: root) else {
-            return
-        }
-
-        let key = AttachedTmuxWindowSizeKey(
-            clientID: ObjectIdentifier(client),
-            windowID: windowID
-        )
-
-        // Suppress resize feedback: after a %layout-change rebuilds the tree,
-        // the resulting geometry updates would send another refresh-client.
-        // The flag is cleared on the next run loop iteration so user-initiated
-        // resizes still go through.
-        if layoutAppliedSuppression.remove(key) != nil {
-            return
-        }
-
-        let previousSize = attachedTmuxWindowSizes[key]
-        let treeSize = Self.attachedTmuxWindowSize(in: root)
-        let contentGridSize = Self.attachedTmuxWindowSize(
-            surfaceSize: nil,
-            contentSize: contentSize,
-            cellSize: surface.cellSize
-        )
-        let size = Self.preferredAttachedTmuxWindowSize(
-            root: root,
-            treeSize: treeSize,
-            contentSize: contentGridSize
-        )
-        guard let size else { return }
-        let sizeChanged = previousSize != size
-        if sizeChanged {
-            attachedTmuxWindowSizes[key] = size
-            tmuxWindowResizeSender(client, windowID, size.columns, size.rows)
-        }
-
-        // After the first resize, complete the deferred bootstrap: capture pane
-        // content at the now-correct dimensions and resume %output delivery.
-        let paneIDs = Array(
-            tab.surfaceTree?.root?.leaves().compactMap(\.tmuxPaneID) ?? []
-        ).sorted()
-        if !paneIDs.isEmpty {
-            Task {
-                let pausedPanes = await client.pausedPanes(among: paneIDs)
-                if !pausedPanes.isEmpty {
-                    await client.continueDeferredBootstrap(paneIDs: pausedPanes)
-                }
-            }
-        }
-    }
 }
 
 private extension TmuxSessionBridge {
-    static func attachedTmuxWindowSize(
-        in node: SplitTree<Ghostty.SurfaceView>.Node?
-    ) -> AttachedTmuxWindowSize? {
-        guard let node else { return nil }
-
-        switch node {
-        case .leaf(let surface):
-            guard let surfaceSize = surface.surfaceSize,
-                  surfaceSize.columns > 0,
-                  surfaceSize.rows > 0 else {
-                return nil
-            }
-
-            return AttachedTmuxWindowSize(
-                columns: Int(surfaceSize.columns),
-                rows: Int(surfaceSize.rows)
-            )
-
-        case .split(let split):
-            guard let left = attachedTmuxWindowSize(in: split.left),
-                  let right = attachedTmuxWindowSize(in: split.right) else {
-                return nil
-            }
-
-            switch split.direction {
-            case .horizontal:
-                return AttachedTmuxWindowSize(
-                    columns: left.columns + right.columns + 1,
-                    rows: max(left.rows, right.rows)
-                )
-            case .vertical:
-                return AttachedTmuxWindowSize(
-                    columns: max(left.columns, right.columns),
-                    rows: left.rows + right.rows + 1
-                )
-            }
-        }
-    }
-
-    static func preferredAttachedTmuxWindowSize(
-        root: SplitTree<Ghostty.SurfaceView>.Node,
-        treeSize: AttachedTmuxWindowSize?,
-        contentSize: AttachedTmuxWindowSize?
-    ) -> AttachedTmuxWindowSize? {
-        // Always prefer treeSize (derived from actual Ghostty surface grid sizes)
-        // over contentSize (derived from container pixel dimensions / cell size).
-        // contentSize can overcount by 1 column due to pixel rounding, causing
-        // tmux panes to be wider than the Ghostty surface grid.
-        return treeSize ?? contentSize
-    }
-
-    func firstLeafView(in node: SplitTree<Ghostty.SurfaceView>.Node) -> Ghostty.SurfaceView? {
-        switch node {
-        case .leaf(let view):
-            return view
-        case .split(let split):
-            return firstLeafView(in: split.left)
-        }
-    }
-
     func requestInitialAttachedTmuxCapture(
         client: TmuxControlClient,
         windowID: Int,
@@ -304,57 +105,6 @@ private extension TmuxSessionBridge {
                 route(.paneOutput(paneID: pane.paneID, data: pane.data), from: client)
             }
         } catch {}
-    }
-
-    func cleanupAttachedTmuxWindowState(for session: Session) {
-        guard let client = session.controlClient else { return }
-        cleanupAttachedTmuxWindowState(for: client)
-    }
-
-    func cleanupAttachedTmuxWindowState(for client: TmuxControlClient, windowID: Int) {
-        let key = AttachedTmuxWindowSizeKey(clientID: ObjectIdentifier(client), windowID: windowID)
-        attachedTmuxWindowSizes.removeValue(forKey: key)
-        attachedTmuxWindowRecaptureTasks.removeValue(forKey: key)?.cancel()
-    }
-
-    func cleanupAttachedTmuxWindowState(for client: TmuxControlClient) {
-        let clientID = ObjectIdentifier(client)
-        attachedTmuxWindowSizes = attachedTmuxWindowSizes.filter { $0.key.clientID != clientID }
-        let keys = attachedTmuxWindowRecaptureTasks.keys.filter { $0.clientID == clientID }
-        for key in keys {
-            attachedTmuxWindowRecaptureTasks.removeValue(forKey: key)?.cancel()
-        }
-    }
-
-    func scheduleAttachedTmuxWindowRecapture(
-        client: TmuxControlClient,
-        windowID: Int,
-        paneIDs: [Int],
-        expectedSize: AttachedTmuxWindowSize
-    ) {
-        let key = AttachedTmuxWindowSizeKey(
-            clientID: ObjectIdentifier(client),
-            windowID: windowID
-        )
-        attachedTmuxWindowRecaptureTasks[key]?.cancel()
-
-        let delayNanoseconds = UInt64(max(attachedTmuxWindowRecaptureDelay, 0) * 1_000_000_000)
-        attachedTmuxWindowRecaptureTasks[key] = Task { @MainActor [weak self] in
-            if delayNanoseconds > 0 {
-                do {
-                    try await Task.sleep(nanoseconds: delayNanoseconds)
-                } catch {
-                    return
-                }
-            }
-
-            guard let self else { return }
-            defer {
-                self.attachedTmuxWindowRecaptureTasks.removeValue(forKey: key)
-            }
-            guard self.attachedTmuxWindowSizes[key] == expectedSize else { return }
-            self.tmuxWindowInitialCaptureRequester(client, windowID, paneIDs)
-        }
     }
 
     func observeTabSelection(for session: Session, client: TmuxControlClient) {
@@ -399,7 +149,6 @@ private extension TmuxSessionBridge {
                 upsertWindow(snapshot, in: session, client: client)
 
             case .removeWindow(let windowID):
-                cleanupAttachedTmuxWindowState(for: client, windowID: windowID)
                 if let controller = windowControllersByWorkspace[session.workspaceID]?.removeValue(forKey: windowID) {
                     controller.teardown()
                 }
@@ -438,14 +187,6 @@ private extension TmuxSessionBridge {
                 } else {
                     applyLayout(layout, windowID: windowID, session: session, client: client)
                 }
-                // Suppress the resize feedback that the tree rebuild will cause.
-                // The flag is consumed (removed) on the next updateAttachedTmuxWindowSize
-                // call, allowing subsequent user-initiated resizes through.
-                let layoutKey = AttachedTmuxWindowSizeKey(
-                    clientID: ObjectIdentifier(client),
-                    windowID: windowID
-                )
-                layoutAppliedSuppression.insert(layoutKey)
 
             case .setActivePane(let windowID, let paneID):
                 if let controller = windowControllersByWorkspace[session.workspaceID]?[windowID] {
@@ -654,7 +395,6 @@ extension TmuxSessionBridge: TmuxControlClientDelegate {
 
     func controlClientDidExit(_ client: TmuxControlClient, reason: String?) {
         route(.clientExited, from: client)
-        cleanupAttachedTmuxWindowState(for: client)
         if let session = session(for: client),
            let controllers = windowControllersByWorkspace.removeValue(forKey: session.workspaceID) {
             for (_, controller) in controllers {

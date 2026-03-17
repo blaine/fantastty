@@ -8,7 +8,6 @@ import AppKit
 /// Routes libghostty notifications to the correct session/tab.
 class SessionManager: ObservableObject {
     typealias TmuxOutputInjector = (Ghostty.SurfaceView, Data) -> Bool
-    typealias TmuxWindowResizeSender = TmuxSessionBridge.TmuxWindowResizeSender
     typealias TmuxWindowInitialCaptureRequester = TmuxSessionBridge.TmuxWindowInitialCaptureRequester
     typealias AttachedTmuxSplitSender = (TmuxControlClient, Int, Bool) async throws -> Void
     typealias AttachedTmuxNewWindowSender = (TmuxControlClient) async throws -> String
@@ -230,17 +229,9 @@ class SessionManager: ObservableObject {
             attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
         }
     }
-    var tmuxWindowResizeSender: TmuxWindowResizeSender {
-        get { attachedTmuxSessionBridge.tmuxWindowResizeSender }
-        set { attachedTmuxSessionBridge.tmuxWindowResizeSender = newValue }
-    }
     var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester {
         get { attachedTmuxSessionBridge.tmuxWindowInitialCaptureRequester }
         set { attachedTmuxSessionBridge.tmuxWindowInitialCaptureRequester = newValue }
-    }
-    var attachedTmuxWindowRecaptureDelay: TimeInterval {
-        get { attachedTmuxSessionBridge.attachedTmuxWindowRecaptureDelay }
-        set { attachedTmuxSessionBridge.attachedTmuxWindowRecaptureDelay = newValue }
     }
     var attachedTmuxSplitSender: AttachedTmuxSplitSender = SessionManager.defaultAttachedTmuxSplitSender
     var attachedTmuxNewWindowSender: AttachedTmuxNewWindowSender = SessionManager.defaultAttachedTmuxNewWindowSender
@@ -1558,18 +1549,6 @@ class SessionManager: ObservableObject {
         case .split(let split):
             return firstLeafView(in: split.left)
         }
-    }
-
-    func updateAttachedTmuxWindowSize(
-        session: Session,
-        tab: TerminalTab,
-        contentSize: CGSize
-    ) {
-        attachedTmuxSessionBridge.updateAttachedTmuxWindowSize(
-            session: session,
-            tab: tab,
-            contentSize: contentSize
-        )
     }
 
     // MARK: - Tmux Attach
