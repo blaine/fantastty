@@ -56,7 +56,13 @@ struct AppCommands: Commands {
             .keyboardShortcut("c", modifiers: .command)
 
             Button("Paste") {
-                if let surface = sessionManager.focusedSurfaceView?.surface {
+                if let surfaceView = sessionManager.focusedSurfaceView,
+                   let paneID = surfaceView.tmuxPaneID,
+                   let client = surfaceView.tmuxControlClient,
+                   let str = NSPasteboard.general.string(forType: .string),
+                   let data = str.data(using: .utf8), !data.isEmpty {
+                    Task { await client.sendKeys(paneID: paneID, data: data) }
+                } else if let surface = sessionManager.focusedSurfaceView?.surface {
                     let action = "paste_from_clipboard"
                     ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
                 }

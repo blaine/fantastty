@@ -8,7 +8,7 @@ final class TmuxSessionBridge: ObservableObject {
     typealias TmuxWindowInitialCaptureRequester = (TmuxControlClient, Int, [Int]) -> Void
 
     var ghosttyApp: Ghostty.App?
-    var tmuxOutputInjector: TmuxOutputInjector = TmuxSessionBridge.defaultTmuxOutputInjector
+    var tmuxOutputInjector: TmuxOutputInjector!
     var tmuxWindowSelector: TmuxWindowSelector = TmuxSessionBridge.defaultTmuxWindowSelector
     var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester!
     var onWindowClosed: ((TmuxControlClient, Int) -> Void)?
@@ -23,6 +23,9 @@ final class TmuxSessionBridge: ObservableObject {
     static let attachedTmuxSilentCommand = "/bin/sh -lc 'stty raw -echo; exec /bin/cat >/dev/null'"
 
     init() {
+        tmuxOutputInjector = { [weak self] surface, data in
+            self?.defaultTmuxOutputInjector(surface, data) ?? false
+        }
         tmuxWindowInitialCaptureRequester = { [weak self] client, windowID, paneIDs in
             guard let self else { return }
             Task { @MainActor in
@@ -65,12 +68,21 @@ final class TmuxSessionBridge: ObservableObject {
         bindingStore.hasBinding(workspaceID: workspaceID)
     }
 
-    private static func defaultTmuxOutputInjector(_ surface: Ghostty.SurfaceView, _ data: Data) -> Bool {
-        guard let cSurface = surface.surface else { return false }
-        data.withUnsafeBytes { buffer in
-            guard let ptr = buffer.baseAddress?.assumingMemoryBound(to: CChar.self) else { return }
-            ghostty_surface_inject_output(cSurface, ptr, UInt(buffer.count))
-        }
+    /// Fallback coalescing injectors for surfaces not managed by a
+    /// TmuxWindowController (e.g. during initial window setup).
+    /// Keyed by pane ID; each limits to one in-flight inject.
+    private var fallbackInjectors: [Int: CoalescingInjector] = [:]
+
+    private func defaultTmuxOutputInjector(_ surface: Ghostty.SurfaceView, _ data: Data) -> Bool {
+        guard surface.surface != nil else { return false }
+        guard let paneID = surface.tmuxPaneID else { return false }
+        let injector = fallbackInjectors[paneID] ?? {
+            let new = CoalescingInjector(paneID: paneID, surface: surface)
+            fallbackInjectors[paneID] = new
+            return new
+        }()
+        injector.updateSurface(surface)
+        injector.enqueue(data)
         return true
     }
 

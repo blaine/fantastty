@@ -69,7 +69,7 @@ protocol TmuxCommandSending: AnyObject {
 // MARK: - TmuxControlTransport
 
 protocol TmuxControlTransport: AnyObject {
-    var onLine: (@Sendable (String) -> Void)? { get set }
+    var onLine: (@Sendable (Data) -> Void)? { get set }
     var onTermination: (@Sendable (Int32?) -> Void)? { get set }
 
     func start(command: String, environment: [String: String]) throws
@@ -78,7 +78,7 @@ protocol TmuxControlTransport: AnyObject {
 }
 
 final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
-    var onLine: (@Sendable (String) -> Void)?
+    var onLine: (@Sendable (Data) -> Void)?
     var onTermination: (@Sendable (Int32?) -> Void)?
 
     private var process: Process?
@@ -185,9 +185,9 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
                 buffered.append(contentsOf: chunk[0..<count])
 
                 while let newlineIndex = buffered.firstIndex(of: 0x0a) {
-                    let lineData = buffered[..<newlineIndex]
+                    let lineData = Data(buffered[..<newlineIndex])
                     buffered.removeSubrange(...newlineIndex)
-                    emitLine(String(decoding: lineData, as: UTF8.self))
+                    emitLine(lineData)
                 }
                 continue
             }
@@ -203,11 +203,11 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
         }
 
         if !buffered.isEmpty {
-            emitLine(String(decoding: buffered, as: UTF8.self))
+            emitLine(Data(buffered))
         }
     }
 
-    private func emitLine(_ line: String) {
+    private func emitLine(_ line: Data) {
         let callback = withLockedState { onLine }
         callback?(line)
     }
@@ -236,7 +236,7 @@ actor TmuxControlClient {
     typealias TransportFactory = () -> any TmuxControlTransport
 
     private enum TransportEvent: Sendable {
-        case line(String)
+        case line(Data)
         case termination(Int32?)
     }
 
@@ -415,8 +415,8 @@ actor TmuxControlClient {
             }
         }
 
-        transport.onLine = { line in
-            eventContinuation.yield(.line(line))
+        transport.onLine = { lineData in
+            eventContinuation.yield(.line(lineData))
         }
         transport.onTermination = { status in
             eventContinuation.yield(.termination(status))
@@ -725,8 +725,8 @@ actor TmuxControlClient {
 
     private func handleTransportEvent(_ event: TransportEvent) async {
         switch event {
-        case .line(let line):
-            await handleLine(line)
+        case .line(let lineData):
+            await handleLine(lineData)
         case .termination(let status):
             await handleTransportTermination(status: status)
         }
@@ -739,11 +739,15 @@ actor TmuxControlClient {
         transportEventTask = nil
     }
 
-    private func handleLine(_ line: String) async {
+    private func handleLine(_ lineData: Data) async {
+        // Convert to String for protocol parsing (all non-%output lines are ASCII).
+        // The raw Data is passed to the parser for %output lines to avoid lossy
+        // UTF-8 conversion of high bytes in the payload.
+        let line = String(decoding: lineData, as: UTF8.self)
         #if DEBUG
         recordDebugTrace("line:\(line)")
         #endif
-        let event = parser.parse(line: line)
+        let event = parser.parse(lineData: lineData)
 
         if blockTracker.hasActiveBlock {
             switch event {
@@ -1237,7 +1241,7 @@ actor TmuxControlClient {
     }
 
     func processLine(_ line: String) async {
-        await handleLine(line)
+        await handleLine(Data(line.utf8))
     }
 
     func emitBootstrapPaneContent(_ response: String, paneID: Int) async {

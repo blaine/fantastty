@@ -40,10 +40,15 @@ struct TmuxLayoutMapper {
     ) -> SplitTree<V>.Node {
         assert(children.count >= 2)
 
+        // Minimum ratio per pane so no pane can be squeezed to near-zero.
+        // With N children, each should get at least minRatio of the total.
+        let minRatio = 0.05
+        let maxRatio = 1.0 - minRatio
+
         if children.count == 2 {
             let left = mapToSplitTree(children[0], surfaceForPane: surfaceForPane)
             let right = mapToSplitTree(children[1], surfaceForPane: surfaceForPane)
-            let ratio = Double(sizeOf(children[0])) / Double(totalSize)
+            let ratio = min(max(Double(sizeOf(children[0])) / Double(totalSize), minRatio), maxRatio)
             return .split(SplitTree<V>.Node.Split(
                 direction: direction, ratio: ratio, left: left, right: right
             ))
@@ -67,7 +72,7 @@ struct TmuxLayoutMapper {
             )
         }
 
-        let ratio = Double(firstSize) / Double(totalSize)
+        let ratio = min(max(Double(firstSize) / Double(totalSize), minRatio), maxRatio)
         return .split(SplitTree<V>.Node.Split(
             direction: direction, ratio: ratio, left: left, right: right
         ))

@@ -24,8 +24,10 @@ struct SplitView<L: View, R: View>: View {
     /// Called when the divider is double-tapped to equalize splits.
     let onEqualize: () -> Void
 
-    /// The minimum size (in points) of a split
-    let minSize: CGFloat = 10
+    /// The minimum size (in points) of a split pane.
+    /// Set to ~2 cell heights (~34pt) so each pane always has usable space
+    /// even when tmux/pixel rounding produces tight splits.
+    let minSize: CGFloat = 34
 
     /// The current fractional width of the split view. 0.5 means L/R are equally sized, for example.
     @Binding var split: CGFloat
@@ -111,11 +113,17 @@ struct SplitView<L: View, R: View>: View {
             result.size.width = result.size.width * split
             result.size.width -= splitterVisibleSize / 2
             result.size.width -= result.size.width.truncatingRemainder(dividingBy: self.resizeIncrements.width)
+            // Enforce minimum so the right pane isn't squeezed below minSize
+            let maxLeft = size.width - splitterVisibleSize - minSize
+            result.size.width = min(max(result.size.width, minSize), maxLeft)
 
         case .vertical:
             result.size.height = result.size.height * split
             result.size.height -= splitterVisibleSize / 2
             result.size.height -= result.size.height.truncatingRemainder(dividingBy: self.resizeIncrements.height)
+            // Enforce minimum so the bottom pane isn't squeezed below minSize
+            let maxTop = size.height - splitterVisibleSize - minSize
+            result.size.height = min(max(result.size.height, minSize), maxTop)
         }
 
         return result

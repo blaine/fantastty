@@ -107,8 +107,11 @@ final class TmuxWindowController {
         tab.focusedSurface = surface
     }
 
-    /// Subscribes to a surface's grid size changes and sends both refresh-client
-    /// and resize-pane to tmux in one shot — no race between the two commands.
+    /// Subscribes to a surface's grid size changes and tells tmux the new
+    /// pane and client size. Both `resize-pane` and `refresh-client -C`
+    /// are needed: the client size constrains the maximum window size
+    /// (defaults to 80x24 if never set), while resize-pane sets the
+    /// individual pane dimensions.
     private func subscribeSurfaceSize(paneID: Int, surface: Ghostty.SurfaceView) {
         let windowID = self.windowID
         surfaceSizeSubscriptions[paneID] = surface.$surfaceSize
@@ -120,7 +123,7 @@ final class TmuxWindowController {
                     self?.checkBootstrapReadiness()
                 }
             })
-            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak surface] size in
                 guard let client = surface?.tmuxControlClient else { return }
                 let cols = Int(size.columns)

@@ -831,7 +831,7 @@ final class TmuxControlClientTests: XCTestCase {
 }
 
 final class FakeTmuxControlTransport: TmuxControlTransport {
-    var onLine: (@Sendable (String) -> Void)?
+    var onLine: (@Sendable (Data) -> Void)?
     var onTermination: (@Sendable (Int32?) -> Void)?
 
     private(set) var started = false
@@ -867,7 +867,7 @@ final class FakeTmuxControlTransport: TmuxControlTransport {
     }
 
     func emitLine(_ line: String) {
-        onLine?(line)
+        onLine?(Data(line.utf8))
     }
 
     func emitTermination(_ status: Int32?) {
@@ -932,7 +932,7 @@ final class ScriptedTmuxControlTransport: TmuxControlTransport {
     typealias Handler = (ScriptedTmuxControlTransport) -> Void
     typealias WriteHandler = (String, ScriptedTmuxControlTransport) -> Void
 
-    var onLine: (@Sendable (String) -> Void)?
+    var onLine: (@Sendable (Data) -> Void)?
     var onTermination: (@Sendable (Int32?) -> Void)?
 
     private let startHandler: Handler
@@ -958,7 +958,7 @@ final class ScriptedTmuxControlTransport: TmuxControlTransport {
     func stop() {}
 
     func emitLine(_ line: String) {
-        onLine?(line)
+        onLine?(Data(line.utf8))
     }
 
     func emitTermination(_ status: Int32?) {

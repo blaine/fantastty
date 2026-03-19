@@ -20,6 +20,10 @@ enum AttachedTmuxInputEncoder {
     ]
 
     private static let keyCodeToTmuxTokens: [UInt16: String] = [
+        36: "Enter",
+        48: "Tab",
+        51: "BSpace",
+        53: "Escape",
         123: "Left",
         124: "Right",
         125: "Down",
@@ -72,6 +76,10 @@ enum AttachedTmuxInputEncoder {
            eventCharacters.count == 1,
            let scalar = eventCharacters.unicodeScalars.first,
            scalar.value < 0x20 || scalar.value == 0x7f {
+            // When shift or option is held, defer to inputKeyToken so the
+            // modifier is preserved (e.g. shift-enter → S-Enter).
+            let hasModifier = modifierFlags.contains(.shift) || modifierFlags.contains(.option)
+            if hasModifier { return nil }
             return Data([UInt8(scalar.value)])
         }
 
@@ -620,7 +628,15 @@ extension Ghostty {
             guard let surface = self.surface else { return }
             guard self.focused != focused else { return }
             self.focused = focused
-            ghostty_surface_set_focus(surface, focused)
+
+            // For tmux-attached surfaces, skip the Ghostty focus call.
+            // The child process is cat >/dev/null, so focus events are
+            // meaningless. More importantly, ghostty_surface_set_focus
+            // pushes to a BlockingQueue that can deadlock when full
+            // (the inject queue may be saturating it).
+            if tmuxPaneID == nil || tmuxControlClient == nil {
+                ghostty_surface_set_focus(surface, focused)
+            }
 
             // Update our secure input state if we are a password input
             if (passwordInput) {
@@ -1598,9 +1614,16 @@ extension Ghostty {
                         Task { await client.sendKeyToken(paneID: paneID, keyToken: keyToken) }
                         return true
                     }
-                    if tmuxPaneID != nil, tmuxControlClient != nil {
-                        // Attached tmux panes must not forward key events into
-                        // the local Ghostty child process.
+                    // For tmux panes, non-binding keys that weren't captured by
+                    // the tmux routing above should be swallowed — don't push them
+                    // through ghostty_surface_key, which enqueues to BlockingQueue
+                    // and risks deadlock. Binding keys (Cmd shortcuts) are handled
+                    // locally and must still go through Ghostty.
+                    if tmuxPaneID != nil, tmuxControlClient != nil,
+                       !AttachedTmuxInputRouter.shouldHandleLocally(
+                        bindingFlags: surfaceModel?.keyIsBinding(key_ev),
+                        event: event
+                       ) {
                         return true
                     }
                     return ghostty_surface_key(surface, key_ev)
@@ -1637,9 +1660,16 @@ extension Ghostty {
                     Task { await client.sendKeyToken(paneID: paneID, keyToken: keyToken) }
                     return true
                 }
-                if tmuxPaneID != nil, tmuxControlClient != nil {
-                    // Attached tmux panes must not forward key events into
-                    // the local Ghostty child process.
+                // For tmux panes, non-binding keys that weren't captured by
+                // the tmux routing above should be swallowed — don't push them
+                // through ghostty_surface_key, which enqueues to BlockingQueue
+                // and risks deadlock. Binding keys (Cmd shortcuts) are handled
+                // locally and must still go through Ghostty.
+                if tmuxPaneID != nil, tmuxControlClient != nil,
+                   !AttachedTmuxInputRouter.shouldHandleLocally(
+                    bindingFlags: surfaceModel?.keyIsBinding(key_ev),
+                    event: event
+                   ) {
                     return true
                 }
                 return ghostty_surface_key(surface, key_ev)
@@ -1760,6 +1790,7 @@ extension Ghostty {
 
         @IBAction func paste(_ sender: Any?) {
             guard let surface = self.surface else { return }
+            if pasteViaTmux() { return }
             let action = "paste_from_clipboard"
             if (!ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))) {
                 AppDelegate.logger.warning("action failed action=\(action)")
@@ -1769,10 +1800,22 @@ extension Ghostty {
 
         @IBAction func pasteAsPlainText(_ sender: Any?) {
             guard let surface = self.surface else { return }
+            if pasteViaTmux() { return }
             let action = "paste_from_clipboard"
             if (!ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))) {
                 AppDelegate.logger.warning("action failed action=\(action)")
             }
+        }
+
+        /// Routes clipboard paste through tmux control mode for attached panes.
+        /// Returns true if handled.
+        private func pasteViaTmux() -> Bool {
+            guard let paneID = tmuxPaneID,
+                  let client = tmuxControlClient else { return false }
+            guard let str = NSPasteboard.general.string(forType: .string),
+                  let data = str.data(using: .utf8), !data.isEmpty else { return false }
+            Task { await client.sendKeys(paneID: paneID, data: data) }
+            return true
         }
 
         @IBAction func pasteSelection(_ sender: Any?) {

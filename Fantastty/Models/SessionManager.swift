@@ -103,12 +103,21 @@ class SessionManager: ObservableObject {
     /// Reference to tmux manager
     private let tmuxManager = TmuxManager.shared
 
-    private static func defaultTmuxOutputInjector(_ surface: Ghostty.SurfaceView, _ data: Data) -> Bool {
-        guard let cSurface = surface.surface else { return false }
-        data.withUnsafeBytes { buffer in
-            guard let ptr = buffer.baseAddress?.assumingMemoryBound(to: CChar.self) else { return }
-            ghostty_surface_inject_output(cSurface, ptr, UInt(buffer.count))
-        }
+    /// Fallback coalescing injectors keyed by pane ID.
+    /// The TmuxSessionBridge's own injectors handle the primary path;
+    /// this covers the SessionManager-level override if set.
+    private var fallbackInjectors: [Int: CoalescingInjector] = [:]
+
+    private func defaultTmuxOutputInjector(_ surface: Ghostty.SurfaceView, _ data: Data) -> Bool {
+        guard surface.surface != nil else { return false }
+        guard let paneID = surface.tmuxPaneID else { return false }
+        let injector = fallbackInjectors[paneID] ?? {
+            let new = CoalescingInjector(paneID: paneID, surface: surface)
+            fallbackInjectors[paneID] = new
+            return new
+        }()
+        injector.updateSurface(surface)
+        injector.enqueue(data)
         return true
     }
 
@@ -224,7 +233,7 @@ class SessionManager: ObservableObject {
     private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
     private let attachedTmuxSessionBridge = TmuxSessionBridge()
     private var lifecycleRouterByWorkspaceID: [String: TerminalLifecycleRouter] = [:]
-    var tmuxOutputInjector: TmuxOutputInjector = SessionManager.defaultTmuxOutputInjector {
+    var tmuxOutputInjector: TmuxOutputInjector! {
         didSet {
             attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
         }
@@ -276,6 +285,9 @@ class SessionManager: ObservableObject {
         liveTmuxWorkspaceProvider = { TmuxManager.shared.groupSessionsByWorkspace() }
         attachedSessionReconnectStarter = SessionManager.defaultAttachedSessionReconnectStarter
         workspaceMetadataProvider = { Array(SessionMetadataStore.shared.metadata.values) }
+        tmuxOutputInjector = { [weak self] surface, data in
+            self?.defaultTmuxOutputInjector(surface, data) ?? false
+        }
         attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
 
         thumbnailRefreshController.onStateChange = { [weak self] isSuspended in

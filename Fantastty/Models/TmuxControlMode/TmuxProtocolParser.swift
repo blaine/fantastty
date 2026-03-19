@@ -19,11 +19,60 @@ struct TmuxProtocolParser {
     /// Whether we have already stripped the DCS prefix from the first line.
     private var dcsStripped = false
 
-    /// Parse a single line from tmux control mode output.
+    /// Parse a single line from tmux control mode output (raw bytes).
     ///
-    /// - Parameter line: A raw line (possibly including trailing CR from the PTY).
+    /// This is the primary entry point. It processes `%output` payloads as raw
+    /// bytes to avoid lossy UTF-8 conversion of high bytes (0x80-0xFF) that tmux
+    /// passes through unescaped. All other event types are pure ASCII and are
+    /// safely converted to String for parsing.
+    ///
+    /// - Parameter lineData: Raw bytes of one protocol line (without the trailing LF).
     /// - Returns: A `TmuxEvent` if the line is a `%`-prefixed notification, or `nil`
     ///   for data lines (e.g. command response bodies) and empty lines.
+    mutating func parse(lineData: Data) -> TmuxEvent? {
+        var bytes = Array(lineData)
+
+        // Strip trailing \r from PTY line endings.
+        if bytes.last == 0x0d { bytes.removeLast() }
+
+        // Strip DCS prefix on the very first line.
+        if !dcsStripped {
+            dcsStripped = true
+            let dcsBytes: [UInt8] = [0x1b, 0x50, 0x31, 0x30, 0x30, 0x30, 0x70] // \x1bP1000p
+            if let range = bytes.findSubrange(dcsBytes) {
+                bytes = Array(bytes[(range.upperBound)...])
+            }
+        }
+
+        // Strip control/whitespace prefix before first `%`.
+        if bytes.first != 0x25, // '%'
+           let percentIdx = bytes.firstIndex(of: 0x25) {
+            let prefix = bytes[..<percentIdx]
+            let hasOnlyControlPrefix = prefix.allSatisfy { $0 < 0x21 || $0 == 0x09 }
+            if hasOnlyControlPrefix {
+                bytes = Array(bytes[percentIdx...])
+            }
+        }
+
+        guard bytes.first == 0x25 else { return nil } // '%'
+
+        // Fast-path: check for `%output ` (8 bytes) to handle it in raw-byte space.
+        let outputPrefix: [UInt8] = [0x25, 0x6f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x20] // "%output "
+        if bytes.count >= outputPrefix.count,
+           bytes[..<outputPrefix.count].elementsEqual(outputPrefix) {
+            return parseOutputFromBytes(Array(bytes[outputPrefix.count...]))
+        }
+
+        // For all other event types, convert to String (they are pure ASCII).
+        let line = String(decoding: bytes, as: UTF8.self)
+        return parse(line: line)
+    }
+
+    /// Parse a single line from tmux control mode output (String).
+    ///
+    /// Used for non-output event types and for backward compatibility with tests.
+    /// For `%output` lines, prefer `parse(lineData:)` which avoids lossy UTF-8
+    /// conversion of high bytes in the payload.
     mutating func parse(line rawLine: String) -> TmuxEvent? {
         var line = rawLine
 
@@ -138,6 +187,26 @@ struct TmuxProtocolParser {
     }
 
     // MARK: - Notification Parsers
+
+    /// Parse `%output` payload from raw bytes, avoiding lossy String conversion.
+    /// `rest` is everything after "%output " (the pane ID and octal-encoded payload).
+    private func parseOutputFromBytes(_ rest: [UInt8]) -> TmuxEvent? {
+        // Find the pane ID: starts with '%', ends at first space.
+        guard rest.first == 0x25 else { return nil } // '%'
+        guard let spaceIdx = rest.firstIndex(of: 0x20) else {
+            // No payload — just pane ID
+            let paneStr = String(decoding: rest, as: UTF8.self)
+            guard let paneID = Self.parsePercentID(paneStr) else { return nil }
+            return .output(paneID: paneID, data: Data())
+        }
+        let paneStr = String(decoding: rest[..<spaceIdx], as: UTF8.self)
+        guard let paneID = Self.parsePercentID(paneStr) else { return nil }
+
+        // Payload starts after the space — decode octal escapes from raw bytes.
+        let payload = Array(rest[(spaceIdx + 1)...])
+        let data = Self.decodeOctalEscapesFromBytes(payload)
+        return .output(paneID: paneID, data: data)
+    }
 
     private func parseOutput(_ rest: String) -> TmuxEvent? {
         // Format: %<paneID> <octal-encoded-data>
@@ -386,5 +455,71 @@ struct TmuxProtocolParser {
             count += 1
         }
         data.append(contentsOf: buf[0..<count])
+    }
+
+    // MARK: - Raw Byte Octal Escape Decoding
+
+    /// Decode tmux octal-escaped output from raw bytes, preserving all byte values.
+    ///
+    /// Unlike `decodeOctalEscapes(_:String)`, this operates directly on raw bytes
+    /// so that high bytes (0x80-0xFF) are never run through Swift's lossy UTF-8
+    /// String conversion. Tmux passes bytes >= 0x20 (except backslash) through
+    /// unescaped, including raw UTF-8 continuation bytes. If a multi-byte UTF-8
+    /// sequence is split across two `%output` messages, the String-based decoder
+    /// would corrupt the incomplete sequence with U+FFFD replacement characters.
+    static func decodeOctalEscapesFromBytes(_ bytes: [UInt8]) -> Data {
+        var data = Data()
+        data.reserveCapacity(bytes.count)
+        var i = bytes.startIndex
+
+        while i < bytes.endIndex {
+            let byte = bytes[i]
+            if byte == 0x5c { // backslash '\'
+                // Attempt to read three octal digits.
+                var octalCount = 0
+                var value: UInt8 = 0
+                let remaining = bytes.endIndex - (i + 1)
+                let limit = min(3, remaining)
+                for j in 0..<limit {
+                    let next = bytes[i + 1 + j]
+                    if next >= 0x30, next <= 0x37 { // '0'...'7'
+                        octalCount += 1
+                        value = value &* 8 &+ (next - 0x30)
+                    } else {
+                        break
+                    }
+                }
+                if octalCount == 3 {
+                    data.append(value)
+                    i += 4 // skip backslash + 3 digits
+                } else {
+                    // Not a valid octal escape; emit the backslash and any
+                    // consumed digits literally.
+                    data.append(byte)
+                    i += 1
+                }
+            } else {
+                data.append(byte)
+                i += 1
+            }
+        }
+
+        return data
+    }
+}
+
+// MARK: - Array Subrange Search
+
+extension Array where Element: Equatable {
+    /// Find the first occurrence of `subrange` in this array.
+    func findSubrange(_ subrange: [Element]) -> Range<Int>? {
+        guard !subrange.isEmpty, subrange.count <= count else { return nil }
+        let end = count - subrange.count
+        for i in 0...end {
+            if self[i..<(i + subrange.count)].elementsEqual(subrange) {
+                return i..<(i + subrange.count)
+            }
+        }
+        return nil
     }
 }
