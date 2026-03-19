@@ -455,6 +455,10 @@ actor TmuxControlClient {
         recordDebugTrace("connect:ready-complete")
         #endif
 
+        // Enable extended keys so tmux generates CSI u sequences for
+        // modified keys (e.g. shift-enter → \x1b[13;2u).
+        _ = try await send("set-option -g extended-keys on")
+
         #if DEBUG
         recordDebugTrace("connect:bootstrap:start")
         #endif

@@ -273,6 +273,10 @@ private extension TmuxSessionBridge {
                 await client.continueDeferredBootstrap(paneIDs: paneIDs)
             }
         }
+        // Background tabs may never render (SwiftUI doesn't render non-visible
+        // tabs), so their surfaces never publish a size. Start a timeout to
+        // ensure the bootstrap completes even for invisible windows.
+        controller.startBootstrapTimeout()
         windowControllersByWorkspace[session.workspaceID, default: [:]][snapshot.windowID] = controller
         let tab = controller.tab
 

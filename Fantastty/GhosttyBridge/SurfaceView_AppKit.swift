@@ -37,6 +37,11 @@ enum AttachedTmuxInputEncoder {
     ]
 
     private static let commandSelectorToKeyCode: [Selector: UInt16] = [
+        #selector(NSResponder.insertNewline(_:)): 36,       // Enter
+        #selector(NSResponder.insertTab(_:)): 48,           // Tab
+        #selector(NSResponder.insertBacktab(_:)): 48,       // Shift-Tab (keyCode same, modifier differs)
+        #selector(NSResponder.cancelOperation(_:)): 53,     // Escape
+        #selector(NSResponder.deleteBackward(_:)): 51,      // Backspace
         #selector(NSResponder.moveLeft(_:)): 123,
         #selector(NSResponder.moveRight(_:)): 124,
         #selector(NSResponder.moveDown(_:)): 125,

@@ -137,6 +137,17 @@ final class TmuxWindowController {
             }
     }
 
+    /// Starts a timeout that fires the bootstrap callback even if not all panes
+    /// have reported their size. This handles background tabs whose surfaces
+    /// haven't rendered yet (SwiftUI doesn't render non-visible tabs).
+    func startBootstrapTimeout(seconds: TimeInterval = 2.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self, !self.bootstrapCompleted else { return }
+            self.bootstrapCompleted = true
+            self.onBootstrapReady?()
+        }
+    }
+
     private func checkBootstrapReadiness() {
         guard !bootstrapCompleted else { return }
         let allPaneIDs = Set(paneControllers.keys)
