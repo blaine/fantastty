@@ -1027,7 +1027,8 @@ class SessionManager: ObservableObject {
            let client = surface.tmuxControlClient {
             Task {
                 // Send Ctrl-L (form feed / clear) to the pane
-                await client.sendKeyToken(paneID: paneID, keyToken: "C-l")
+                // Ctrl-L = 0x0c (form feed / clear)
+                await client.sendKeys(paneID: paneID, data: Data([0x0c]))
             }
         } else if let s = surface.surface {
             let action = "clear_screen"

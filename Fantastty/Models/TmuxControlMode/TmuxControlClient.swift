@@ -674,10 +674,6 @@ actor TmuxControlClient {
         sendFireAndForget("send-keys -t %\(paneID) -H \(hex)")
     }
 
-    func sendKeyToken(paneID: Int, keyToken: String) {
-        sendFireAndForget(Self.sendKeyTokenCommand(paneID: paneID, keyToken: keyToken))
-    }
-
     func refreshClientSize(windowID: Int?, width: Int, height: Int) {
         guard width > 0, height > 0 else { return }
         sendFireAndForget(Self.clientSizeCommand(windowID: windowID, width: width, height: height))
@@ -1095,10 +1091,6 @@ actor TmuxControlClient {
 
     static func resizePaneCommand(paneID: Int, columns: Int, rows: Int) -> String {
         "resize-pane -t %\(paneID) -x \(columns) -y \(rows)"
-    }
-
-    static func sendKeyTokenCommand(paneID: Int, keyToken: String) -> String {
-        "send-keys -t %\(paneID) \(keyToken)"
     }
 
     static func clientPaneOutputStateCommand(paneIDs: [Int], state: String) -> String {

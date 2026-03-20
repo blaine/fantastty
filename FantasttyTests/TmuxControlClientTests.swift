@@ -247,68 +247,114 @@ final class TmuxControlClientTests: XCTestCase {
         XCTAssertNil(data)
     }
 
-    func testAttachedTmuxInputKeyTokenMapsArrowFunctionKeyUnicode() {
-        let token = AttachedTmuxInputEncoder.inputKeyToken(
-            isRelease: false,
-            eventCharacters: "\u{f700}",
-            keyCode: 0
-        )
+    // MARK: - Escape sequence encoding
 
-        XCTAssertEqual(token, "Up")
+    func testEscapeSequenceArrowUpUnmodified() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 126,
+            eventCharacters: "\u{f700}",
+            modifierFlags: []
+        )
+        // \e[A
+        XCTAssertEqual(data, Data([0x1b, 0x5b, 0x41]))
     }
 
-    func testAttachedTmuxInputKeyTokenMapsArrowByKeyCodeFallback() {
-        let token = AttachedTmuxInputEncoder.inputKeyToken(
-            isRelease: false,
+    func testEscapeSequenceArrowLeftByKeyCodeFallback() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 123,
             eventCharacters: nil,
-            keyCode: 123
+            modifierFlags: []
         )
-
-        XCTAssertEqual(token, "Left")
+        // \e[D
+        XCTAssertEqual(data, Data([0x1b, 0x5b, 0x44]))
     }
 
-    func testAttachedTmuxInputKeyTokenSupportsControlAndOptionModifiers() {
-        let token = AttachedTmuxInputEncoder.inputKeyToken(
-            isRelease: false,
-            eventCharacters: "\u{f703}",
+    func testEscapeSequenceArrowRightWithControlAndOption() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
             keyCode: 124,
+            eventCharacters: "\u{f703}",
             modifierFlags: [.control, .option]
         )
-
-        XCTAssertEqual(token, "C-M-Right")
+        // \e[1;7C  (modifier = 1 + 4 + 2 = 7)
+        XCTAssertEqual(data, Data(Array("\u{1b}[1;7C".utf8)))
     }
 
-    func testAttachedTmuxInputKeyTokenIgnoresReleaseEvents() {
-        let token = AttachedTmuxInputEncoder.inputKeyToken(
-            isRelease: true,
-            eventCharacters: "\u{f700}",
-            keyCode: 126
+    func testEscapeSequenceShiftEnterProducesCsiU() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 36,
+            eventCharacters: nil,
+            modifierFlags: [.shift]
         )
-
-        XCTAssertNil(token)
+        // \e[13;2u
+        XCTAssertEqual(data, Data(Array("\u{1b}[13;2u".utf8)))
     }
 
-    func testAttachedTmuxCommandSelectorKeyTokenMapsArrowSelectors() {
-        let leftToken = AttachedTmuxInputEncoder.commandSelectorKeyToken(
-            NSSelectorFromString("moveLeft:"),
+    func testEscapeSequenceShiftTabProducesBacktab() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 48,
+            eventCharacters: nil,
+            modifierFlags: [.shift]
+        )
+        // \e[Z
+        XCTAssertEqual(data, Data([0x1b, 0x5b, 0x5a]))
+    }
+
+    func testEscapeSequenceUnmodifiedEnterProducesRawByte() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 36,
+            eventCharacters: nil,
             modifierFlags: []
         )
-        let upToken = AttachedTmuxInputEncoder.commandSelectorKeyToken(
-            NSSelectorFromString("moveUp:"),
-            modifierFlags: []
-        )
-
-        XCTAssertEqual(leftToken, "Left")
-        XCTAssertEqual(upToken, "Up")
+        XCTAssertEqual(data, Data([0x0d]))
     }
 
-    func testAttachedTmuxCommandSelectorKeyTokenIncludesModifiers() {
-        let token = AttachedTmuxInputEncoder.commandSelectorKeyToken(
-            NSSelectorFromString("moveRight:"),
-            modifierFlags: [.control, .option]
+    func testEscapeSequenceF1Unmodified() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 122,
+            eventCharacters: nil,
+            modifierFlags: []
         )
+        // \eOP
+        XCTAssertEqual(data, Data([0x1b, 0x4f, 0x50]))
+    }
 
-        XCTAssertEqual(token, "C-M-Right")
+    func testEscapeSequenceF5WithShift() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 96,
+            eventCharacters: nil,
+            modifierFlags: [.shift]
+        )
+        // \e[15;2~
+        XCTAssertEqual(data, Data(Array("\u{1b}[15;2~".utf8)))
+    }
+
+    func testEscapeSequenceHomeUnmodified() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 115,
+            eventCharacters: "\u{f729}",
+            modifierFlags: []
+        )
+        // \eOH
+        XCTAssertEqual(data, Data([0x1b, 0x4f, 0x48]))
+    }
+
+    func testEscapeSequenceDeleteWithControl() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 117,
+            eventCharacters: "\u{f728}",
+            modifierFlags: [.control]
+        )
+        // \e[3;5~
+        XCTAssertEqual(data, Data(Array("\u{1b}[3;5~".utf8)))
+    }
+
+    func testEscapeSequenceUnknownKeyReturnsNil() {
+        let data = AttachedTmuxInputEncoder.escapeSequence(
+            keyCode: 0, // 'a' keyCode
+            eventCharacters: "a",
+            modifierFlags: []
+        )
+        XCTAssertNil(data)
     }
 
     func testAttachedTmuxEventCharactersReturnsCharactersForKeyDown() {
@@ -665,13 +711,6 @@ final class TmuxControlClientTests: XCTestCase {
         XCTAssertEqual(
             TmuxControlClient.clientPaneOutputStateCommand(paneIDs: [7, 9], state: "off"),
             "refresh-client -A '%7:off' -A '%9:off'"
-        )
-    }
-
-    func testSendKeyTokenCommandFormat() {
-        XCTAssertEqual(
-            TmuxControlClient.sendKeyTokenCommand(paneID: 7, keyToken: "C-M-Right"),
-            "send-keys -t %7 C-M-Right"
         )
     }
 
