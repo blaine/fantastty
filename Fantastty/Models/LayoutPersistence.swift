@@ -106,11 +106,6 @@ final class LayoutPersistence {
         }
     }
 
-    /// Remove the layout file from disk.
-    func delete() {
-        try? FileManager.default.removeItem(at: layoutURL)
-    }
-
     // MARK: - Private helpers
 
     private func persistedAttachmentInfo(from info: TmuxAttachmentInfo) -> TmuxAttachmentInfo {

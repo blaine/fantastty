@@ -86,6 +86,11 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
     private var readTask: Task<Void, Never>?
     private let stateLock = NSLock()
     private var didNotifyTermination = false
+    /// Serial queue for PTY writes. Writing to the PTY master can block when
+    /// tmux's input buffer is full (e.g. tmux is blocked writing stdout).
+    /// Dispatching writes here keeps the actor's cooperative thread free to
+    /// consume the read side, breaking the circular dependency.
+    private let writeQueue = DispatchQueue(label: "com.fantastty.tmux-transport-write")
 
     func start(command: String, environment: [String: String]) throws {
         stop()
@@ -137,19 +142,25 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
             throw TmuxControlError.notConnected
         }
 
-        try data.withUnsafeBytes { rawBuffer in
-            guard let baseAddress = rawBuffer.baseAddress else { return }
-            var totalWritten = 0
-            while totalWritten < rawBuffer.count {
-                let pointer = baseAddress.advanced(by: totalWritten)
-                let remaining = rawBuffer.count - totalWritten
-                let written = Darwin.write(fd, pointer, remaining)
-                if written < 0 {
-                    if errno == EINTR { continue }
-                    let code = POSIXErrorCode(rawValue: errno) ?? .EIO
-                    throw POSIXError(code)
+        // Dispatch the blocking Darwin.write() to a serial background queue.
+        // The actor calls transport.write() from its cooperative thread; if
+        // Darwin.write() blocked inline it would prevent the actor from
+        // consuming the read side of the PTY, creating a circular deadlock
+        // when tmux's stdout buffer is full.
+        writeQueue.async {
+            data.withUnsafeBytes { rawBuffer in
+                guard let baseAddress = rawBuffer.baseAddress else { return }
+                var totalWritten = 0
+                while totalWritten < rawBuffer.count {
+                    let pointer = baseAddress.advanced(by: totalWritten)
+                    let remaining = rawBuffer.count - totalWritten
+                    let written = Darwin.write(fd, pointer, remaining)
+                    if written < 0 {
+                        if errno == EINTR { continue }
+                        return  // write error — connection will be detected by read side
+                    }
+                    totalWritten += written
                 }
-                totalWritten += written
             }
         }
     }
@@ -161,6 +172,10 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
         if let process, process.isRunning {
             process.terminate()
         }
+
+        // Drain pending writes before closing the fd to avoid writing to a
+        // recycled file descriptor.
+        writeQueue.sync {}
 
         withLockedState {
             if masterFD >= 0 {
@@ -641,11 +656,10 @@ actor TmuxControlClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             commandQueue.enqueue(continuation)
-            do {
-                try transport.write(Data((command + "\n").utf8))
-            } catch {
-                commandQueue.dequeueWithError(error)
-            }
+            // Write errors are detected by the read side (transport termination).
+            // The write itself is dispatched to a background queue to avoid
+            // blocking the actor.
+            try? transport.write(Data((command + "\n").utf8))
         }
     }
 

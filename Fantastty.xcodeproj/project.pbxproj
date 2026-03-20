@@ -156,7 +156,6 @@
 		60EB92210D7C1DFE0EED9B2B /* TmuxPaneControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C123129804DCF809CCA4CA /* TmuxPaneControllerTests.swift */; };
 		A7B3C4D5E6F708192A3B4C5D /* TmuxWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8C4D5E6F708192A3B4C5D6E /* TmuxWindowController.swift */; };
 		C9D5E6F708192A3B4C5D6E7F /* TmuxWindowControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E6F708192A3B4C5D6E7F80 /* TmuxWindowControllerTests.swift */; };
-		F2A3B4C5D6E7F8091A2B3C4D /* TmuxSizingLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8091A2B3C /* TmuxSizingLog.swift */; };
 		D49A1C3D10AD54BB2389990D /* TerminalLifecycleRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FA6DBB8656EE803773A9FD5 /* TerminalLifecycleRouter.swift */; };
 		4F873AEF4608ADA493BDA433 /* TerminalLifecycleRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1EC59EF5E86B222607BB72B /* TerminalLifecycleRouterTests.swift */; };
 		CBE9A4F332C829FFB746320E /* LayoutPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA7EBE1EA384B63C22342AF /* LayoutPersistence.swift */; };
@@ -313,7 +312,6 @@
 		57C123129804DCF809CCA4CA /* TmuxPaneControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxPaneControllerTests.swift; sourceTree = "<group>"; };
 		B8C4D5E6F708192A3B4C5D6E /* TmuxWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxWindowController.swift; sourceTree = "<group>"; };
 		D0E6F708192A3B4C5D6E7F80 /* TmuxWindowControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxWindowControllerTests.swift; sourceTree = "<group>"; };
-		E1F2A3B4C5D6E7F8091A2B3C /* TmuxSizingLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSizingLog.swift; sourceTree = "<group>"; };
 		0FA6DBB8656EE803773A9FD5 /* TerminalLifecycleRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLifecycleRouter.swift; sourceTree = "<group>"; };
 		D1EC59EF5E86B222607BB72B /* TerminalLifecycleRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLifecycleRouterTests.swift; sourceTree = "<group>"; };
 		3CA7EBE1EA384B63C22342AF /* LayoutPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutPersistence.swift; sourceTree = "<group>"; };
@@ -660,7 +658,6 @@
 				EBA080AA9F478AA62CA4AB6D /* CoalescingInjector.swift */,
 				4E3F550C31DA16A5BBD6A362 /* TmuxPaneController.swift */,
 				B8C4D5E6F708192A3B4C5D6E /* TmuxWindowController.swift */,
-				E1F2A3B4C5D6E7F8091A2B3C /* TmuxSizingLog.swift */,
 			);
 			path = TmuxControlMode;
 			sourceTree = "<group>";
@@ -862,7 +859,6 @@
 				4255F7788D540E34710D330F /* CoalescingInjector.swift in Sources */,
 				8168B4059B1851FBE5E28D93 /* TmuxPaneController.swift in Sources */,
 				A7B3C4D5E6F708192A3B4C5D /* TmuxWindowController.swift in Sources */,
-				F2A3B4C5D6E7F8091A2B3C4D /* TmuxSizingLog.swift in Sources */,
 				D49A1C3D10AD54BB2389990D /* TerminalLifecycleRouter.swift in Sources */,
 				CBE9A4F332C829FFB746320E /* LayoutPersistence.swift in Sources */,
 			);
@@ -998,7 +994,7 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.2.2;
 				OTHER_LDFLAGS = (
 					"-lstdc++",
 				);
@@ -1029,7 +1025,7 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.2.2;
 				OTHER_LDFLAGS = (
 					"-lstdc++",
 				);

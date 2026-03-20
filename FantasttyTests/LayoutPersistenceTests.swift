@@ -132,27 +132,4 @@ final class LayoutPersistenceTests: XCTestCase {
         XCTAssertNil(persistence.load())
     }
 
-    // MARK: - Delete
-
-    func testDeleteRemovesFile() throws {
-        let persistence = LayoutPersistence(layoutURL: tempURL)
-        let snapshot = Fantastty.LayoutSnapshot(
-            workspaces: [],
-            selectedWorkspaceID: nil,
-            savedAt: Date()
-        )
-        persistence.save(snapshot)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: tempURL.path))
-
-        persistence.delete()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
-    }
-
-    func testDeleteOnMissingFileIsNoOp() {
-        let nonExistentURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("nonexistent-\(UUID().uuidString).json")
-        let persistence = LayoutPersistence(layoutURL: nonExistentURL)
-        // Should not throw or crash
-        persistence.delete()
-    }
 }

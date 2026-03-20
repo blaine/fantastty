@@ -375,11 +375,6 @@ class SessionManager: ObservableObject {
         layoutPersistence.load()
     }
 
-    /// Delete the layout snapshot file after consumption.
-    private func deleteLayout() {
-        layoutPersistence.delete()
-    }
-
     // MARK: - Session Restoration
 
     /// Restore sessions from existing tmux sessions.
@@ -508,8 +503,9 @@ class SessionManager: ObservableObject {
             )
         }
 
-        // Delete layout file after consumption
-        deleteLayout()
+        // The layout file is left on disk after consumption. The periodic save
+        // (every 60s) and shutdown save keep it up-to-date. Previous versions
+        // deleted the file here, which caused layout loss on crash/force-quit.
 
         if selectedSessionID == nil {
             selectedSessionID = sessions.first?.id
@@ -1248,10 +1244,13 @@ class SessionManager: ObservableObject {
             .sink { [weak self] _ in self?.activityTick() }
             .store(in: &smCancellables)
 
-        // Periodic disk flush
+        // Periodic disk flush (activity times + layout)
         Timer.publish(every: 60, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in self?.flushActiveTimes() }
+            .sink { [weak self] _ in
+                self?.flushActiveTimes()
+                self?.saveLayout()
+            }
             .store(in: &smCancellables)
 
         // Flush active time for the old session whenever selection changes
