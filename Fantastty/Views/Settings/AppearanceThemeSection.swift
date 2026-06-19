@@ -24,17 +24,18 @@ struct AppearanceThemeSection: View {
         Font(AppearanceFonts.font(
             family: AppearanceManager.shared.fontFamily ?? "",
             style: AppearanceManager.shared.fontStyle ?? "",
-            size: 11
+            size: 10
         ))
     }
 
     var body: some View {
-        Section("Terminal Theme") {
-            VStack(spacing: 10) {
-                searchField
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Terminal Theme")
+                .font(.headline)
+            searchField
 
-                ScrollViewReader { proxy in
-                    ScrollView {
+            ScrollViewReader { proxy in
+                ScrollView {
                         LazyVStack(spacing: 6) {
                             DefaultThemeRow(
                                 font: thumbnailFont,
@@ -54,16 +55,14 @@ struct AppearanceThemeSection: View {
                                     .id(pair.base)
                             }
                         }
-                        .padding(.vertical, 2)
-                    }
-                    .frame(height: 320)
-                    .onAppear {
-                        guard let selectedBase else { return }
-                        proxy.scrollTo(selectedBase, anchor: .center)
-                    }
+                    .padding(.vertical, 2)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onAppear {
+                    guard let selectedBase else { return }
+                    proxy.scrollTo(selectedBase, anchor: .center)
                 }
             }
-            .padding(.vertical, 4)
         }
     }
 
@@ -134,8 +133,7 @@ private struct ThemePairRow: View {
                 font: font,
                 background: theme.background.color,
                 foreground: theme.foreground.color,
-                palette: theme.palette.map(\.color),
-                compact: true
+                palette: theme.palette.map(\.color)
             )
         }
         .frame(maxWidth: .infinity)
@@ -169,8 +167,7 @@ private struct DefaultThemeRow: View {
                 font: font,
                 background: background,
                 foreground: foreground,
-                palette: palette,
-                compact: true
+                palette: palette
             )
         }
         .modifier(SelectionChrome(isSelected: isSelected))

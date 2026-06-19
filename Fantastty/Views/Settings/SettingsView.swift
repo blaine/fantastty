@@ -3,8 +3,8 @@ import GhosttyKit
 
 /// The pages of the settings window, shown in the sidebar.
 private enum SettingsPage: String, CaseIterable, Identifiable {
+    case general
     case appearance
-    case sidebar
     case sessions
     case integrations
 
@@ -12,8 +12,8 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .general: return "General"
         case .appearance: return "Appearance"
-        case .sidebar: return "Sidebar"
         case .sessions: return "Sessions"
         case .integrations: return "Integrations"
         }
@@ -21,8 +21,8 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .general: return "gearshape"
         case .appearance: return "paintpalette"
-        case .sidebar: return "sidebar.left"
         case .sessions: return "terminal"
         case .integrations: return "puzzlepiece.extension"
         }
@@ -51,8 +51,8 @@ struct SettingsView: View {
     @ViewBuilder
     private var detail: some View {
         switch selection ?? .appearance {
+        case .general: GeneralPage()
         case .appearance: AppearancePage()
-        case .sidebar: SidebarPage()
         case .sessions: SessionsPage()
         case .integrations: IntegrationsPage()
         }
@@ -61,14 +61,15 @@ struct SettingsView: View {
 
 // MARK: - Pages
 
-private struct AppearancePage: View {
+private struct GeneralPage: View {
     @AppStorage(AppearanceMode.userDefaultsKey) private var appearance: AppearanceMode = .system
+    @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
     var body: some View {
         Form {
-            Section("Mode") {
-                Picker("Appearance", selection: $appearance) {
+            Section("Appearance") {
+                Picker("Mode", selection: $appearance) {
                     ForEach(AppearanceMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
@@ -85,23 +86,23 @@ private struct AppearancePage: View {
                 }
             }
 
-            AppearanceFontSection()
-            AppearanceThemeSection()
-        }
-        .formStyle(.grouped)
-    }
-}
-
-private struct SidebarPage: View {
-    @AppStorage("tabsInSidebar") private var tabsInSidebar = false
-
-    var body: some View {
-        Form {
             Section("Sidebar") {
                 Toggle("Show tab thumbnails in sidebar", isOn: $tabsInSidebar)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Font and theme only — the theme list is the page's single scroll region.
+private struct AppearancePage: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            AppearanceFontSection()
+            AppearanceThemeSection()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 

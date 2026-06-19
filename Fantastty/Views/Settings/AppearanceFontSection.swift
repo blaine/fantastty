@@ -1,11 +1,10 @@
 import SwiftUI
 import AppKit
 
-/// Terminal font control: a live terminal preview (rendered in the chosen font
-/// using the actual current theme colors), the current font description, and a
-/// "Change…" button that opens the native macOS font panel — the same pattern
-/// Terminal.app uses. The panel handles family, typeface, and size together.
-/// Choices apply to every open surface immediately via a config reload.
+/// Terminal font control: the current font description and a "Change…" button
+/// that opens the native macOS font panel — the same pattern Terminal.app uses.
+/// The panel handles family, typeface, and size together. Choices apply to every
+/// open surface immediately via a config reload, and preview in the theme list.
 struct AppearanceFontSection: View {
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
@@ -22,7 +21,9 @@ struct AppearanceFontSection: View {
     }
 
     var body: some View {
-        Section("Terminal Font") {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Terminal Font")
+                .font(.headline)
             HStack(spacing: 12) {
                 Text(fontDescription)
                     .lineLimit(1)
@@ -39,7 +40,9 @@ struct AppearanceFontSection: View {
                 )
                 .frame(width: 86, height: 22)
             }
-            .padding(.vertical, 4)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.06)))
         }
     }
 
