@@ -41,6 +41,57 @@ struct GhosttyTheme: Identifiable, Hashable {
     var id: String { name }
 }
 
+/// A light/dark theme pair, e.g. "Gruvbox Light" + "Gruvbox Dark", presented as
+/// a single choice. Ghostty switches between the two with the system appearance.
+struct ThemePair: Identifiable, Hashable {
+    /// The shared name with the light/dark token removed, e.g. "Gruvbox".
+    let base: String
+    let light: GhosttyTheme
+    let dark: GhosttyTheme
+
+    var id: String { base }
+}
+
+/// Groups themes into light/dark pairs by their names. A pair exists when two
+/// themes share a name that differs only by a whole-word "Light"/"Dark" token.
+enum ThemePairing {
+    /// Split a theme name into its base (the name with the light/dark token
+    /// removed) and role. Returns nil when there is no whole-word Light/Dark
+    /// token, so words like "Starlight" or "Twilight" are never treated as
+    /// variants.
+    static func baseAndRole(_ name: String) -> (base: String, isDark: Bool)? {
+        let tokens = name.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard let index = tokens.firstIndex(where: {
+            $0.caseInsensitiveCompare("light") == .orderedSame
+                || $0.caseInsensitiveCompare("dark") == .orderedSame
+        }) else { return nil }
+
+        let isDark = tokens[index].caseInsensitiveCompare("dark") == .orderedSame
+        var rest = tokens
+        rest.remove(at: index)
+        let base = rest.joined(separator: " ")
+        guard !base.isEmpty else { return nil }
+        return (base, isDark)
+    }
+
+    static func pairs(from themes: [GhosttyTheme]) -> [ThemePair] {
+        var light: [String: GhosttyTheme] = [:]
+        var dark: [String: GhosttyTheme] = [:]
+        for theme in themes {
+            guard let (base, isDark) = baseAndRole(theme.name) else { continue }
+            if isDark { dark[base] = theme } else { light[base] = theme }
+        }
+
+        return light.keys
+            .filter { dark[$0] != nil }
+            .compactMap { base -> ThemePair? in
+                guard let l = light[base], let d = dark[base] else { return nil }
+                return ThemePair(base: base, light: l, dark: d)
+            }
+            .sorted { $0.base.localizedCaseInsensitiveCompare($1.base) == .orderedAscending }
+    }
+}
+
 /// Parses a Ghostty theme file. The format is one `key = value` per line, where
 /// colors are `#rrggbb` and palette entries look like `palette = N=#rrggbb`.
 enum GhosttyThemeParser {

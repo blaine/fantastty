@@ -67,6 +67,7 @@
 		729180618E5E4C7C5ADC612C /* TmuxResizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05DD3D578F436EF4184D7B3A /* TmuxResizeTests.swift */; };
 		733E596380CD917CFDA3C5C3 /* AttachedRuntimeActionV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A97D2FF9E04F1DC7B3C0C21 /* AttachedRuntimeActionV2.swift */; };
 		736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A288EE4B731A40F8A2C9450 /* SessionManager.swift */; };
+		74C72C3F7FE5255A71AB492C /* AppearanceThemeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 246BFEA288DD8F4B4E545041 /* AppearanceThemeSection.swift */; };
 		765C8BDD2D5271286CC844EB /* ThemeCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E3E169FE066C4A1638B2A8 /* ThemeCatalogTests.swift */; };
 		7706DB04E347DDA7F9099788 /* SurfaceDragSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6ECC01C380D8F2C8C2D5F32 /* SurfaceDragSource.swift */; };
 		78ACE568FF48B9EAEC1699E7 /* AttachedWorkspaceRuntimeV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7423A05A93D4FD209AECA7 /* AttachedWorkspaceRuntimeV2Tests.swift */; };
@@ -113,6 +114,7 @@
 		BB98D303E99E1EA106BD2E42 /* NSPasteboard+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */; };
 		BC14E76875E00603E4B6E874 /* NSView+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F89AB559009B06C7920573 /* NSView+Extension.swift */; };
 		C0218530ACB954FF271E6D8D /* Fullscreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979CC9A96A66BA0B800EBFD9 /* Fullscreen.swift */; };
+		C1ABFD9C3E650ADE9323CC3B /* ThemePairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EDD375F9C4C38740DD1ED3 /* ThemePairingTests.swift */; };
 		C1DFDC13F4DD6F2EDBBF47FF /* SplitTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E4986A3D30A9E9EAD3A6C93 /* SplitTree.swift */; };
 		C289639676F0C3C2A5367F85 /* Array+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D9B0B29EB99483941D80DA /* Array+Extension.swift */; };
 		C4BBAA2D9186D12F65D10645 /* LayoutPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4E4A387561B58A0E4BA255 /* LayoutPersistence.swift */; };
@@ -142,6 +144,7 @@
 		EBCB934F24446618BFB6AA06 /* macOS26Compat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426A650FBB33044205DB0628 /* macOS26Compat.swift */; };
 		EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B8AC7C303442AAFD418CCF /* SessionNotesPanel.swift */; };
 		F17E8B2AFD709633E40D2347 /* SurfaceScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34925F86E43A164C45263A32 /* SurfaceScrollView.swift */; };
+		F565F58039497D11B493D5C9 /* TerminalPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6B3A51E041A539392C5E97 /* TerminalPreview.swift */; };
 		F6302A2B8DC4F140B95A39A8 /* LayoutPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48AE8BFE05BF6651F542082 /* LayoutPersistenceTests.swift */; };
 		FA5C11D8C21ECED7586C0B3D /* MickeyTermCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E18A7BCA543CD66A3CE0F7 /* MickeyTermCompat.swift */; };
 		FAB4F5B0B3F97B547D5A90DA /* KeyboardShortcut+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DC830394BB05C2E1492E1 /* KeyboardShortcut+Extension.swift */; };
@@ -194,10 +197,12 @@
 		21155CF7FBE0851A95930EA9 /* BrowserTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTabView.swift; sourceTree = "<group>"; };
 		2257D5AEC003EC80DB1C60E4 /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceMode.swift; sourceTree = "<group>"; };
 		22EB9EB620026D7B94EAA835 /* TmuxWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxWindowController.swift; sourceTree = "<group>"; };
+		246BFEA288DD8F4B4E545041 /* AppearanceThemeSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceThemeSection.swift; sourceTree = "<group>"; };
 		2657C84B550AC9E3AAF5FB77 /* Fantastty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fantastty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2675910C3625ED685E6C3D18 /* Ghostty.Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Event.swift; sourceTree = "<group>"; };
 		26994D8303B90A21F4361636 /* SSHHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHHostStore.swift; sourceTree = "<group>"; };
 		2707539263087F86169C0F42 /* AttachedRuntimeEventV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachedRuntimeEventV2.swift; sourceTree = "<group>"; };
+		27EDD375F9C4C38740DD1ED3 /* ThemePairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePairingTests.swift; sourceTree = "<group>"; };
 		29064C8B4FAE03B39947FA46 /* TerminalSplitTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSplitTreeView.swift; sourceTree = "<group>"; };
 		29D1A75206E0B9D8EC82438D /* SplitView.Divider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.Divider.swift; sourceTree = "<group>"; };
 		2D308F8F4C24380795511065 /* NewSessionMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionMenu.swift; sourceTree = "<group>"; };
@@ -245,6 +250,7 @@
 		87017B8990883C045D8CFF1A /* SurfaceProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceProgressBar.swift; sourceTree = "<group>"; };
 		89D7A1C18ABA131100C04F12 /* View+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extension.swift"; sourceTree = "<group>"; };
 		8AA0D6D299784B012B4D2227 /* SessionDisplayInfoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDisplayInfoTests.swift; sourceTree = "<group>"; };
+		8C6B3A51E041A539392C5E97 /* TerminalPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPreview.swift; sourceTree = "<group>"; };
 		8C90954F9347690877C04B6B /* TmuxSessionBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSessionBridgeTests.swift; sourceTree = "<group>"; };
 		8F1F62E4EC552622732B6159 /* Ghostty.Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Config.swift; sourceTree = "<group>"; };
 		8F96F132170CA05F1F29696A /* Ghostty.Input.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ghostty.Input.swift; sourceTree = "<group>"; };
@@ -353,7 +359,9 @@
 			isa = PBXGroup;
 			children = (
 				39F5F5E6CC0507C8F726F412 /* AppearanceFontSection.swift */,
+				246BFEA288DD8F4B4E545041 /* AppearanceThemeSection.swift */,
 				05FDE6EECD20438D68A96708 /* SettingsView.swift */,
+				8C6B3A51E041A539392C5E97 /* TerminalPreview.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -531,6 +539,7 @@
 				DE5C065C673FF1F18175BD62 /* SplitLayoutPipelineTests.swift */,
 				793B52D59FC2DC474473D514 /* TerminalLifecycleRouterTests.swift */,
 				C4E3E169FE066C4A1638B2A8 /* ThemeCatalogTests.swift */,
+				27EDD375F9C4C38740DD1ED3 /* ThemePairingTests.swift */,
 				586ED08E0691B05D1745B1FB /* TmuxAttachmentInfoTests.swift */,
 				94B58FA6AEE71D03E20D60FF /* TmuxAttachUITests.swift */,
 				66B2EC1CFE12E4915836C38C /* TmuxControlClientTests.swift */,
@@ -762,6 +771,7 @@
 				35F31819EF8AB53BF8792497 /* SplitLayoutPipelineTests.swift in Sources */,
 				9CD23ABDB81A5CCC495D0BEC /* TerminalLifecycleRouterTests.swift in Sources */,
 				765C8BDD2D5271286CC844EB /* ThemeCatalogTests.swift in Sources */,
+				C1ABFD9C3E650ADE9323CC3B /* ThemePairingTests.swift in Sources */,
 				A66606C20C69C670F0A563C2 /* TmuxAttachUITests.swift in Sources */,
 				6A6C3A84976885AD50403629 /* TmuxAttachmentInfoTests.swift in Sources */,
 				FF9B99B9F293E187792791DE /* TmuxControlClientTests.swift in Sources */,
@@ -786,6 +796,7 @@
 				43AC6BF228FCB8199C6515AE /* AppearanceFontSection.swift in Sources */,
 				18D678C3F78A5C5AAD543E2D /* AppearanceManager.swift in Sources */,
 				9FCC0B688CF4E5FB7432BEE5 /* AppearanceMode.swift in Sources */,
+				74C72C3F7FE5255A71AB492C /* AppearanceThemeSection.swift in Sources */,
 				C289639676F0C3C2A5367F85 /* Array+Extension.swift in Sources */,
 				FDCDAC988847846FCBC27A75 /* AttachedPaneRuntimeV2.swift in Sources */,
 				733E596380CD917CFDA3C5C3 /* AttachedRuntimeActionV2.swift in Sources */,
@@ -873,6 +884,7 @@
 				47D5DF0E77A71E93A0338129 /* TabBarView.swift in Sources */,
 				DB97FBFBFA6D303D58560FFE /* TabThumbnailPanel.swift in Sources */,
 				A788A1B64E9EB8AACC74B725 /* TerminalLifecycleRouter.swift in Sources */,
+				F565F58039497D11B493D5C9 /* TerminalPreview.swift in Sources */,
 				7E78A52CCC4F8B345DCDFFF1 /* TerminalSplitTreeView.swift in Sources */,
 				58BE9BB13F2EF1EC78FD192C /* TerminalTab.swift in Sources */,
 				49FF3310FC6D35CA76C240C7 /* ThemeCatalog.swift in Sources */,

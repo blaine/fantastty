@@ -52,4 +52,24 @@ final class ThemeCatalogTests: XCTestCase {
         let catalog = ThemeCatalog(directory: tempDir.appendingPathComponent("does-not-exist"))
         XCTAssertTrue(catalog.themes.isEmpty)
     }
+
+    func testExposesLightDarkPairs() throws {
+        try writeTheme("Gruvbox Light", "background = #ffffff\n")
+        try writeTheme("Gruvbox Dark", "background = #000000\n")
+        try writeTheme("Dracula", "background = #282a36\n")
+
+        let catalog = ThemeCatalog(directory: tempDir)
+
+        XCTAssertEqual(catalog.pairs.map(\.base), ["Gruvbox"])
+    }
+
+    func testFileURLForLoadedTheme() throws {
+        try writeTheme("Dracula", "background = #282a36\n")
+
+        let catalog = ThemeCatalog(directory: tempDir)
+
+        let expected = tempDir.appendingPathComponent("Dracula").resolvingSymlinksInPath()
+        XCTAssertEqual(catalog.fileURL(named: "Dracula")?.resolvingSymlinksInPath(), expected)
+        XCTAssertNil(catalog.fileURL(named: "Nonexistent"))
+    }
 }

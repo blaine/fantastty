@@ -11,7 +11,11 @@ final class ThemeCatalog {
     /// All themes, sorted case-insensitively by name.
     let themes: [GhosttyTheme]
 
+    /// The themes that form a light/dark pair, sorted by base name.
+    let pairs: [ThemePair]
+
     private let byName: [String: GhosttyTheme]
+    private let urlByName: [String: URL]
 
     init(directory: URL?) {
         guard let directory,
@@ -20,23 +24,36 @@ final class ThemeCatalog {
                 includingPropertiesForKeys: nil
               ) else {
             themes = []
+            pairs = []
             byName = [:]
+            urlByName = [:]
             return
         }
 
+        var urlByName: [String: URL] = [:]
         let parsed = urls
             .filter { !$0.lastPathComponent.hasPrefix(".") }
             .compactMap { url -> GhosttyTheme? in
                 guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-                return GhosttyThemeParser.parse(name: url.lastPathComponent, contents: contents)
+                let name = url.lastPathComponent
+                urlByName[name] = url
+                return GhosttyThemeParser.parse(name: name, contents: contents)
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
         themes = parsed
+        pairs = ThemePairing.pairs(from: parsed)
         byName = Dictionary(parsed.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        self.urlByName = urlByName
     }
 
     func theme(named name: String) -> GhosttyTheme? {
         byName[name]
+    }
+
+    /// The absolute file URL of a bundled theme, used to reference it from the
+    /// appearance overlay's `theme` directive.
+    func fileURL(named name: String) -> URL? {
+        urlByName[name]
     }
 }

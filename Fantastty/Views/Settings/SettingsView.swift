@@ -33,6 +33,8 @@ struct SettingsView: View {
 
             AppearanceFontSection()
 
+            AppearanceThemeSection()
+
             Section("Sidebar") {
                 Toggle("Show tab thumbnails in sidebar", isOn: $tabsInSidebar)
             }

@@ -19,7 +19,7 @@ final class AppearanceManager {
         static let fontFamily = "appearanceFontFamily"
         static let fontStyle = "appearanceFontStyle"
         static let fontSize = "appearanceFontSize"
-        static let themeName = "appearanceThemeName"
+        static let themePairBase = "appearanceThemePairBase"
     }
 
     private let defaults = UserDefaults.standard
@@ -57,23 +57,26 @@ final class AppearanceManager {
         set { defaults.set(newValue, forKey: Key.fontSize) }
     }
 
-    /// The name of the chosen color theme, or nil to inherit the base config.
-    var themeName: String? {
-        get { defaults.string(forKey: Key.themeName) }
-        set { defaults.set(newValue, forKey: Key.themeName) }
+    /// The base name of the chosen light/dark theme pair (e.g. "Gruvbox"), or
+    /// nil to inherit the base config.
+    var themePairBase: String? {
+        get { defaults.string(forKey: Key.themePairBase) }
+        set { defaults.set(newValue, forKey: Key.themePairBase) }
     }
 
     // MARK: - Overlay
 
     /// Build the overlay file's contents from the chosen settings. Only keys the
     /// user has set are emitted, so unset values fall through to the rest of the
-    /// config. The theme is inlined verbatim (it is itself valid Ghostty config).
-    /// Returns nil when nothing is set, meaning the overlay file should be removed.
+    /// config. A theme pair is written as a `theme = light:…,dark:…` directive so
+    /// Ghostty switches between the two with the system appearance. Returns nil
+    /// when nothing is set, meaning the overlay file should be removed.
     static func overlayText(
         fontFamily: String?,
         fontStyle: String?,
         fontSize: Double,
-        themeContents: String?
+        lightThemePath: String?,
+        darkThemePath: String?
     ) -> String? {
         var lines: [String] = []
         if let family = fontFamily, !family.isEmpty {
@@ -85,9 +88,8 @@ final class AppearanceManager {
         if fontSize > 0 {
             lines.append("font-size = \(Int(fontSize.rounded()))")
         }
-        if let theme = themeContents {
-            let trimmed = theme.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { lines.append(trimmed) }
+        if let light = lightThemePath, let dark = darkThemePath {
+            lines.append("theme = light:\(light),dark:\(dark)")
         }
 
         guard !lines.isEmpty else { return nil }
@@ -96,12 +98,18 @@ final class AppearanceManager {
 
     /// Write the overlay file from the current settings.
     func writeOverlay() {
-        let themeContents = themeName.flatMap { ThemeCatalog.shared.theme(named: $0)?.rawContents }
+        let pair = themePairBase.flatMap { base in
+            ThemeCatalog.shared.pairs.first { $0.base == base }
+        }
+        let lightPath = pair.flatMap { ThemeCatalog.shared.fileURL(named: $0.light.name)?.path }
+        let darkPath = pair.flatMap { ThemeCatalog.shared.fileURL(named: $0.dark.name)?.path }
+
         let content = Self.overlayText(
             fontFamily: fontFamily,
             fontStyle: fontStyle,
             fontSize: fontSize,
-            themeContents: themeContents
+            lightThemePath: lightPath,
+            darkThemePath: darkPath
         )
 
         do {
