@@ -24,7 +24,7 @@ struct AppearanceThemeSection: View {
         Font(AppearanceFonts.font(
             family: AppearanceManager.shared.fontFamily ?? "",
             style: AppearanceManager.shared.fontStyle ?? "",
-            size: 9
+            size: 11
         ))
     }
 

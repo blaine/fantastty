@@ -23,31 +23,21 @@ struct AppearanceFontSection: View {
 
     var body: some View {
         Section("Terminal Font") {
-            VStack(alignment: .leading, spacing: 12) {
-                TerminalPreview(
-                    font: Font(AppearanceFonts.font(family: family, style: style, size: size)),
-                    background: ghosttyApp.config.backgroundColor,
-                    foreground: ghosttyApp.config.foregroundColor ?? .white,
-                    palette: ghosttyApp.config.ansiPalette
+            HStack(spacing: 12) {
+                Text(fontDescription)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                FontChangeButton(
+                    currentFont: { AppearanceFonts.font(family: family, style: style, size: size) },
+                    onPicked: { newFamily, newStyle, newSize in
+                        family = newFamily
+                        style = newStyle
+                        size = newSize
+                        apply()
+                    }
                 )
-                .help("Live preview using your current theme colors")
-
-                HStack(spacing: 12) {
-                    Text(fontDescription)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    FontChangeButton(
-                        currentFont: { AppearanceFonts.font(family: family, style: style, size: size) },
-                        onPicked: { newFamily, newStyle, newSize in
-                            family = newFamily
-                            style = newStyle
-                            size = newSize
-                            apply()
-                        }
-                    )
-                    .frame(width: 86, height: 22)
-                }
+                .frame(width: 86, height: 22)
             }
             .padding(.vertical, 4)
         }
