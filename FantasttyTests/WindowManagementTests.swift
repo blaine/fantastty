@@ -317,6 +317,26 @@ final class WindowManagementTests: XCTestCase {
     }
 
     @MainActor
+    func testSelectTabActivatesItsSessionThenSelectsTheTab() {
+        let manager = Fantastty.SessionManager()
+
+        let sessionA = Fantastty.Session(title: "A", type: .local, workspaceID: "select-tab-a")
+        let sessionB = Fantastty.Session(title: "B", type: .local, workspaceID: "select-tab-b")
+        let tabB1 = Fantastty.TerminalTab(type: .local, title: "b1")
+        let tabB2 = Fantastty.TerminalTab(type: .local, title: "b2")
+        sessionB.tabs = [tabB1, tabB2]
+        sessionB.selectedTabID = tabB1.id
+
+        manager.sessions = [sessionA, sessionB]
+        manager.selectedSessionID = sessionA.id
+
+        manager.selectTab(tabB2, in: sessionB)
+
+        XCTAssertEqual(manager.selectedSessionID, sessionB.id)
+        XCTAssertEqual(sessionB.selectedTabID, tabB2.id)
+    }
+
+    @MainActor
     func testWindowPaneChangedUpdatesFocusedSurfaceForAttachedTab() {
         let manager = Fantastty.SessionManager()
         manager.ghosttyApp = WindowManagementTestSupport.ghosttyApp
