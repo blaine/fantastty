@@ -1,0 +1,104 @@
+diff --git a/include/ghostty.h b/include/ghostty.h
+index ec1e80788..18796d2e5 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -966,6 +966,7 @@ typedef void (*ghostty_runtime_write_clipboard_cb)(void*,
+                                                    size_t,
+                                                    bool);
+ typedef void (*ghostty_runtime_close_surface_cb)(void*, bool);
++typedef void (*ghostty_runtime_child_write_cb)(void*, const char*, uintptr_t);
+ typedef bool (*ghostty_runtime_action_cb)(ghostty_app_t,
+                                           ghostty_target_s,
+                                           ghostty_action_s);
+@@ -979,6 +980,7 @@ typedef struct {
+   ghostty_runtime_confirm_read_clipboard_cb confirm_read_clipboard_cb;
+   ghostty_runtime_write_clipboard_cb write_clipboard_cb;
+   ghostty_runtime_close_surface_cb close_surface_cb;
++  ghostty_runtime_child_write_cb child_write_cb;
+ } ghostty_runtime_config_s;
+ 
+ // apprt.ipc.Target.Key
+diff --git a/src/Surface.zig b/src/Surface.zig
+index 64a995265..c3825430b 100644
+--- a/src/Surface.zig
++++ b/src/Surface.zig
+@@ -1058,6 +1058,11 @@ pub fn handleMessage(self: *Surface, msg: Message) !void {
+             );
+         },
+ 
++        .child_write => |w| {
++            defer w.deinit();
++            self.rt_surface.childWrite(w.slice());
++        },
++
+         .close => self.close(),
+ 
+         .child_exited => |v| self.childExited(v),
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index d73047a66..6f4f2f0b5 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -76,6 +76,12 @@ pub const App = struct {
+ 
+         /// Close the current surface given by this function.
+         close_surface: ?*const fn (SurfaceUD, bool) callconv(.c) void = null,
++
++        /// Called when the terminal writes data toward its child process
++        /// (e.g. mouse reports, cursor/device query responses). Used to
++        /// forward those bytes elsewhere for control-mode (tmux) surfaces
++        /// whose child process discards everything.
++        child_write: ?*const fn (SurfaceUD, [*]const u8, usize) callconv(.c) void = null,
+     };
+ 
+     /// This is the key event sent for ghostty_surface_key and
+@@ -744,6 +750,14 @@ pub const Surface = struct {
+         );
+     }
+ 
++    /// Forward data the terminal wrote toward its child process to the host.
++    /// Used so control-mode (tmux) surfaces can relay terminal-generated
++    /// input (mouse reports, query responses) that the silent child discards.
++    pub fn childWrite(self: *const Surface, data: []const u8) void {
++        const func = self.app.opts.child_write orelse return;
++        func(self.userdata, data.ptr, data.len);
++    }
++
+     pub fn getCursorPos(self: *const Surface) !apprt.CursorPos {
+         return self.cursor_pos;
+     }
+diff --git a/src/apprt/surface.zig b/src/apprt/surface.zig
+index 5c25281c8..c619de11c 100644
+--- a/src/apprt/surface.zig
++++ b/src/apprt/surface.zig
+@@ -85,6 +85,11 @@ pub const Message = union(enum) {
+     /// The terminal has reported a change in the working directory.
+     pwd_change: WriteReq,
+ 
++    /// The terminal wrote data toward its child process (mouse reports,
++    /// query responses, etc.). Forwarded to the host so control-mode
++    /// surfaces can relay it; the payload is owned and must be freed.
++    child_write: WriteReq,
++
+     /// The terminal encountered a bell character.
+     ring_bell,
+ 
+diff --git a/src/termio/Termio.zig b/src/termio/Termio.zig
+index 89ea7407b..3ff262792 100644
+--- a/src/termio/Termio.zig
++++ b/src/termio/Termio.zig
+@@ -408,6 +408,15 @@ pub inline fn queueWrite(
+     linefeed: bool,
+ ) !void {
+     try self.backend.queueWrite(self.alloc, td, data, linefeed);
++
++    // Mirror everything written toward the child to the host. Control-mode
++    // (tmux) surfaces run a silent child that discards these bytes, so the
++    // host forwards them (mouse reports, query responses) on to tmux. The
++    // push is non-blocking; dropping a message under backpressure is
++    // acceptable for these low-volume control writes.
++    if (apprt.surface.Message.WriteReq.init(self.alloc, data)) |req| {
++        _ = self.surface_mailbox.push(.{ .child_write = req }, .{ .instant = {} });
++    } else |_| {}
+ }
+ 
+ /// Update the configuration.

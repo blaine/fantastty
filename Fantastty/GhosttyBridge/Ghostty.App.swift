@@ -88,7 +88,8 @@ extension Ghostty {
                 confirm_read_clipboard_cb: { userdata, str, state, request in App.confirmReadClipboard(userdata, string: str, state: state, request: request ) },
                 write_clipboard_cb: { userdata, loc, content, len, confirm in
                     App.writeClipboard(userdata, location: loc, content: content, len: len, confirm: confirm) },
-                close_surface_cb: { userdata, processAlive in App.closeSurface(userdata, processAlive: processAlive) }
+                close_surface_cb: { userdata, processAlive in App.closeSurface(userdata, processAlive: processAlive) },
+                child_write_cb: { userdata, data, len in App.childWrite(userdata, data: data, len: len) }
             )
 
             // Create the ghostty app.
@@ -313,6 +314,7 @@ extension Ghostty {
         ) {}
 
         static func closeSurface(_ userdata: UnsafeMutableRawPointer?, processAlive: Bool) {}
+        static func childWrite(_ userdata: UnsafeMutableRawPointer?, data: UnsafePointer<CChar>?, len: UInt) {}
         #endif
 
         #if os(macOS)
@@ -346,6 +348,19 @@ extension Ghostty {
             NotificationCenter.default.post(name: Notification.ghosttyCloseSurface, object: surface, userInfo: [
                 "process_alive": processAlive,
             ])
+        }
+
+        /// The terminal wrote bytes toward its child process. For tmux-attached
+        /// surfaces (whose child is a silent /dev/null sink), forward those bytes
+        /// — mouse reports, query responses, etc. — on to the tmux pane so they
+        /// reach the program running there.
+        static func childWrite(_ userdata: UnsafeMutableRawPointer?, data: UnsafePointer<CChar>?, len: UInt) {
+            guard let data, len > 0 else { return }
+            let surfaceView = self.surfaceUserdata(from: userdata)
+            guard let paneID = surfaceView.tmuxPaneID,
+                  let client = surfaceView.tmuxControlClient else { return }
+            let bytes = Data(bytes: data, count: Int(len))
+            Task { await client.sendKeys(paneID: paneID, data: bytes) }
         }
 
         static func readClipboard(_ userdata: UnsafeMutableRawPointer?, location: ghostty_clipboard_e, state: UnsafeMutableRawPointer?) {
