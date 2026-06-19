@@ -20,6 +20,9 @@ targets:
       - path: Fantastty
         excludes:
           - "**/.DS_Store"
+          - "Resources/Themes/**"
+      - path: Fantastty/Resources/Themes
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.blainecook.fantastty

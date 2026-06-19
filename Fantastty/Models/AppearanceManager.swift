@@ -19,6 +19,7 @@ final class AppearanceManager {
         static let fontFamily = "appearanceFontFamily"
         static let fontStyle = "appearanceFontStyle"
         static let fontSize = "appearanceFontSize"
+        static let themeName = "appearanceThemeName"
     }
 
     private let defaults = UserDefaults.standard
@@ -56,12 +57,24 @@ final class AppearanceManager {
         set { defaults.set(newValue, forKey: Key.fontSize) }
     }
 
+    /// The name of the chosen color theme, or nil to inherit the base config.
+    var themeName: String? {
+        get { defaults.string(forKey: Key.themeName) }
+        set { defaults.set(newValue, forKey: Key.themeName) }
+    }
+
     // MARK: - Overlay
 
-    /// Write the overlay file from the current settings. Only keys the user has
-    /// chosen are emitted, so unset values fall through to the rest of the
-    /// config.
-    func writeOverlay() {
+    /// Build the overlay file's contents from the chosen settings. Only keys the
+    /// user has set are emitted, so unset values fall through to the rest of the
+    /// config. The theme is inlined verbatim (it is itself valid Ghostty config).
+    /// Returns nil when nothing is set, meaning the overlay file should be removed.
+    static func overlayText(
+        fontFamily: String?,
+        fontStyle: String?,
+        fontSize: Double,
+        themeContents: String?
+    ) -> String? {
         var lines: [String] = []
         if let family = fontFamily, !family.isEmpty {
             lines.append("font-family = \(family)")
@@ -72,14 +85,31 @@ final class AppearanceManager {
         if fontSize > 0 {
             lines.append("font-size = \(Int(fontSize.rounded()))")
         }
+        if let theme = themeContents {
+            let trimmed = theme.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { lines.append(trimmed) }
+        }
+
+        guard !lines.isEmpty else { return nil }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// Write the overlay file from the current settings.
+    func writeOverlay() {
+        let themeContents = themeName.flatMap { ThemeCatalog.shared.theme(named: $0)?.rawContents }
+        let content = Self.overlayText(
+            fontFamily: fontFamily,
+            fontStyle: fontStyle,
+            fontSize: fontSize,
+            themeContents: themeContents
+        )
 
         do {
             try FileManager.default.createDirectory(at: baseDir, withIntermediateDirectories: true)
-            if lines.isEmpty {
+            guard let content else {
                 try? FileManager.default.removeItem(at: overlayURL)
                 return
             }
-            let content = lines.joined(separator: "\n") + "\n"
             let data = Data(content.utf8)
             if let existing = try? Data(contentsOf: overlayURL), existing == data { return }
             try data.write(to: overlayURL, options: .atomic)
