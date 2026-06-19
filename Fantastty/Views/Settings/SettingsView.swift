@@ -40,11 +40,13 @@ struct SettingsView: View {
                 }
             }
             .navigationSplitViewColumnWidth(190)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             detail
                 .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .navigationTitle((selection ?? .appearance).title)
         }
+        .navigationSplitViewStyle(.balanced)
         .frame(width: 760, height: 560)
     }
 
