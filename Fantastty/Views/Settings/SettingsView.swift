@@ -1,20 +1,77 @@
 import SwiftUI
 import GhosttyKit
 
+/// The pages of the settings window, shown in the sidebar.
+private enum SettingsPage: String, CaseIterable, Identifiable {
+    case general
+    case appearance
+    case sessions
+    case integrations
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .appearance: return "Appearance"
+        case .sessions: return "Sessions"
+        case .integrations: return "Integrations"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .general: return "gearshape"
+        case .appearance: return "paintpalette"
+        case .sessions: return "terminal"
+        case .integrations: return "puzzlepiece.extension"
+        }
+    }
+}
+
 struct SettingsView: View {
+    @State private var selection: SettingsPage? = .appearance
+
+    var body: some View {
+        NavigationSplitView {
+            List(selection: $selection) {
+                ForEach(SettingsPage.allCases) { page in
+                    Label(page.title, systemImage: page.icon).tag(page)
+                }
+            }
+            .navigationSplitViewColumnWidth(190)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            detail
+                .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .navigationTitle((selection ?? .appearance).title)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .frame(width: 760, height: 560)
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        switch selection ?? .appearance {
+        case .general: GeneralPage()
+        case .appearance: AppearancePage()
+        case .sessions: SessionsPage()
+        case .integrations: IntegrationsPage()
+        }
+    }
+}
+
+// MARK: - Pages
+
+private struct GeneralPage: View {
     @AppStorage(AppearanceMode.userDefaultsKey) private var appearance: AppearanceMode = .system
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
-    @AppStorage("persistentSessions") private var persistentSessions = false
     @EnvironmentObject private var ghosttyApp: Ghostty.App
-
-    private var tmuxAvailable: Bool {
-        TmuxManager.shared.isTmuxAvailable
-    }
 
     var body: some View {
         Form {
             Section("Appearance") {
-                Picker("Theme", selection: $appearance) {
+                Picker("Mode", selection: $appearance) {
                     ForEach(AppearanceMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
@@ -34,7 +91,32 @@ struct SettingsView: View {
             Section("Sidebar") {
                 Toggle("Show tab thumbnails in sidebar", isOn: $tabsInSidebar)
             }
+        }
+        .formStyle(.grouped)
+    }
+}
 
+/// Font and theme only — the theme list is the page's single scroll region.
+private struct AppearancePage: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            AppearanceFontSection()
+            AppearanceThemeSection()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+private struct SessionsPage: View {
+    @AppStorage("persistentSessions") private var persistentSessions = false
+
+    private var tmuxAvailable: Bool {
+        TmuxManager.shared.isTmuxAvailable
+    }
+
+    var body: some View {
+        Form {
             Section {
                 Toggle("Persistent terminal sessions", isOn: $persistentSessions)
                     .disabled(!tmuxAvailable)
@@ -55,13 +137,19 @@ struct SettingsView: View {
                     Text("When enabled, each workspace runs in a tmux session. Quitting the app leaves sessions running; relaunching reattaches to them.")
                 }
             }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct IntegrationsPage: View {
+    var body: some View {
+        Form {
             Section("Integrations") {
                 LinearAPIKeyRow()
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450)
-        .fixedSize()
     }
 }
 
