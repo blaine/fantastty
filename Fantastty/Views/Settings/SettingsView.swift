@@ -31,6 +31,8 @@ struct SettingsView: View {
                 }
             }
 
+            AppearanceFontSection()
+
             Section("Sidebar") {
                 Toggle("Show tab thumbnails in sidebar", isOn: $tabsInSidebar)
             }
@@ -60,7 +62,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450)
+        .frame(width: 480)
         .fixedSize()
     }
 }
