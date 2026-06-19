@@ -856,6 +856,12 @@ class SessionManager: ObservableObject {
         selectedSessionID = sessions[prevIndex].id
     }
 
+    /// Select a tab from the sidebar, activating its session first so the chosen tab is displayed.
+    func selectTab(_ tab: TerminalTab, in session: Session) {
+        selectedSessionID = session.id
+        session.selectedTabID = tab.id
+    }
+
     // MARK: - Workspace Archiving
 
     /// Archive a workspace: kill tmux, set metadata flag, remove from active sessions.

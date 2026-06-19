@@ -230,7 +230,7 @@ private struct SidebarTabThumbnails: View {
                 isSelected: tab.id == session.selectedTabID,
                 isSessionActive: session.id == sessionManager.selectedSessionID,
                 onSelect: {
-                    session.selectedTabID = tab.id
+                    sessionManager.selectTab(tab, in: session)
                 },
                 onClose: {
                     let shouldClose = session.closeTab(id: tab.id)
