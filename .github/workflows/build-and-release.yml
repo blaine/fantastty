@@ -28,7 +28,7 @@ jobs:
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '16.2'
+        xcode-version: '26.2'
 
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
@@ -99,7 +99,7 @@ jobs:
         VERSION="${{ steps.version.outputs.version }}"
         BUILD_NUMBER="${{ steps.version.outputs.build_number }}"
 
-        xcodebuild \
+        if ! xcodebuild \
           -scheme Fantastty \
           -configuration Release \
           -derivedDataPath build/DerivedData \
@@ -112,14 +112,14 @@ jobs:
           CODE_SIGN_STYLE=Manual \
           ENABLE_HARDENED_RUNTIME=YES \
           OTHER_CODE_SIGN_FLAGS="--keychain build.keychain --timestamp" \
-          build 2>&1 | tee /tmp/xcodebuild.log | grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true
-
-        # Show full build summary on failure
-        if grep -q 'BUILD FAILED' /tmp/xcodebuild.log; then
+          build 2>&1 | tee /tmp/xcodebuild.log; then
           echo "::group::Full build output (last 200 lines)"
           tail -200 /tmp/xcodebuild.log
           echo "::endgroup::"
+          exit 1
         fi
+
+        grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' /tmp/xcodebuild.log || true
 
         # Verify build output exists
         APP_PATH="build/DerivedData/Build/Products/Release/Fantastty.app"

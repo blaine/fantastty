@@ -194,6 +194,14 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS=1", local_release)
         self.assertIn("remote-engine-verify-app-artifacts", local_release)
 
+    def test_release_workflow_uses_sdk26_and_preserves_xcodebuild_failure(self):
+        workflow = RELEASE_WORKFLOW.read_text()
+
+        self.assertIn("xcode-version: '26.2'", workflow)
+        self.assertIn("if ! xcodebuild \\", workflow)
+        self.assertIn("exit 1", workflow)
+        self.assertNotIn("| grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true", workflow)
+
     def test_app_target_gates_sdk26_typed_quic_symbols(self):
         source = REMOTE_ENGINE_CLIENT.read_text()
         absent_sdk26_symbols = [
