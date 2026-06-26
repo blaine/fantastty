@@ -189,6 +189,7 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("go-version-file: tools/remote-engine-helper/helper/go.mod", workflow)
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS: \"1\"", workflow)
         self.assertIn("make remote-engine-verify-app-artifacts", workflow)
+        self.assertIn("- name: Notarize DMG\n      if: startsWith(github.ref, 'refs/tags/')", workflow)
 
         local_release = LOCAL_RELEASE_SCRIPT.read_text()
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS=1", local_release)
