@@ -198,6 +198,8 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         workflow = RELEASE_WORKFLOW.read_text()
 
         self.assertIn("xcode-version: '26.2'", workflow)
+        self.assertNotIn("DEVELOPER_DIR:", workflow)
+        self.assertIn("set -o pipefail", workflow)
         self.assertIn("if ! xcodebuild \\", workflow)
         self.assertIn("exit 1", workflow)
         self.assertNotIn("| grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true", workflow)

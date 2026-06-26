@@ -10,9 +10,6 @@ on:
         description: 'Version number (e.g., 0.2.0). Leave empty to use project default.'
         required: false
 
-env:
-  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
-
 jobs:
   build:
     runs-on: macos-15
@@ -98,6 +95,7 @@ jobs:
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         BUILD_NUMBER="${{ steps.version.outputs.build_number }}"
+        set -o pipefail
 
         if ! xcodebuild \
           -scheme Fantastty \
