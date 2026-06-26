@@ -114,6 +114,9 @@ struct TmuxLayoutParser {
 
         // Leaf: `,PaneID`
         expect(",")
+        if index < source.endIndex && source[index] == "%" {
+            advance()
+        }
         let paneID = parseInt()
         return .leaf(paneID: paneID, width: width, height: height)
     }

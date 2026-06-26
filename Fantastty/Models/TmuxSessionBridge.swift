@@ -410,6 +410,8 @@ extension TmuxSessionBridge: TmuxControlClientDelegate {
             session.backingState = .available
         case .connecting:
             break
+        case .reconnecting:
+            break
         case .disconnected(let reason):
             if !session.tabs.contains(where: { $0.kind == .terminal }) {
                 session.backingState = .missingAttachedBacking(reason: reason)

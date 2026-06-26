@@ -13,6 +13,7 @@ struct TmuxAttachSheet: View {
     @State private var sessionFilter: String = ""
     @State private var discoveredSessions: [DiscoveredSession] = []
     @State private var isLocal: Bool = true
+    @State private var useRemoteEngine: Bool = false
     @State private var isDiscovering: Bool = false
     @State private var discoveryTask: Task<Void, Never>?
 
@@ -35,6 +36,7 @@ struct TmuxAttachSheet: View {
             if !isLocal {
                 TextField("user@hostname:port", text: $hostString)
                     .textFieldStyle(.roundedBorder)
+                Toggle("Remote engine", isOn: $useRemoteEngine)
             }
 
             TextField("Filter sessions...", text: $sessionFilter)
@@ -70,7 +72,12 @@ struct TmuxAttachSheet: View {
             Self.logger.info("Attach sheet appeared; starting discovery")
             discoverSessions()
         }
-        .onChange(of: isLocal) { discoverSessions() }
+        .onChange(of: isLocal) {
+            if isLocal {
+                useRemoteEngine = false
+            }
+            discoverSessions()
+        }
     }
 
     private func discoverSessions() {
@@ -134,11 +141,7 @@ struct TmuxAttachSheet: View {
     }
 
     private func attach(to session: DiscoveredSession) {
-        let info = TmuxAttachmentInfo(
-            sessionName: session.name,
-            host: session.host,
-            connectionState: .disconnected(reason: nil)
-        )
+        let info = Self.attachmentInfo(for: session, useRemoteEngine: useRemoteEngine)
         onAttach?(info)
         dismiss()
     }
@@ -191,5 +194,21 @@ struct TmuxAttachSheet: View {
             $0.name.localizedCaseInsensitiveContains(filter) ||
             $0.host.displayName.localizedCaseInsensitiveContains(filter)
         }
+    }
+
+    nonisolated static func attachmentInfo(for session: DiscoveredSession, useRemoteEngine: Bool) -> TmuxAttachmentInfo {
+        let transport: TmuxAttachmentTransport
+        if useRemoteEngine, case .ssh = session.host {
+            transport = .remoteEngine
+        } else {
+            transport = .tmuxControl
+        }
+        return TmuxAttachmentInfo(
+            sessionName: session.name,
+            host: session.host,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach,
+            transport: transport
+        )
     }
 }

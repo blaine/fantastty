@@ -36,6 +36,11 @@ jobs:
         # Must match minimum_zig_version in vendor/ghostty/build.zig.zon
         version: 0.15.2
 
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: tools/remote-engine-helper/helper/go.mod
+
     - name: Determine version
       id: version
       run: |
@@ -89,6 +94,7 @@ jobs:
       env:
         DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS: "1"
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         BUILD_NUMBER="${{ steps.version.outputs.build_number }}"
@@ -122,6 +128,9 @@ jobs:
           find build -name "Fantastty.app" -type d 2>/dev/null || true
           exit 1
         fi
+
+        # Verify bundled remote-engine helpers before signing and packaging.
+        make remote-engine-verify-app-artifacts APP="$APP_PATH"
 
         # Verify code signature
         echo "Verifying code signature..."

@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage(AppearanceMode.userDefaultsKey) private var appearance: AppearanceMode = .system
     @AppStorage("tabsInSidebar") private var tabsInSidebar = false
     @AppStorage("persistentSessions") private var persistentSessions = false
+    @AppStorage(RemotePredictiveEchoSettings.userDefaultsKey) private var remotePredictiveEchoEnabled = true
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
     private var tmuxAvailable: Bool {
@@ -54,6 +55,9 @@ struct SettingsView: View {
                 if tmuxAvailable {
                     Text("When enabled, each workspace runs in a tmux session. Quitting the app leaves sessions running; relaunching reattaches to them.")
                 }
+            }
+            Section("Remote Engine") {
+                Toggle("Predictive echo", isOn: $remotePredictiveEchoEnabled)
             }
             Section("Integrations") {
                 LinearAPIKeyRow()

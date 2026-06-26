@@ -299,13 +299,19 @@ final class TmuxControlClientTests: XCTestCase {
         XCTAssertEqual(data, Data([0x1b, 0x5b, 0x5a]))
     }
 
-    func testEscapeSequenceUnmodifiedEnterProducesRawByte() {
-        let data = AttachedTmuxInputEncoder.escapeSequence(
+    func testEscapeSequenceUnmodifiedEnterUsesRawInputPath() {
+        let escapeData = AttachedTmuxInputEncoder.escapeSequence(
             keyCode: 36,
             eventCharacters: nil,
             modifierFlags: []
         )
-        XCTAssertEqual(data, Data([0x0d]))
+        let inputData = AttachedTmuxInputEncoder.inputData(
+            isRelease: false,
+            text: "\r",
+            eventCharacters: "\r"
+        )
+        XCTAssertNil(escapeData)
+        XCTAssertEqual(inputData, Data([0x0d]))
     }
 
     func testEscapeSequenceF1Unmodified() {
