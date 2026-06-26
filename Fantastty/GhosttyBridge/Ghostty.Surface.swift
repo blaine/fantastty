@@ -10,7 +10,7 @@ extension Ghostty {
     /// all over.
     ///
     /// Wraps a `ghostty_surface_t`
-    final class Surface: Sendable {
+    final class Surface: Sendable, RemoteGridSurface {
         private let surface: ghostty_surface_t
 
         /// Read the underlying C value for this surface. This is unsafe because the value will be
@@ -50,6 +50,80 @@ extension Ghostty {
                 // len includes the null terminator so we do len - 1
                 ghostty_surface_text(surface, ptr, UInt(len - 1))
             }
+        }
+
+        /// Reset the terminal grid backing remote pane contents.
+        @MainActor
+        func resetRemoteGrid(columns: Int, rows: Int) -> Bool {
+            guard let columns = UInt32(exactly: columns), columns > 0 else { return false }
+            guard let rows = UInt32(exactly: rows), rows > 0 else { return false }
+            return ghostty_surface_remote_grid_reset(surface, columns, rows)
+        }
+
+        /// Replace one row in the remote grid with UTF-8 text.
+        @MainActor
+        func setRemoteGridRow(_ row: Int, text: String) -> Bool {
+            guard let row = UInt32(exactly: row) else { return false }
+            return text.withCString { ptr in
+                ghostty_surface_remote_grid_set_row(surface, row, ptr, UInt(text.utf8.count))
+            }
+        }
+
+        /// Replace one row in the remote grid with structured cells.
+        @MainActor
+        func setRemoteGridRow(_ row: Int, cells: [RemoteGridCell]) -> Bool {
+            guard let row = UInt32(exactly: row) else { return false }
+            var allocations: [UnsafeMutablePointer<CChar>] = []
+            allocations.reserveCapacity(cells.count)
+            defer {
+                for allocation in allocations {
+                    allocation.deallocate()
+                }
+            }
+
+            var cCells: [ghostty_remote_grid_cell_s] = []
+            cCells.reserveCapacity(cells.count)
+            for cell in cells {
+                guard let width = UInt32(exactly: cell.width) else { return false }
+                let bytes = Array(cell.text.utf8CString)
+                let allocation = UnsafeMutablePointer<CChar>.allocate(capacity: bytes.count)
+                allocation.initialize(from: bytes, count: bytes.count)
+                allocations.append(allocation)
+
+                cCells.append(ghostty_remote_grid_cell_s(
+                    text: UnsafePointer(allocation),
+                    len: UInt(bytes.count - 1),
+                    width: width,
+                    style: Ghostty.remoteGridStyle(cell.style)
+                ))
+            }
+
+            return cCells.withUnsafeBufferPointer { buffer in
+                guard let baseAddress = buffer.baseAddress else { return false }
+                return ghostty_surface_remote_grid_set_row_cells(surface, row, baseAddress, UInt(buffer.count))
+            }
+        }
+
+        /// Set the remote grid cursor position and visibility.
+        @MainActor
+        func setRemoteGridCursor(row: Int, column: Int, visible: Bool) -> Bool {
+            guard let row = UInt32(exactly: row) else { return false }
+            guard let column = UInt32(exactly: column) else { return false }
+            return ghostty_surface_remote_grid_set_cursor(surface, row, column, visible)
+        }
+
+        /// Set the remote grid cursor position, visibility, and shape.
+        @MainActor
+        func setRemoteGridCursor(_ cursor: RemoteCursorState) -> Bool {
+            guard let row = UInt32(exactly: cursor.row) else { return false }
+            guard let column = UInt32(exactly: cursor.column) else { return false }
+            return ghostty_surface_remote_grid_set_cursor_ex(
+                surface,
+                row,
+                column,
+                cursor.visible,
+                cursor.shape.cRemoteGridShape
+            )
         }
 
         /// Send a key event to the terminal.
@@ -157,6 +231,73 @@ extension Ghostty {
             return action.withCString { cString in
                 ghostty_surface_binding_action(surface, cString, UInt(len - 1))
             }
+        }
+    }
+}
+
+private extension Ghostty {
+    static func remoteGridStyle(_ style: RemoteCellStyle) -> ghostty_remote_grid_style_s {
+        var cStyle = ghostty_remote_grid_style_s()
+        cStyle.foreground = remoteGridColor(style.foreground)
+        cStyle.background = remoteGridColor(style.background)
+        cStyle.underline_color = remoteGridColor(style.underlineColor)
+        cStyle.bold = style.bold ? 1 : 0
+        cStyle.faint = style.faint ? 1 : 0
+        cStyle.italic = style.italic ? 1 : 0
+        cStyle.blink = style.blink ? 1 : 0
+        cStyle.inverse = style.inverse ? 1 : 0
+        cStyle.invisible = style.invisible ? 1 : 0
+        cStyle.strikethrough = style.strikethrough ? 1 : 0
+        cStyle.underline = style.underline.cRemoteGridUnderline
+        return cStyle
+    }
+
+    static func remoteGridColor(_ color: RemoteGridColor) -> ghostty_remote_grid_color_s {
+        var cColor = ghostty_remote_grid_color_s()
+        switch color {
+        case .default:
+            cColor.tag = ghostty_remote_grid_color_tag_e(GHOSTTY_REMOTE_GRID_COLOR_DEFAULT)
+        case .indexed(let index):
+            cColor.tag = ghostty_remote_grid_color_tag_e(GHOSTTY_REMOTE_GRID_COLOR_INDEXED)
+            cColor.index = index
+        case .rgb(let red, let green, let blue):
+            cColor.tag = ghostty_remote_grid_color_tag_e(GHOSTTY_REMOTE_GRID_COLOR_RGB)
+            cColor.red = red
+            cColor.green = green
+            cColor.blue = blue
+        }
+        return cColor
+    }
+}
+
+private extension RemoteUnderlineStyle {
+    var cRemoteGridUnderline: ghostty_remote_grid_underline_e {
+        switch self {
+        case .none:
+            return ghostty_remote_grid_underline_e(GHOSTTY_REMOTE_GRID_UNDERLINE_NONE)
+        case .single:
+            return ghostty_remote_grid_underline_e(GHOSTTY_REMOTE_GRID_UNDERLINE_SINGLE)
+        case .double:
+            return ghostty_remote_grid_underline_e(GHOSTTY_REMOTE_GRID_UNDERLINE_DOUBLE)
+        case .curly:
+            return ghostty_remote_grid_underline_e(GHOSTTY_REMOTE_GRID_UNDERLINE_CURLY)
+        case .dotted:
+            return ghostty_remote_grid_underline_e(GHOSTTY_REMOTE_GRID_UNDERLINE_DOTTED)
+        case .dashed:
+            return ghostty_remote_grid_underline_e(GHOSTTY_REMOTE_GRID_UNDERLINE_DASHED)
+        }
+    }
+}
+
+private extension RemoteCursorShape {
+    var cRemoteGridShape: ghostty_remote_grid_cursor_shape_e {
+        switch self {
+        case .block:
+            return ghostty_remote_grid_cursor_shape_e(GHOSTTY_REMOTE_GRID_CURSOR_SHAPE_BLOCK)
+        case .bar:
+            return ghostty_remote_grid_cursor_shape_e(GHOSTTY_REMOTE_GRID_CURSOR_SHAPE_BAR)
+        case .underline:
+            return ghostty_remote_grid_cursor_shape_e(GHOSTTY_REMOTE_GRID_CURSOR_SHAPE_UNDERLINE)
         }
     }
 }

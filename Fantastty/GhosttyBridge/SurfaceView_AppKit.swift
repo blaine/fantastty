@@ -501,6 +501,10 @@ extension Ghostty {
         var tmuxPaneID: Int?
         /// Tmux control mode: weak ref to control client for input routing.
         weak var tmuxControlClient: TmuxControlClient?
+        /// Remote engine: routes encoded pane input over the remote control stream.
+        var remotePaneInputHandler: ((Int, RemotePaneInput) -> Void)?
+        /// Remote engine: reports local pane focus changes for prediction safety.
+        var remotePaneFocusHandler: ((Int, Bool) -> Void)?
 
         private var markedText: NSMutableAttributedString
         private(set) var focused: Bool = true
@@ -723,17 +727,46 @@ extension Ghostty {
             progressReportTimer?.invalidate()
         }
 
+        private var hasPaneInputRoute: Bool {
+            tmuxPaneID != nil && (tmuxControlClient != nil || remotePaneInputHandler != nil)
+        }
+
+        private func shouldRoutePaneInput(bindingFlags: Input.BindingFlags?, event: NSEvent) -> Bool {
+            hasPaneInputRoute && !AttachedTmuxInputRouter.shouldHandleLocally(bindingFlags: bindingFlags, event: event)
+        }
+
+        private func sendPaneInput(
+            paneID: Int,
+            data: Data,
+            source: RemotePaneInputSource = .directKey
+        ) {
+            if let remotePaneInputHandler {
+                remotePaneInputHandler(paneID, RemotePaneInput(data: data, source: source))
+                return
+            }
+            guard let client = tmuxControlClient else { return }
+            Task { await client.sendKeys(paneID: paneID, data: data) }
+        }
+
         func focusDidChange(_ focused: Bool) {
             guard let surface = self.surface else { return }
-            guard self.focused != focused else { return }
+            guard self.focused != focused else {
+                if let paneID = tmuxPaneID, let remotePaneFocusHandler {
+                    remotePaneFocusHandler(paneID, focused)
+                }
+                return
+            }
             self.focused = focused
+            if let paneID = tmuxPaneID, let remotePaneFocusHandler {
+                remotePaneFocusHandler(paneID, focused)
+            }
 
             // For tmux-attached surfaces, skip the Ghostty focus call.
             // The child process is cat >/dev/null, so focus events are
             // meaningless. More importantly, ghostty_surface_set_focus
             // pushes to a BlockingQueue that can deadlock when full
             // (the inject queue may be saturating it).
-            if tmuxPaneID == nil || tmuxControlClient == nil {
+            if !hasPaneInputRoute {
                 ghostty_surface_set_focus(surface, focused)
             }
 
@@ -770,6 +803,34 @@ extension Ghostty {
             contentSize = size
         }
 
+        func resizeRemoteGrid(columns: Int, rows: Int) -> Bool {
+            guard let surface = self.surface else { return false }
+            guard let columns = UInt32(exactly: columns), columns > 0 else { return false }
+            guard let rows = UInt32(exactly: rows), rows > 0 else { return false }
+
+            let current = ghostty_surface_size(surface)
+            let cellWidth = max(current.cell_width_px, 1)
+            let cellHeight = max(current.cell_height_px, 1)
+            let currentGridWidth = UInt32(current.columns).multipliedReportingOverflow(by: cellWidth)
+            let currentGridHeight = UInt32(current.rows).multipliedReportingOverflow(by: cellHeight)
+            guard !currentGridWidth.overflow, !currentGridHeight.overflow else { return false }
+            let widthOverhead = current.width_px.subtractingReportingOverflow(currentGridWidth.partialValue)
+            let heightOverhead = current.height_px.subtractingReportingOverflow(currentGridHeight.partialValue)
+            guard !widthOverhead.overflow, !heightOverhead.overflow else { return false }
+
+            let targetWidth = columns.multipliedReportingOverflow(by: cellWidth)
+            let targetHeight = rows.multipliedReportingOverflow(by: cellHeight)
+            guard !targetWidth.overflow, !targetHeight.overflow else { return false }
+            let paddedWidth = targetWidth.partialValue.addingReportingOverflow(widthOverhead.partialValue)
+            let paddedHeight = targetHeight.partialValue.addingReportingOverflow(heightOverhead.partialValue)
+            guard !paddedWidth.overflow, !paddedHeight.overflow else { return false }
+
+            setSurfaceSize(width: paddedWidth.partialValue, height: paddedHeight.partialValue)
+
+            let updated = ghostty_surface_size(surface)
+            return updated.columns == columns && updated.rows == rows
+        }
+
         private func setSurfaceSize(width: UInt32, height: UInt32) {
             guard let surface = self.surface else { return }
 
@@ -778,11 +839,15 @@ extension Ghostty {
 
             // Update our cached size metrics
             let size = ghostty_surface_size(surface)
-            DispatchQueue.main.async {
-                // DispatchQueue required since this may be called by SwiftUI off
-                // the main thread and Published changes need to be on the main
-                // thread. This caused a crash on macOS <= 14.
+            // Published changes need to happen on the main thread. This can be
+            // called by SwiftUI off-main on macOS <= 14, but main-thread callers
+            // should publish synchronously so resize events keep their order.
+            if Thread.isMainThread {
                 self.surfaceSize = size
+            } else {
+                DispatchQueue.main.async {
+                    self.surfaceSize = size
+                }
             }
         }
 
@@ -978,7 +1043,7 @@ extension Ghostty {
             guard let healthAny = notification.userInfo?["health"] else { return }
             guard let health = healthAny as? ghostty_action_renderer_health_e else { return }
             DispatchQueue.main.async { [weak self] in
-                self?.healthy = health == GHOSTTY_RENDERER_HEALTH_OK
+                self?.healthy = health == GHOSTTY_RENDERER_HEALTH_HEALTHY
             }
         }
 
@@ -1442,7 +1507,8 @@ extension Ghostty {
                         action,
                         event: event,
                         translationEvent: translationEvent,
-                        text: text
+                        text: text,
+                        inputSource: markedTextBefore ? .imeCommit : .directKey
                     )
                 }
             } else {
@@ -1671,7 +1737,8 @@ extension Ghostty {
             event: NSEvent,
             translationEvent: NSEvent? = nil,
             text: String? = nil,
-            composing: Bool = false
+            composing: Bool = false,
+            inputSource: RemotePaneInputSource = .directKey
         ) -> Bool {
             guard let surface = self.surface else { return false }
 
@@ -1686,11 +1753,7 @@ extension Ghostty {
                 let textResult = text.withCString { ptr in
                     key_ev.text = ptr
                     if let paneID = tmuxPaneID,
-                       let client = tmuxControlClient,
-                       !AttachedTmuxInputRouter.shouldHandleLocally(
-                       bindingFlags: surfaceModel?.keyIsBinding(key_ev),
-                       event: event
-                       ),
+                       shouldRoutePaneInput(bindingFlags: surfaceModel?.keyIsBinding(key_ev), event: event),
                        let data = AttachedTmuxInputEncoder.inputData(
                         isRelease: action == GHOSTTY_ACTION_RELEASE,
                         text: text,
@@ -1698,23 +1761,22 @@ extension Ghostty {
                         modifierFlags: event.modifierFlags
                        ) {
 
-                        Task { await client.sendKeys(paneID: paneID, data: data) }
+                        let source = inputSource == .directKey
+                            ? RemotePaneInputSource.directInputSource(for: data)
+                            : inputSource
+                        sendPaneInput(paneID: paneID, data: data, source: source)
                         return true
                     }
                     if action != GHOSTTY_ACTION_RELEASE,
                        let paneID = tmuxPaneID,
-                       let client = tmuxControlClient,
-                       !AttachedTmuxInputRouter.shouldHandleLocally(
-                        bindingFlags: surfaceModel?.keyIsBinding(key_ev),
-                        event: event
-                       ),
+                       shouldRoutePaneInput(bindingFlags: surfaceModel?.keyIsBinding(key_ev), event: event),
                        let data = AttachedTmuxInputEncoder.escapeSequence(
                         keyCode: event.keyCode,
                         eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: event),
                         modifierFlags: event.modifierFlags
                        ) {
 
-                        Task { await client.sendKeys(paneID: paneID, data: data) }
+                        sendPaneInput(paneID: paneID, data: data, source: .escapeSequence)
                         return true
                     }
                     // For tmux panes, non-binding keys that weren't captured by
@@ -1722,11 +1784,7 @@ extension Ghostty {
                     // through ghostty_surface_key, which enqueues to BlockingQueue
                     // and risks deadlock. Binding keys (Cmd shortcuts) are handled
                     // locally and must still go through Ghostty.
-                    if tmuxPaneID != nil, tmuxControlClient != nil,
-                       !AttachedTmuxInputRouter.shouldHandleLocally(
-                        bindingFlags: surfaceModel?.keyIsBinding(key_ev),
-                        event: event
-                       ) {
+                    if shouldRoutePaneInput(bindingFlags: surfaceModel?.keyIsBinding(key_ev), event: event) {
                         return true
                     }
                     return ghostty_surface_key(surface, key_ev)
@@ -1734,11 +1792,7 @@ extension Ghostty {
                 return textResult
             } else {
                 if let paneID = tmuxPaneID,
-                   let client = tmuxControlClient,
-                   !AttachedTmuxInputRouter.shouldHandleLocally(
-                   bindingFlags: surfaceModel?.keyIsBinding(key_ev),
-                   event: event
-                   ),
+                   shouldRoutePaneInput(bindingFlags: surfaceModel?.keyIsBinding(key_ev), event: event),
                    let data = AttachedTmuxInputEncoder.inputData(
                     isRelease: action == GHOSTTY_ACTION_RELEASE,
                     text: text,
@@ -1746,23 +1800,22 @@ extension Ghostty {
                     modifierFlags: event.modifierFlags
                    ) {
 
-                    Task { await client.sendKeys(paneID: paneID, data: data) }
+                    let source = inputSource == .directKey
+                        ? RemotePaneInputSource.directInputSource(for: data)
+                        : inputSource
+                    sendPaneInput(paneID: paneID, data: data, source: source)
                     return true
                 }
                 if action != GHOSTTY_ACTION_RELEASE,
                    let paneID = tmuxPaneID,
-                   let client = tmuxControlClient,
-                   !AttachedTmuxInputRouter.shouldHandleLocally(
-                    bindingFlags: surfaceModel?.keyIsBinding(key_ev),
-                    event: event
-                   ),
+                   shouldRoutePaneInput(bindingFlags: surfaceModel?.keyIsBinding(key_ev), event: event),
                    let data = AttachedTmuxInputEncoder.escapeSequence(
                     keyCode: event.keyCode,
                     eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: event),
                     modifierFlags: event.modifierFlags
                    ) {
 
-                    Task { await client.sendKeys(paneID: paneID, data: data) }
+                    sendPaneInput(paneID: paneID, data: data, source: .escapeSequence)
                     return true
                 }
                 // For tmux panes, non-binding keys that weren't captured by
@@ -1770,11 +1823,7 @@ extension Ghostty {
                 // through ghostty_surface_key, which enqueues to BlockingQueue
                 // and risks deadlock. Binding keys (Cmd shortcuts) are handled
                 // locally and must still go through Ghostty.
-                if tmuxPaneID != nil, tmuxControlClient != nil,
-                   !AttachedTmuxInputRouter.shouldHandleLocally(
-                    bindingFlags: surfaceModel?.keyIsBinding(key_ev),
-                    event: event
-                   ) {
+                if shouldRoutePaneInput(bindingFlags: surfaceModel?.keyIsBinding(key_ev), event: event) {
                     return true
                 }
                 return ghostty_surface_key(surface, key_ev)
@@ -1912,15 +1961,19 @@ extension Ghostty {
             }
         }
 
-        /// Routes clipboard paste through tmux control mode for attached panes.
+        /// Routes clipboard paste through the active remote pane input path.
         /// Returns true if handled.
-        private func pasteViaTmux() -> Bool {
-            guard let paneID = tmuxPaneID,
-                  let client = tmuxControlClient else { return false }
-            guard let str = NSPasteboard.general.string(forType: .string),
-                  let data = str.data(using: .utf8), !data.isEmpty else { return false }
-            Task { await client.sendKeys(paneID: paneID, data: data) }
+        func pasteViaTmux(from pasteboard: NSPasteboard = .general) -> Bool {
+            guard let paneID = tmuxPaneID, hasPaneInputRoute else { return false }
+            guard let data = Self.remotePanePasteData(from: pasteboard) else { return false }
+            sendPaneInput(paneID: paneID, data: data, source: .paste)
             return true
+        }
+
+        static func remotePanePasteData(from pasteboard: NSPasteboard = .general) -> Data? {
+            guard let str = pasteboard.getOpinionatedStringContents(),
+                  let data = str.data(using: .utf8), !data.isEmpty else { return nil }
+            return data
         }
 
         @IBAction func pasteSelection(_ sender: Any?) {
@@ -2352,14 +2405,14 @@ extension Ghostty.SurfaceView: NSTextInputClient {
         }
 
         if let paneID = tmuxPaneID,
-           let client = tmuxControlClient,
+           hasPaneInputRoute,
            let data = AttachedTmuxInputEncoder.inputData(
             isRelease: false,
             text: chars,
             eventCharacters: nil,
             modifierFlags: currentEvent.modifierFlags
            ) {
-            Task { await client.sendKeys(paneID: paneID, data: data) }
+            sendPaneInput(paneID: paneID, data: data, source: .imeCommit)
             return
         }
 
@@ -2381,10 +2434,9 @@ extension Ghostty.SurfaceView: NSTextInputClient {
             }
 
             if let paneID = tmuxPaneID,
-               let client = tmuxControlClient,
                let current = NSApp.currentEvent,
                current.type == .keyDown,
-               !AttachedTmuxInputRouter.shouldHandleLocally(bindingFlags: nil, event: current),
+               shouldRoutePaneInput(bindingFlags: nil, event: current),
                let data = AttachedTmuxInputEncoder.escapeSequence(
                 keyCode: current.keyCode,
                 eventCharacters: AttachedTmuxInputEncoder.eventCharacters(for: current),
@@ -2392,7 +2444,7 @@ extension Ghostty.SurfaceView: NSTextInputClient {
                ) {
                 routedTmuxCommandSelectorDuringKeyDown = true
 
-                Task { await client.sendKeys(paneID: paneID, data: data) }
+                sendPaneInput(paneID: paneID, data: data, source: .escapeSequence)
                 return
             }
 

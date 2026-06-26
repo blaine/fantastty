@@ -50,6 +50,25 @@ final class SessionDisplayInfoTests: XCTestCase {
         XCTAssertFalse(info.isDisconnected)
     }
 
+    func testRemoteEngineReconnectingLabelsResumeWithoutMigrationClaim() {
+        let attachment = Fantastty.TmuxAttachmentInfo(
+            sessionName: "remote",
+            host: .ssh(Fantastty.SSHHostInfo(user: "me", hostname: "mybox", port: nil)),
+            connectionState: .reconnecting(reason: "Socket is not connected"),
+            transport: .remoteEngine
+        )
+
+        let info = SessionDisplayInfo(mode: .attached(attachment), backingState: .available)
+
+        XCTAssertTrue(info.isConnecting)
+        XCTAssertTrue(info.isReconnecting)
+        XCTAssertFalse(info.isDisconnected)
+        XCTAssertEqual(info.statusMessage, "Reconnecting remote engine. Existing panes are preserved while Fantastty resumes the session.")
+        XCTAssertEqual(info.accessibilityLabel, "Remote engine reconnecting")
+        XCTAssertTrue(info.showsStatusOverlay)
+        XCTAssertFalse(info.statusMessage.localizedCaseInsensitiveContains("migrat"))
+    }
+
     func testRemoteAttachedSessionCanBeMarkedMissingWithoutChangingMode() {
         let session = Session(title: "Workspace", type: .local, workspaceID: "missing-local")
         let attachment = Fantastty.TmuxAttachmentInfo(

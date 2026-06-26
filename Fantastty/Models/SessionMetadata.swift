@@ -220,15 +220,19 @@ class SessionMetadataStore: ObservableObject {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    init() {
-        // Store in ~/.fantastty/workspaces.json
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        let fantasttyDir = homeDir.appendingPathComponent(".fantastty")
-
-        // Create directory if needed
-        try? FileManager.default.createDirectory(at: fantasttyDir, withIntermediateDirectories: true)
-
-        self.fileURL = fantasttyDir.appendingPathComponent("workspaces.json")
+    init(fileURL: URL? = nil) {
+        if let fileURL {
+            try? FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            self.fileURL = fileURL
+        } else {
+            let homeDir = FileManager.default.homeDirectoryForCurrentUser
+            let fantasttyDir = homeDir.appendingPathComponent(".fantastty")
+            try? FileManager.default.createDirectory(at: fantasttyDir, withIntermediateDirectories: true)
+            self.fileURL = fantasttyDir.appendingPathComponent("workspaces.json")
+        }
 
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601

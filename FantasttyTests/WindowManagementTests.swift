@@ -458,29 +458,57 @@ final class WindowManagementTests: XCTestCase {
         let sessionName = "codex-split-restore-\(UUID().uuidString.prefix(8).lowercased())"
         let tmuxPath = Fantastty.TmuxManager.shared.tmuxPath
 
-        let createProcess = Process()
-        createProcess.executableURL = URL(fileURLWithPath: tmuxPath)
-        createProcess.arguments = ["new-session", "-d", "-s", sessionName, "-n", "splitwin"]
-        try createProcess.run()
-        createProcess.waitUntilExit()
-        XCTAssertEqual(createProcess.terminationStatus, 0)
+        func runTmux(_ arguments: [String], file: StaticString = #filePath, line: UInt = #line) throws -> String? {
+            let process = Process()
+            let stdout = Pipe()
+            let stderr = Pipe()
+            process.executableURL = URL(fileURLWithPath: tmuxPath)
+            process.arguments = arguments
+            process.standardOutput = stdout
+            process.standardError = stderr
+            try process.run()
+            process.waitUntilExit()
+
+            let output = String(
+                data: stdout.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8
+            ) ?? ""
+            let errorOutput = String(
+                data: stderr.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8
+            ) ?? ""
+            XCTAssertEqual(
+                process.terminationStatus,
+                0,
+                "tmux \(arguments.joined(separator: " ")) failed: \(errorOutput)",
+                file: file,
+                line: line
+            )
+            return process.terminationStatus == 0 ? output : nil
+        }
+
+        guard try runTmux([
+            "new-session", "-d", "-x", "120", "-y", "40", "-s", sessionName, "-n", "splitwin"
+        ]) != nil else {
+            return
+        }
+        defer {
+            Fantastty.TmuxManager.shared.killSession(name: sessionName)
+        }
 
         // Build a 3-pane topology in the first window:
         // left pane + right side split vertically into top/bottom.
-        for args in [
-            ["split-window", "-h", "-t", "\(sessionName):0"],
-            ["split-window", "-v", "-t", "\(sessionName):0.1"]
-        ] {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: tmuxPath)
-            process.arguments = args
-            try process.run()
-            process.waitUntilExit()
-            XCTAssertEqual(process.terminationStatus, 0)
+        guard let rightPaneOutput = try runTmux([
+            "split-window", "-h", "-P", "-F", "#{pane_id}", "-t", "\(sessionName):splitwin"
+        ]) else {
+            return
         }
-
-        defer {
-            Fantastty.TmuxManager.shared.killSession(name: sessionName)
+        let rightPaneID = rightPaneOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rightPaneID.isEmpty else {
+            return XCTFail("Expected split-window to report the right pane id")
+        }
+        guard try runTmux(["split-window", "-v", "-t", rightPaneID]) != nil else {
+            return
         }
 
         let info = Fantastty.TmuxAttachmentInfo(
@@ -795,14 +823,16 @@ final class WindowManagementTests: XCTestCase {
         }
 
         var newWindowCalls = 0
+        let newWindowSent = expectation(description: "attached tmux new-window request sent")
         manager.attachedTmuxNewWindowSender = { sentClient in
             XCTAssertTrue(sentClient === client)
             newWindowCalls += 1
+            newWindowSent.fulfill()
             return ""
         }
 
         let created = manager.createTab()
-        await Task.yield()
+        await fulfillment(of: [newWindowSent], timeout: 2.0)
 
         XCTAssertNil(created)
         XCTAssertEqual(newWindowCalls, 1)

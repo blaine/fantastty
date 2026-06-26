@@ -20,6 +20,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Fantastty connects to remote shell hosts on your local network.</string>
 	<key>NSMainStoryboardFile</key>
 	<string></string>
 	<key>NSPrincipalClass</key>

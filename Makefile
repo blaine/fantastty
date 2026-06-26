@@ -11,3 +11,12 @@ xcframework:
 
 clean:
 	rm -rf xcframework/GhosttyKit.xcframework
+
+.PHONY: remote-engine-app-artifacts remote-engine-verify-app-artifacts
+
+remote-engine-app-artifacts:
+	tools/remote-engine-helper/package_app_artifacts.sh
+
+remote-engine-verify-app-artifacts:
+	@test -n "$$APP" || (echo "usage: APP=/path/to/Fantastty.app make remote-engine-verify-app-artifacts" >&2; exit 2)
+	tools/remote-engine-helper/verify_app_artifacts.py "$$APP"

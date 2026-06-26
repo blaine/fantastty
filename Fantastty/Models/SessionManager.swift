@@ -225,6 +225,7 @@ class SessionManager: ObservableObject {
     var ghosttyApp: Ghostty.App? {
         didSet {
             attachedTmuxSessionBridge.ghosttyApp = ghosttyApp
+            remoteWorkspaceBridge.ghosttyApp = ghosttyApp
         }
     }
 
@@ -232,7 +233,12 @@ class SessionManager: ObservableObject {
     /// Populated in setupTitleObserver; pruned in closeTab/closeSurface/closeSession.
     private var surfaceIndex: [ObjectIdentifier: (Session, TerminalTab)] = [:]
     private let attachedTmuxSessionBridge = TmuxSessionBridge()
+    private let remoteWorkspaceBridge = RemoteWorkspaceBridge()
     private var lifecycleRouterByWorkspaceID: [String: TerminalLifecycleRouter] = [:]
+    private var remoteEngineClientsByWorkspaceID: [String: RemoteEngineClient] = [:]
+    private var remoteEngineTabSelectionCancellables: [String: AnyCancellable] = [:]
+    private var remoteEngineTabSelectionSyncSuppressionWorkspaceIDs: Set<String> = []
+    private var remoteEngineWorkspacesWaitingForAuthoritativeRender: Set<String> = []
     var tmuxOutputInjector: TmuxOutputInjector! {
         didSet {
             attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
@@ -248,6 +254,28 @@ class SessionManager: ObservableObject {
     var liveTmuxWorkspaceProvider: LiveTmuxWorkspaceProvider
     var attachedSessionReconnectStarter: AttachedSessionReconnectStarter
     var workspaceMetadataProvider: WorkspaceMetadataProvider
+    var sessionMetadataStore: SessionMetadataStore = .shared {
+        didSet {
+            workspaceMetadataProvider = { [sessionMetadataStore] in
+                Array(sessionMetadataStore.metadata.values)
+            }
+        }
+    }
+    var remoteEngineBootstrapper: RemoteEngineBootstrapper = SSHRemoteEngineBootstrapper()
+    var remoteEngineTransport: RemoteEngineTransport = RemoteEngineNWQUICTransport()
+    var remoteEngineReconnectPolicy: RemoteEngineReconnectPolicy = .forever
+    var remoteWorkspaceSurfaceFactory: RemoteWorkspaceBridge.SurfaceFactory? {
+        get { remoteWorkspaceBridge.surfaceFactory }
+        set { remoteWorkspaceBridge.surfaceFactory = newValue }
+    }
+    var remoteWorkspacePaneGridRenderer: RemoteWorkspaceBridge.PaneGridRenderer {
+        get { remoteWorkspaceBridge.paneGridRenderer }
+        set { remoteWorkspaceBridge.paneGridRenderer = newValue }
+    }
+    var remoteWorkspaceRenderDiagnosticHandler: RemoteWorkspaceBridge.RenderDiagnosticHandler? {
+        get { remoteWorkspaceBridge.renderDiagnosticHandler }
+        set { remoteWorkspaceBridge.renderDiagnosticHandler = newValue }
+    }
     private let thumbnailRefreshController = ThumbnailRefreshController()
 
     // MARK: - Activity Tracking
@@ -284,11 +312,43 @@ class SessionManager: ObservableObject {
         tmuxAvailabilityProvider = { TmuxManager.shared.isTmuxAvailable }
         liveTmuxWorkspaceProvider = { TmuxManager.shared.groupSessionsByWorkspace() }
         attachedSessionReconnectStarter = SessionManager.defaultAttachedSessionReconnectStarter
-        workspaceMetadataProvider = { Array(SessionMetadataStore.shared.metadata.values) }
+        workspaceMetadataProvider = { [sessionMetadataStore] in
+            Array(sessionMetadataStore.metadata.values)
+        }
         tmuxOutputInjector = { [weak self] surface, data in
             self?.defaultTmuxOutputInjector(surface, data) ?? false
         }
         attachedTmuxSessionBridge.tmuxOutputInjector = tmuxOutputInjector
+        remoteWorkspaceBridge.keyframeRequestHandler = { [weak self] workspaceID, paneID, reason in
+            self?.remoteEngineClientsByWorkspaceID[workspaceID]?.requestKeyframe(paneID: paneID, reason: reason)
+        }
+        remoteWorkspaceBridge.paneInputHandler = { [weak self] workspaceID, paneID, data in
+            self?.remoteEngineClientsByWorkspaceID[workspaceID]?.sendKeys(paneID: paneID, data: data)
+        }
+        remoteWorkspaceBridge.paneResizeHandler = { [weak self] workspaceID, paneID, size in
+            self?.remoteEngineClientsByWorkspaceID[workspaceID]?.resizePane(paneID: paneID, size: size)
+        }
+        remoteWorkspaceBridge.tabSelectionSyncHandler = { [weak self] workspaceID, applySelection in
+            guard let self else {
+                applySelection()
+                return
+            }
+            self.remoteEngineTabSelectionSyncSuppressionWorkspaceIDs.insert(workspaceID)
+            defer { self.remoteEngineTabSelectionSyncSuppressionWorkspaceIDs.remove(workspaceID) }
+            applySelection()
+        }
+        remoteWorkspaceBridge.unsupportedPaneStateHandler = { [weak self] workspaceID, state in
+            self?.applyUnsupportedRemotePaneState(state, workspaceID: workspaceID)
+        }
+        remoteWorkspaceBridge.authoritativePaneRenderHandler = { [weak self] workspaceID, _ in
+            self?.completeRemoteEngineRenderResume(workspaceID: workspaceID)
+        }
+        remoteWorkspaceBridge.isPredictiveEchoEnabled = Self.isRemotePredictiveEchoEnabled
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .sink { [weak self] _ in
+                self?.remoteWorkspaceBridge.isPredictiveEchoEnabled = Self.isRemotePredictiveEchoEnabled
+            }
+            .store(in: &smCancellables)
 
         thumbnailRefreshController.onStateChange = { [weak self] isSuspended in
             DispatchQueue.main.async {
@@ -303,6 +363,13 @@ class SessionManager: ObservableObject {
         }
     }
 
+    private static var isRemotePredictiveEchoEnabled: Bool {
+        guard UserDefaults.standard.object(forKey: RemotePredictiveEchoSettings.userDefaultsKey) != nil else {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: RemotePredictiveEchoSettings.userDefaultsKey)
+    }
+
     // MARK: - Activity Tracking Methods
 
     private func activityTick() {
@@ -315,9 +382,7 @@ class SessionManager: ObservableObject {
     /// Flush all in-memory active times to disk. Call on deselect and app quit.
     func flushActiveTimes() {
         for session in sessions {
-            var meta = SessionMetadataStore.shared.getOrCreate(forKey: session.workspaceID)
-            meta.totalActiveSeconds = session.totalActiveSeconds
-            SessionMetadataStore.shared.update(meta)
+            updateActiveTimeMetadata(for: session)
         }
     }
 
@@ -422,7 +487,7 @@ class SessionManager: ObservableObject {
                         launchMode: .attach
                     )
                 Self.logger.info("Restoring attached tmux workspace \(wsLayout.workspaceID)")
-                restoreAttachedSession(
+                restorePersistedAttachmentSession(
                     attachment: attachment,
                     workspaceID: wsLayout.workspaceID,
                     tabLayouts: wsLayout.tabs,
@@ -448,7 +513,7 @@ class SessionManager: ObservableObject {
                 }
 
                 Self.logger.info("Restoring unlayouted workspace \(workspaceID)")
-                restoreAttachedSession(
+                restorePersistedAttachmentSession(
                     attachment: TmuxAttachmentInfo(
                         sessionName: baseSession.name,
                         host: .local,
@@ -485,7 +550,7 @@ class SessionManager: ObservableObject {
 
                 Self.logger.info("Restoring workspace \(workspaceID)")
 
-                restoreAttachedSession(
+                restorePersistedAttachmentSession(
                     attachment: TmuxAttachmentInfo(
                         sessionName: baseSession.name,
                         host: .local,
@@ -522,6 +587,37 @@ class SessionManager: ObservableObject {
         return persisted
     }
 
+    private func restorePersistedAttachmentSession(
+        attachment: TmuxAttachmentInfo,
+        workspaceID: String,
+        tabLayouts: [WorkspaceTabLayout] = [],
+        selectedTabIndex: Int? = nil,
+        autoReconnect: Bool = true
+    ) {
+        if attachment.transport == .remoteEngine,
+           case .ssh(let host) = attachment.host {
+            restoreRemoteEngineSession(
+                attachment: attachment,
+                host: host,
+                workspaceID: workspaceID,
+                tabLayouts: tabLayouts,
+                selectedTabIndex: selectedTabIndex,
+                autoReconnect: autoReconnect
+            )
+            return
+        }
+
+        var attachedAttachment = attachment
+        attachedAttachment.transport = .tmuxControl
+        restoreAttachedSession(
+            attachment: attachedAttachment,
+            workspaceID: workspaceID,
+            tabLayouts: tabLayouts,
+            selectedTabIndex: selectedTabIndex,
+            autoReconnect: autoReconnect
+        )
+    }
+
     private func restoreAttachedSession(
         attachment: TmuxAttachmentInfo,
         workspaceID: String,
@@ -543,6 +639,42 @@ class SessionManager: ObservableObject {
             startAttachedSessionReconnect(session)
         } else {
             session.backingState = placeholderBackingState(for: attachment)
+        }
+    }
+
+    private func restoreRemoteEngineSession(
+        attachment: TmuxAttachmentInfo,
+        host: SSHHostInfo,
+        workspaceID: String,
+        tabLayouts: [WorkspaceTabLayout] = [],
+        selectedTabIndex: Int? = nil,
+        autoReconnect: Bool = true
+    ) {
+        var info = persistedAttachmentInfo(from: attachment)
+        info.transport = .remoteEngine
+        let session = Session(
+            title: info.sessionName,
+            type: .ssh(host: host.hostname, user: host.user, port: host.port),
+            workspaceID: workspaceID,
+            metadataStore: sessionMetadataStore
+        )
+        session.mode = .attached(info)
+        restorePersistedAttachedTabs(
+            tabLayouts,
+            in: session,
+            selectedTabIndex: selectedTabIndex
+        )
+        sessions.append(session)
+
+        if autoReconnect {
+            session.backingState = .available
+            startRemoteEngineClient(
+                session,
+                host: host,
+                tmuxSessionName: remoteEngineExternalTmuxSessionName(for: attachment, workspaceID: workspaceID)
+            )
+        } else {
+            session.backingState = placeholderBackingState(for: info)
         }
     }
 
@@ -610,7 +742,7 @@ class SessionManager: ObservableObject {
                 connectionState: .disconnected(reason: nil),
                 launchMode: .attach
             )
-            restoreAttachedSession(
+            restorePersistedAttachmentSession(
                 attachment: attachment,
                 workspaceID: meta.workspaceID,
                 autoReconnect: shouldAutoReconnect(
@@ -676,6 +808,17 @@ class SessionManager: ObservableObject {
         var info = persistedAttachmentInfo(from: existingInfo)
         info.connectionState = .disconnected(reason: nil)
         info.launchMode = .attach
+        if info.transport == .remoteEngine,
+           case .ssh(let host) = info.host {
+            session.controlClient = nil
+            attachedTmuxSessionBridge.unregisterSession(session)
+            lifecycleRouterByWorkspaceID.removeValue(forKey: session.workspaceID)
+            session.mode = .attached(info)
+            session.backingState = .available
+            selectedSessionID = session.id
+            startRemoteEngineClient(session, host: host)
+            return
+        }
         configureAttachedSession(session, with: info)
         selectedSessionID = session.id
         startAttachedSessionReconnect(session)
@@ -775,7 +918,7 @@ class SessionManager: ObservableObject {
             session.backingState = .missingAttachedBacking(reason: "tmux unavailable")
         }
 
-        let metadataStore = SessionMetadataStore.shared
+        let metadataStore = sessionMetadataStore
         var meta = metadataStore.getOrCreate(forKey: workspaceID)
         if meta.name.isEmpty {
             metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
@@ -795,11 +938,11 @@ class SessionManager: ObservableObject {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
 
         let session = sessions[index]
+        let wasRemoteEngineSession = remoteEngineClientsByWorkspaceID[session.workspaceID] != nil
         attachedTmuxSessionBridge.unregisterSession(session)
-        let metadataStore = SessionMetadataStore.shared
-
-        metadataStore.update(
-            forKey: session.workspaceID,
+        unregisterRemoteEngineSession(session, shutdownRemote: killTmux)
+        updateLifecycleMetadata(
+            for: session,
             isArchived: false,
             isTrashed: true
         )
@@ -813,7 +956,7 @@ class SessionManager: ObservableObject {
         lifecycleRouterByWorkspaceID.removeValue(forKey: session.workspaceID)
 
         // Kill tmux session if requested and session has one
-        if killTmux {
+        if killTmux && !wasRemoteEngineSession {
             let wsID = session.workspaceID
             tmuxManager.killWorkspaceSessions(workspaceID: wsID)
             Self.logger.info("Killed tmux sessions for workspace \(wsID)")
@@ -868,14 +1011,19 @@ class SessionManager: ObservableObject {
     func archiveSession(id: UUID) {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[index]
+        let wasRemoteEngineSession = remoteEngineClientsByWorkspaceID[session.workspaceID] != nil
         attachedTmuxSessionBridge.unregisterSession(session)
+        unregisterRemoteEngineSession(session, shutdownRemote: true)
 
         // Kill tmux sessions
-        tmuxManager.killWorkspaceSessions(workspaceID: session.workspaceID)
+        if !wasRemoteEngineSession {
+            tmuxManager.killWorkspaceSessions(workspaceID: session.workspaceID)
+        }
 
-        // Set archived flag in metadata
-        let metadataStore = SessionMetadataStore.shared
-        metadataStore.update(forKey: session.workspaceID, isArchived: true)
+        updateLifecycleMetadata(
+            for: session,
+            isArchived: true
+        )
 
         // Remove from active sessions
         sessions.remove(at: index)
@@ -896,15 +1044,31 @@ class SessionManager: ObservableObject {
 
     /// Unarchive a workspace: clear archived flag, create a fresh session.
     func unarchiveSession(workspaceID: String) {
-        let metadataStore = SessionMetadataStore.shared
+        let metadataStore = sessionMetadataStore
         metadataStore.update(forKey: workspaceID, isArchived: false)
 
-        createSession(workspaceID: workspaceID)
+        guard !sessions.contains(where: { $0.workspaceID == workspaceID }) else {
+            selectedSessionID = sessions.first(where: { $0.workspaceID == workspaceID })?.id
+            return
+        }
+
+        let metadata = metadataStore.getOrCreate(forKey: workspaceID)
+        let attachment = metadata.attachment ?? TmuxAttachmentInfo(
+            sessionName: tmuxManager.baseSessionName(workspaceID: metadata.workspaceID),
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach
+        )
+        restorePersistedAttachmentSession(
+            attachment: attachment,
+            workspaceID: metadata.workspaceID
+        )
+        selectedSessionID = sessions.last?.id
     }
 
     /// Restore a trashed workspace as an active placeholder.
     func restoreTrashedWorkspace(workspaceID: String) {
-        let metadataStore = SessionMetadataStore.shared
+        let metadataStore = sessionMetadataStore
         metadataStore.update(forKey: workspaceID, isArchived: false, isTrashed: false)
 
         guard !sessions.contains(where: { $0.workspaceID == workspaceID }) else {
@@ -919,7 +1083,7 @@ class SessionManager: ObservableObject {
             connectionState: .disconnected(reason: nil),
             launchMode: .attach
         )
-        restoreAttachedSession(
+        restorePersistedAttachmentSession(
             attachment: attachment,
             workspaceID: metadata.workspaceID
         )
@@ -928,18 +1092,18 @@ class SessionManager: ObservableObject {
 
     /// Permanently delete an archived workspace's metadata.
     func deleteArchivedWorkspace(workspaceID: String) {
-        SessionMetadataStore.shared.remove(forKey: workspaceID)
+        sessionMetadataStore.remove(forKey: workspaceID)
     }
 
     /// Permanently delete a trashed workspace's metadata.
     func deleteTrashedWorkspace(workspaceID: String) {
-        SessionMetadataStore.shared.remove(forKey: workspaceID)
+        sessionMetadataStore.remove(forKey: workspaceID)
     }
 
     /// Permanently delete all trashed workspaces.
     func emptyTrash() {
-        for meta in SessionMetadataStore.shared.trashedWorkspaces {
-            SessionMetadataStore.shared.remove(forKey: meta.workspaceID)
+        for meta in sessionMetadataStore.trashedWorkspaces {
+            sessionMetadataStore.remove(forKey: meta.workspaceID)
         }
     }
 
@@ -953,20 +1117,25 @@ class SessionManager: ObservableObject {
             return nil
         }
 
-        guard let client = session.controlClient else {
-            Self.logger.error(
-                "Cannot create tab: attached session missing control client for workspace \(session.workspaceID, privacy: .public)"
-            )
+        if let client = session.controlClient {
+            Task {
+                do {
+                    _ = try await attachedTmuxNewWindowSender(client)
+                } catch {
+                    Self.logger.error("Failed to create attached tmux window: \(error.localizedDescription, privacy: .public)")
+                }
+            }
             return nil
         }
 
-        Task {
-            do {
-                _ = try await attachedTmuxNewWindowSender(client)
-            } catch {
-                Self.logger.error("Failed to create attached tmux window: \(error.localizedDescription, privacy: .public)")
-            }
+        if let remoteEngineClient = remoteEngineClientsByWorkspaceID[session.workspaceID] {
+            remoteEngineClient.newWindow()
+            return nil
         }
+
+        Self.logger.error(
+            "Cannot create tab: attached session missing control client for workspace \(session.workspaceID, privacy: .public)"
+        )
         return nil
     }
 
@@ -1002,6 +1171,15 @@ class SessionManager: ObservableObject {
             return
         }
 
+        if let tab = session.tabs.first(where: { $0.id == id }),
+           tab.kind == .terminal,
+           isRemoteEngineSession(session) {
+            Self.logger.info(
+                "Ignoring local terminal tab close for remote engine workspace \(session.workspaceID, privacy: .public)"
+            )
+            return
+        }
+
         if let tab = session.tabs.first(where: { $0.id == id }) {
             // Remove tab's surfaces from the lookup index before the tab is removed
             deregisterSurfaces(in: tab)
@@ -1030,7 +1208,11 @@ class SessionManager: ObservableObject {
 
         if case .attached = session.mode,
            let paneID = surface.tmuxPaneID,
-           let client = surface.tmuxControlClient {
+           let remotePaneInputHandler = surface.remotePaneInputHandler {
+            remotePaneInputHandler(paneID, RemotePaneInput(data: Data([0x0c]), source: .directKey))
+        } else if case .attached = session.mode,
+                  let paneID = surface.tmuxPaneID,
+                  let client = surface.tmuxControlClient {
             Task {
                 // Send Ctrl-L (form feed / clear) to the pane
                 // Ctrl-L = 0x0c (form feed / clear)
@@ -1073,6 +1255,13 @@ class SessionManager: ObservableObject {
             Task {
                 await router.closePane(paneID: paneID, in: session)
             }
+            return
+        }
+
+        if surfaceView.tmuxPaneID != nil, isRemoteEngineSession(session) {
+            Self.logger.info(
+                "Ignoring local pane close for remote engine workspace \(session.workspaceID, privacy: .public)"
+            )
             return
         }
 
@@ -1267,9 +1456,7 @@ class SessionManager: ObservableObject {
             .sink { [weak self] (oldID, _) in
                 guard let self = self, let oldID = oldID,
                       let session = self.sessions.first(where: { $0.id == oldID }) else { return }
-                var meta = SessionMetadataStore.shared.getOrCreate(forKey: session.workspaceID)
-                meta.totalActiveSeconds = session.totalActiveSeconds
-                SessionMetadataStore.shared.update(meta)
+                self.updateActiveTimeMetadata(for: session)
             }
             .store(in: &smCancellables)
 
@@ -1357,7 +1544,9 @@ class SessionManager: ObservableObject {
         from surfaceView: Ghostty.SurfaceView,
         direction: SplitTree<Ghostty.SurfaceView>.NewDirection
     ) -> Bool {
-        guard let (_, tab) = findSessionAndTab(for: surfaceView) else { return false }
+        guard let (session, tab) = findSessionAndTab(for: surfaceView) else { return false }
+        guard !isRemoteEngineSession(session),
+              session.controlClient != nil else { return false }
         return splitPaneIDIfAllowed(for: tab, direction: direction) != nil
     }
 
@@ -1571,6 +1760,275 @@ class SessionManager: ObservableObject {
 
     // MARK: - Tmux Attach
 
+    @discardableResult
+    func createRemoteEngineSession(host: SSHHostInfo, workspaceID: String? = nil) -> Session {
+        let workspaceID = workspaceID ?? String(UUID().uuidString.prefix(8).lowercased())
+        let info = TmuxAttachmentInfo(
+            sessionName: "fantastty-remote-\(workspaceID)",
+            host: .ssh(host),
+            connectionState: .connecting,
+            launchMode: .attach,
+            transport: .remoteEngine
+        )
+        let session = Session(
+            title: info.sessionName,
+            type: .ssh(host: host.hostname, user: host.user, port: host.port),
+            workspaceID: workspaceID,
+            metadataStore: sessionMetadataStore
+        )
+        session.mode = .attached(info)
+        session.backingState = .available
+
+        sessions.append(session)
+        selectedSessionID = session.id
+        startRemoteEngineClient(session, host: host)
+
+        let metadataStore = sessionMetadataStore
+        var meta = metadataStore.getOrCreate(forKey: workspaceID)
+        if meta.name.isEmpty {
+            metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
+            meta = metadataStore.getOrCreate(forKey: workspaceID)
+        }
+        meta.attachment = persistedAttachmentInfo(from: info)
+        metadataStore.update(meta)
+
+        Self.logger.info("Created remote engine session \(session.id) host=\(host.displayName)")
+        return session
+    }
+
+    private func startRemoteEngineClient(_ session: Session, host: SSHHostInfo, tmuxSessionName: String? = nil) {
+        let workspaceID = session.workspaceID
+        remoteWorkspaceBridge.registerRemoteWorkspaceSession(session)
+
+        let client = RemoteEngineClient(
+            workspaceID: workspaceID,
+            materialProvider: { [remoteEngineBootstrapper] in
+                try await remoteEngineBootstrapper.attachMaterial(
+                    workspaceID: workspaceID,
+                    host: host,
+                    tmuxSessionName: tmuxSessionName
+                )
+            },
+            transport: remoteEngineTransport,
+            reconnectPolicy: remoteEngineReconnectPolicy,
+            messageHandler: { [weak self] inbound in
+                self?.remoteWorkspaceBridge.handle(inbound.message, delivery: inbound.delivery)
+            },
+            reattachHandler: { [weak self] in
+                await self?.remoteWorkspaceBridge.handleReattach(workspaceID: workspaceID)
+            },
+            stateHandler: { [weak self, weak session] state in
+                guard let self, let session else { return }
+                self.applyRemoteEngineState(state, to: session)
+            }
+        )
+        remoteEngineClientsByWorkspaceID[workspaceID] = client
+        observeRemoteEngineTabSelection(for: session)
+        client.start()
+    }
+
+    private func observeRemoteEngineTabSelection(for session: Session) {
+        remoteEngineTabSelectionCancellables[session.workspaceID]?.cancel()
+        remoteEngineTabSelectionCancellables[session.workspaceID] = session.$selectedTabID
+            .dropFirst()
+            .sink { [weak self, weak session] selectedTabID in
+                guard let self, let session, let selectedTabID else { return }
+                guard let tab = session.tabs.first(where: { $0.id == selectedTabID }),
+                      let windowID = tab.tmuxWindowID else {
+                    return
+                }
+                guard !self.remoteEngineTabSelectionSyncSuppressionWorkspaceIDs.contains(session.workspaceID) else {
+                    return
+                }
+                self.remoteEngineClientsByWorkspaceID[session.workspaceID]?.selectWindow(windowID: windowID)
+            }
+    }
+
+    private func remoteEngineExternalTmuxSessionName(for info: TmuxAttachmentInfo, workspaceID: String) -> String? {
+        let privateWorkspaceSessionName = "fantastty-remote-\(workspaceID)"
+        return info.sessionName == privateWorkspaceSessionName ? nil : info.sessionName
+    }
+
+    private func unregisterRemoteEngineSession(_ session: Session, shutdownRemote: Bool = false) {
+        let client = remoteEngineClientsByWorkspaceID.removeValue(forKey: session.workspaceID)
+        remoteEngineTabSelectionCancellables.removeValue(forKey: session.workspaceID)?.cancel()
+        remoteEngineTabSelectionSyncSuppressionWorkspaceIDs.remove(session.workspaceID)
+        remoteEngineWorkspacesWaitingForAuthoritativeRender.remove(session.workspaceID)
+        let material = client?.lastAttachMaterial
+        client?.stop()
+        remoteWorkspaceBridge.unregisterSession(session)
+
+        guard shutdownRemote,
+              let material,
+              case .attached(let info) = session.mode,
+              case .ssh(let host) = info.host else {
+            return
+        }
+
+        let bootstrapper = remoteEngineBootstrapper
+        Task {
+            do {
+                try await bootstrapper.shutdown(material: material, host: host)
+            } catch {
+                Self.logger.error("Failed to shut down remote engine helper: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    private func isRemoteEngineSession(_ session: Session) -> Bool {
+        if remoteEngineClientsByWorkspaceID[session.workspaceID] != nil {
+            return true
+        }
+        guard case .attached(let info) = session.mode else { return false }
+        return info.transport == .remoteEngine
+    }
+
+    func handleRemoteTerminalTabBecameVisible(session: Session, tab: TerminalTab) {
+        guard isRemoteEngineSession(session) else { return }
+        for surface in tab.surfaceTree?.root?.leaves() ?? [] {
+            guard let paneID = surface.tmuxPaneID else { continue }
+            remoteWorkspaceBridge.handleRemotePaneBecameVisible(
+                workspaceID: session.workspaceID,
+                paneID: paneID
+            )
+        }
+    }
+
+    func handleRemoteSelectedTerminalBecameVisible(session: Session) {
+        guard let tab = session.selectedTab else { return }
+        handleRemoteTerminalTabBecameVisible(session: session, tab: tab)
+    }
+
+    private func updateLifecycleMetadata(
+        for session: Session,
+        isArchived: Bool? = nil,
+        isTrashed: Bool? = nil
+    ) {
+        var meta = sessionMetadataStore.getOrCreate(forKey: session.workspaceID)
+        if let isArchived {
+            meta.isArchived = isArchived
+            meta.archivedAt = isArchived ? Date() : nil
+        }
+        if let isTrashed {
+            meta.isTrashed = isTrashed
+            meta.trashedAt = isTrashed ? Date() : nil
+        }
+        sessionMetadataStore.update(meta)
+    }
+
+    private func updateActiveTimeMetadata(for session: Session) {
+        var meta = sessionMetadataStore.getOrCreate(forKey: session.workspaceID)
+        meta.totalActiveSeconds = session.totalActiveSeconds
+        sessionMetadataStore.update(meta)
+    }
+
+    private func applyRemoteEngineState(_ state: RemoteEngineClientState, to session: Session) {
+        guard remoteEngineClientsByWorkspaceID[session.workspaceID] != nil else { return }
+        guard case .attached(var info) = session.mode else { return }
+        switch state {
+        case .idle:
+            info.connectionState = .disconnected(reason: nil)
+        case .connecting:
+            info.connectionState = .connecting
+            session.backingState = .available
+        case .reconnecting(let reason):
+            info.connectionState = .reconnecting(reason: reason)
+            session.backingState = .available
+        case .connected:
+            session.backingState = .available
+            if case .reconnecting = info.connectionState {
+                remoteEngineWorkspacesWaitingForAuthoritativeRender.insert(session.workspaceID)
+            } else {
+                info.connectionState = .connected
+                remoteEngineWorkspacesWaitingForAuthoritativeRender.remove(session.workspaceID)
+            }
+        case .disconnected(let reason):
+            remoteEngineWorkspacesWaitingForAuthoritativeRender.remove(session.workspaceID)
+            let presentation = reason.map(remoteEngineFailurePresentation)
+            let presentedReason = presentation?.connectionReason
+            if presentation?.allowsSSHFallbackBeforeRemotePanes == true &&
+                shouldFallbackRemoteEngineSessionToSSHControlMode(session) {
+                fallbackRemoteEngineSessionToSSHControlMode(session, info: info, reason: presentedReason)
+                return
+            }
+            info.connectionState = .disconnected(reason: presentedReason)
+            if !session.tabs.contains(where: { $0.kind == .terminal }) {
+                session.backingState = .missingAttachedBacking(reason: presentedReason)
+            }
+        }
+        session.mode = .attached(info)
+    }
+
+    private func completeRemoteEngineRenderResume(workspaceID: String) {
+        guard remoteEngineWorkspacesWaitingForAuthoritativeRender.remove(workspaceID) != nil else { return }
+        guard remoteEngineClientsByWorkspaceID[workspaceID] != nil else { return }
+        guard let session = sessions.first(where: { $0.workspaceID == workspaceID }) else { return }
+        guard case .attached(var info) = session.mode else { return }
+        guard info.transport == .remoteEngine else { return }
+        guard case .reconnecting = info.connectionState else { return }
+
+        info.connectionState = .connected
+        session.backingState = .available
+        session.mode = .attached(info)
+    }
+
+    private func remoteEngineFailurePresentation(_ reason: String) -> RemoteEngineFailurePresentation {
+        RemoteEngineFailurePresentation
+            .presenting(RemoteEngineError.remote(reason))
+    }
+
+    private func applyUnsupportedRemotePaneState(_ state: RemoteUnsupportedPaneState, workspaceID: String) {
+        guard remoteEngineClientsByWorkspaceID[workspaceID] != nil else { return }
+        guard let session = sessions.first(where: { $0.workspaceID == workspaceID }) else { return }
+        guard case .attached(var info) = session.mode else { return }
+
+        info.connectionState = .disconnected(
+            reason: "remote pane \(state.paneID) unsupported: \(state.reason.rawValue)"
+        )
+        session.mode = .attached(info)
+    }
+
+    private func shouldFallbackRemoteEngineSessionToSSHControlMode(_ session: Session) -> Bool {
+        guard !hasRemoteEnginePane(in: session) else { return false }
+        guard case .attached(let info) = session.mode,
+              case .ssh = info.host else {
+            return false
+        }
+        return true
+    }
+
+    private func hasRemoteEnginePane(in session: Session) -> Bool {
+        session.tabs.contains { tab in
+            tab.surfaceTree?.root?.leaves().contains { surface in
+                surface.remotePaneInputHandler != nil
+            } == true
+        }
+    }
+
+    private func fallbackRemoteEngineSessionToSSHControlMode(
+        _ session: Session,
+        info: TmuxAttachmentInfo,
+        reason: String?
+    ) {
+        remoteEngineClientsByWorkspaceID.removeValue(forKey: session.workspaceID)?.stop()
+        remoteEngineTabSelectionCancellables.removeValue(forKey: session.workspaceID)?.cancel()
+        remoteEngineTabSelectionSyncSuppressionWorkspaceIDs.remove(session.workspaceID)
+        remoteWorkspaceBridge.unregisterSession(session)
+
+        var fallbackInfo = info
+        fallbackInfo.connectionState = .disconnected(reason: reason)
+        fallbackInfo.launchMode = .create
+        fallbackInfo.transport = .tmuxControl
+
+        configureAttachedSession(session, with: fallbackInfo)
+        session.backingState = .available
+        startAttachedSessionReconnect(session)
+
+        var meta = sessionMetadataStore.getOrCreate(forKey: session.workspaceID)
+        meta.attachment = persistedAttachmentInfo(from: fallbackInfo)
+        sessionMetadataStore.update(meta)
+    }
+
     func makeAttachedSession(info: TmuxAttachmentInfo, workspaceID: String? = nil) -> Session {
         let wsID = workspaceID ?? String(UUID().uuidString.prefix(8)).lowercased()
         let sessionType: SessionType = {
@@ -1581,12 +2039,14 @@ class SessionManager: ObservableObject {
                 return .ssh(host: sshInfo.hostname, user: sshInfo.user, port: sshInfo.port)
             }
         }()
-        let session = Session(title: info.sessionName, type: sessionType, workspaceID: wsID)
+        let session = Session(title: info.sessionName, type: sessionType, workspaceID: wsID, metadataStore: sessionMetadataStore)
         session.mode = .attached(info)
 
-        let client = TmuxControlClient(attachmentInfo: info)
-        session.controlClient = client
-        attachedTmuxSessionBridge.registerAttachedSession(session)
+        if info.transport == .tmuxControl {
+            let client = TmuxControlClient(attachmentInfo: info)
+            session.controlClient = client
+            attachedTmuxSessionBridge.registerAttachedSession(session)
+        }
 
         return session
     }
@@ -1598,11 +2058,15 @@ class SessionManager: ObservableObject {
         sessions.append(session)
         selectedSessionID = session.id
 
-        startAttachedSessionReconnect(session)
+        if info.transport == .remoteEngine, case .ssh(let host) = info.host {
+            startRemoteEngineClient(session, host: host, tmuxSessionName: info.sessionName)
+        } else {
+            startAttachedSessionReconnect(session)
+        }
 
         // Persist metadata so the session survives across restarts even if
         // layout.json is lost or corrupt.
-        let metadataStore = SessionMetadataStore.shared
+        let metadataStore = sessionMetadataStore
         var meta = metadataStore.getOrCreate(forKey: session.workspaceID)
         if meta.name.isEmpty {
             metadataStore.update(forKey: session.workspaceID, name: Self.generateWorkspaceName())

@@ -356,8 +356,8 @@ final class SplitLayoutPipelineTests: XCTestCase {
         return history
     }
 
-    /// Test the feedback loop for stability across container heights.
-    func testFeedbackLoop_twoVerticalPanes_stability() {
+    /// Show that the old surface-sum feedback loop is unstable across container heights.
+    func testSurfaceSumFeedbackLoopDemonstratesInstability() {
         let cellHeight: CGFloat = 17
         let initialPaneHeights = [27, 27]
         let initialTotalHeight = 55
@@ -379,12 +379,10 @@ final class SplitLayoutPipelineTests: XCTestCase {
             }
         }
 
-        if !unstable.isEmpty {
-            let sample = unstable.prefix(10).map {
-                "  container=\($0.containerH): \($0.iterations) iters, rows=\($0.lastRows)"
-            }.joined(separator: "\n")
-            XCTFail("Feedback loop didn't converge at \(unstable.count) container heights:\n\(sample)")
-        }
+        XCTAssertFalse(
+            unstable.isEmpty,
+            "Surface-sum feedback loop unexpectedly converged; revisit contentSize-derived sizing coverage."
+        )
     }
 
     /// Test that using container-derived grid size (contentSize) is stable.
@@ -455,7 +453,9 @@ final class SplitLayoutPipelineTests: XCTestCase {
             }
         }
 
-        XCTFail(lines.joined(separator: "\n"))
+        XCTContext.runActivity(named: "Feedback loop diagnostic") { activity in
+            activity.add(XCTAttachment(string: lines.joined(separator: "\n")))
+        }
     }
 
     /// Sweep all cell sizes (common font heights) × container sizes.

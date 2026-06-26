@@ -348,20 +348,27 @@ extension Ghostty {
             ])
         }
 
-        static func readClipboard(_ userdata: UnsafeMutableRawPointer?, location: ghostty_clipboard_e, state: UnsafeMutableRawPointer?) {
+        static func readClipboard(_ userdata: UnsafeMutableRawPointer?, location: ghostty_clipboard_e, state: UnsafeMutableRawPointer?) -> Bool {
             // If we don't even have a surface, something went terrible wrong so we have
             // to leak "state".
             let surfaceView = self.surfaceUserdata(from: userdata)
-            guard let surface = surfaceView.surface else { return }
+            guard let surface = surfaceView.surface else { return false }
 
             // Get our pasteboard
             guard let pasteboard = NSPasteboard.ghostty(location) else {
-                return completeClipboardRequest(surface, data: "", state: state)
+                return false
             }
 
             // Get our string
-            let str = pasteboard.getOpinionatedStringContents() ?? ""
+            guard let str = readableClipboardString(from: pasteboard) else {
+                return false
+            }
             completeClipboardRequest(surface, data: str, state: state)
+            return true
+        }
+
+        static func readableClipboardString(from pasteboard: NSPasteboard) -> String? {
+            pasteboard.getOpinionatedStringContents()
         }
 
         static func confirmReadClipboard(

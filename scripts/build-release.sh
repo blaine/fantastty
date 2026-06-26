@@ -31,7 +31,7 @@ mkdir -p "$BUILD_DIR"
 
 # ── Build ──────────────────────────────────────────────────────
 echo "==> Building $APP_NAME (Release)..."
-xcodebuild \
+FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS=1 xcodebuild \
     -scheme "$SCHEME" \
     -configuration Release \
     -derivedDataPath "$BUILD_DIR/DerivedData" \
@@ -45,6 +45,9 @@ if [ ! -d "$APP_BUILT" ]; then
     exit 1
 fi
 cp -R "$APP_BUILT" "$APP_PATH"
+
+echo "==> Verifying remote-engine artifacts..."
+make -C "$PROJECT_DIR" remote-engine-verify-app-artifacts APP="$APP_PATH"
 
 # ── Verify signature ──────────────────────────────────────────
 echo "==> Verifying code signature..."

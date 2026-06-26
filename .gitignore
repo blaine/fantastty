@@ -20,6 +20,11 @@ DerivedData/
 # Built xcframework
 xcframework/
 .derivedData
+.worktrees/
+
+# Generated remote engine helper bundle artifacts
+Fantastty/Resources/RemoteEngine/manifest.json
+Fantastty/Resources/RemoteEngine/linux-*/
 
 # macOS
 .DS_Store

@@ -690,6 +690,7 @@ final class PersistenceTests: XCTestCase {
 
     @MainActor
     func testRestoreTmuxSessionsRestoresMetadataOnlyLocalWorkspaceAsAttachedPlaceholder() throws {
+        Fantastty.SessionManager.layoutURLOverride = tempFileURL()
         let workspaceID = "placeholder-local-\(UUID().uuidString.prefix(8).lowercased())"
         workspaceIDsToCleanup.append(workspaceID)
 
@@ -730,6 +731,7 @@ final class PersistenceTests: XCTestCase {
 
     @MainActor
     func testRestoreTmuxSessionsRestoresMetadataOnlyRemoteWorkspaceAsAttachedPlaceholder() throws {
+        Fantastty.SessionManager.layoutURLOverride = tempFileURL()
         var meta = Fantastty.SessionMetadata(
             workspaceID: "remote-placeholder",
             name: "Remote Placeholder",
@@ -769,6 +771,7 @@ final class PersistenceTests: XCTestCase {
 
     @MainActor
     func testRestoreTmuxSessionsSkipsTrashedMetadataWorkspaces() throws {
+        Fantastty.SessionManager.layoutURLOverride = tempFileURL()
         let workspaceID = "trashed-placeholder-\(UUID().uuidString.prefix(8).lowercased())"
         workspaceIDsToCleanup.append(workspaceID)
 
@@ -857,6 +860,7 @@ final class PersistenceTests: XCTestCase {
 
     @MainActor
     func testRestoreTmuxSessionsWithoutLayoutSortsMetadataPlaceholdersByModifiedAtDescending() {
+        Fantastty.SessionManager.layoutURLOverride = tempFileURL()
         var olderMeta = SessionMetadata(workspaceID: "workspace-old", name: "Older")
         olderMeta.modifiedAt = Date(timeIntervalSince1970: 100)
         var newerMeta = SessionMetadata(workspaceID: "workspace-new", name: "Newer")

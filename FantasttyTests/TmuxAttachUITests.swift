@@ -133,4 +133,54 @@ final class TmuxAttachUITests: XCTestCase {
 
         XCTAssertTrue(sessions.isEmpty)
     }
+
+    func testRemoteTmuxAttachCanSelectRemoteEngineTransport() {
+        let host = SSHHostInfo(user: "jesse", hostname: "remote.example.invalid", port: nil)
+        let session = TmuxAttachSheet.DiscoveredSession(
+            name: "0",
+            host: .ssh(host),
+            windowCount: 9
+        )
+
+        let info = TmuxAttachSheet.attachmentInfo(for: session, useRemoteEngine: true)
+
+        XCTAssertEqual(info.sessionName, "0")
+        XCTAssertEqual(info.host, .ssh(host))
+        XCTAssertTrue(info.launchMode == .attach)
+        XCTAssertTrue(info.transport == .remoteEngine)
+    }
+
+    func testLocalTmuxAttachKeepsControlModeTransport() {
+        let session = TmuxAttachSheet.DiscoveredSession(
+            name: "local",
+            host: .local,
+            windowCount: 1
+        )
+
+        let info = TmuxAttachSheet.attachmentInfo(for: session, useRemoteEngine: true)
+
+        XCTAssertTrue(info.transport == .tmuxControl)
+    }
+
+    func testSSHConnectionSheetBuildsNormalSSHTarget() {
+        let target = SSHConnectionSheet.connectionTarget(
+            host: "dev.example.com",
+            user: "deploy",
+            port: "2222",
+            useRemoteEngine: false
+        )
+
+        XCTAssertEqual(target, .ssh(.ssh(host: "dev.example.com", user: "deploy", port: 2222)))
+    }
+
+    func testSSHConnectionSheetBuildsRemoteEngineTarget() {
+        let target = SSHConnectionSheet.connectionTarget(
+            host: "remote.example.invalid",
+            user: "",
+            port: "22",
+            useRemoteEngine: true
+        )
+
+        XCTAssertEqual(target, .remoteEngine(Fantastty.SSHHostInfo(user: nil, hostname: "remote.example.invalid", port: nil)))
+    }
 }

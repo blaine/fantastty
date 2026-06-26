@@ -5,6 +5,7 @@ import Foundation
 /// The state of a tmux control mode connection.
 enum ConnectionState: Codable, Equatable {
     case connecting
+    case reconnecting(reason: String?)
     case connected
     case disconnected(reason: String?)
 }
@@ -72,6 +73,11 @@ enum TmuxAttachmentLaunchMode: String, Codable, Equatable {
     case create
 }
 
+enum TmuxAttachmentTransport: String, Codable, Equatable {
+    case tmuxControl
+    case remoteEngine
+}
+
 // MARK: - TmuxAttachmentInfo
 
 /// Information about a tmux session attachment, including the session name,
@@ -81,17 +87,20 @@ struct TmuxAttachmentInfo: Codable, Equatable {
     let host: TmuxHost
     var connectionState: ConnectionState
     var launchMode: TmuxAttachmentLaunchMode
+    var transport: TmuxAttachmentTransport
 
     init(
         sessionName: String,
         host: TmuxHost,
         connectionState: ConnectionState,
-        launchMode: TmuxAttachmentLaunchMode = .attach
+        launchMode: TmuxAttachmentLaunchMode = .attach,
+        transport: TmuxAttachmentTransport = .tmuxControl
     ) {
         self.sessionName = sessionName
         self.host = host
         self.connectionState = connectionState
         self.launchMode = launchMode
+        self.transport = transport
     }
 
     /// Generate the command to attach to this tmux session in control mode.
@@ -125,6 +134,7 @@ struct TmuxAttachmentInfo: Codable, Equatable {
         case host
         case connectionState
         case launchMode
+        case transport
     }
 
     init(from decoder: Decoder) throws {
@@ -133,6 +143,7 @@ struct TmuxAttachmentInfo: Codable, Equatable {
         host = try container.decode(TmuxHost.self, forKey: .host)
         connectionState = try container.decode(ConnectionState.self, forKey: .connectionState)
         launchMode = try container.decodeIfPresent(TmuxAttachmentLaunchMode.self, forKey: .launchMode) ?? .attach
+        transport = try container.decodeIfPresent(TmuxAttachmentTransport.self, forKey: .transport) ?? .tmuxControl
     }
 
     func encode(to encoder: Encoder) throws {
@@ -141,6 +152,7 @@ struct TmuxAttachmentInfo: Codable, Equatable {
         try container.encode(host, forKey: .host)
         try container.encode(connectionState, forKey: .connectionState)
         try container.encode(launchMode, forKey: .launchMode)
+        try container.encode(transport, forKey: .transport)
     }
 }
 

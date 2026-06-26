@@ -173,6 +173,13 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         XCTAssertEqual(original, decoded)
     }
 
+    func testConnectionStateReconnectingCodableRoundTrip() throws {
+        let original = ConnectionState.reconnecting(reason: "Socket is not connected")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(ConnectionState.self, from: data)
+        XCTAssertEqual(original, decoded)
+    }
+
     func testConnectionStateDisconnectedWithReasonCodableRoundTrip() throws {
         let original = ConnectionState.disconnected(reason: "timeout")
         let data = try JSONEncoder().encode(original)
@@ -194,11 +201,13 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         let original = TmuxAttachmentInfo(
             sessionName: "work",
             host: .ssh(sshInfo),
-            connectionState: .connected
+            connectionState: .connected,
+            transport: .remoteEngine
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(TmuxAttachmentInfo.self, from: data)
         XCTAssertEqual(original, decoded)
+        XCTAssertEqual(decoded.transport, .remoteEngine)
     }
 
     // MARK: - Codable Round-Trips: SessionMode

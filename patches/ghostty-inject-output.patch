@@ -1,20 +1,80 @@
 diff --git a/include/ghostty.h b/include/ghostty.h
-index 3d3973084..ec1e80788 100644
+index ea5ac49d3..1a473c898 100644
 --- a/include/ghostty.h
 +++ b/include/ghostty.h
-@@ -1078,6 +1078,7 @@ bool ghostty_surface_key_is_binding(ghostty_surface_t,
-                                     ghostty_input_key_s,
-                                     ghostty_binding_flags_e*);
- void ghostty_surface_text(ghostty_surface_t, const char*, uintptr_t);
-+void ghostty_surface_inject_output(ghostty_surface_t, const char*, uintptr_t);
- void ghostty_surface_preedit(ghostty_surface_t, const char*, uintptr_t);
- bool ghostty_surface_mouse_captured(ghostty_surface_t);
- bool ghostty_surface_mouse_button(ghostty_surface_t,
+@@ -1127,6 +1127,59 @@ GHOSTTY_API bool ghostty_surface_key_is_binding(ghostty_surface_t,
+                                                    ghostty_input_key_s,
+                                                    ghostty_binding_flags_e*);
+ GHOSTTY_API void ghostty_surface_text(ghostty_surface_t, const char*, uintptr_t);
++GHOSTTY_API void ghostty_surface_inject_output(ghostty_surface_t, const char*, uintptr_t);
++typedef int32_t ghostty_remote_grid_color_tag_e;
++enum {
++  GHOSTTY_REMOTE_GRID_COLOR_DEFAULT = 0,
++  GHOSTTY_REMOTE_GRID_COLOR_INDEXED = 1,
++  GHOSTTY_REMOTE_GRID_COLOR_RGB = 2,
++};
++typedef int32_t ghostty_remote_grid_underline_e;
++enum {
++  GHOSTTY_REMOTE_GRID_UNDERLINE_NONE = 0,
++  GHOSTTY_REMOTE_GRID_UNDERLINE_SINGLE = 1,
++  GHOSTTY_REMOTE_GRID_UNDERLINE_DOUBLE = 2,
++  GHOSTTY_REMOTE_GRID_UNDERLINE_CURLY = 3,
++  GHOSTTY_REMOTE_GRID_UNDERLINE_DOTTED = 4,
++  GHOSTTY_REMOTE_GRID_UNDERLINE_DASHED = 5,
++};
++typedef int32_t ghostty_remote_grid_cursor_shape_e;
++enum {
++  GHOSTTY_REMOTE_GRID_CURSOR_SHAPE_BLOCK = 0,
++  GHOSTTY_REMOTE_GRID_CURSOR_SHAPE_BAR = 1,
++  GHOSTTY_REMOTE_GRID_CURSOR_SHAPE_UNDERLINE = 2,
++};
++typedef struct {
++  ghostty_remote_grid_color_tag_e tag;
++  uint8_t index;
++  uint8_t red;
++  uint8_t green;
++  uint8_t blue;
++} ghostty_remote_grid_color_s;
++typedef struct {
++  ghostty_remote_grid_color_s foreground;
++  ghostty_remote_grid_color_s background;
++  ghostty_remote_grid_color_s underline_color;
++  uint8_t bold;
++  uint8_t faint;
++  uint8_t italic;
++  uint8_t blink;
++  uint8_t inverse;
++  uint8_t invisible;
++  uint8_t strikethrough;
++  ghostty_remote_grid_underline_e underline;
++} ghostty_remote_grid_style_s;
++typedef struct {
++  const char* text;
++  uintptr_t len;
++  uint32_t width;
++  ghostty_remote_grid_style_s style;
++} ghostty_remote_grid_cell_s;
++GHOSTTY_API bool ghostty_surface_remote_grid_reset(ghostty_surface_t, uint32_t, uint32_t);
++GHOSTTY_API bool ghostty_surface_remote_grid_set_row(ghostty_surface_t, uint32_t, const char*, uintptr_t);
++GHOSTTY_API bool ghostty_surface_remote_grid_set_row_cells(ghostty_surface_t, uint32_t, const ghostty_remote_grid_cell_s*, uintptr_t);
++GHOSTTY_API bool ghostty_surface_remote_grid_set_cursor(ghostty_surface_t, uint32_t, uint32_t, bool);
++GHOSTTY_API bool ghostty_surface_remote_grid_set_cursor_ex(ghostty_surface_t, uint32_t, uint32_t, bool, ghostty_remote_grid_cursor_shape_e);
+ GHOSTTY_API void ghostty_surface_preedit(ghostty_surface_t, const char*, uintptr_t);
+ GHOSTTY_API bool ghostty_surface_mouse_captured(ghostty_surface_t);
+ GHOSTTY_API bool ghostty_surface_mouse_button(ghostty_surface_t,
 diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
-index dcf8a6357..d73047a66 100644
+index 917ca57ce..64e81ddb9 100644
 --- a/src/apprt/embedded.zig
 +++ b/src/apprt/embedded.zig
-@@ -1780,6 +1780,17 @@ pub const CAPI = struct {
+@@ -17,6 +17,7 @@ const terminal = @import("../terminal/main.zig");
+ const CoreApp = @import("../App.zig");
+ const CoreInspector = @import("../inspector/main.zig").Inspector;
+ const CoreSurface = @import("../Surface.zig");
++const unicode = @import("../unicode/main.zig");
+ const configpkg = @import("../config.zig");
+ const Config = configpkg.Config;
+ const String = @import("../main_c.zig").String;
+@@ -1824,6 +1825,485 @@ pub const CAPI = struct {
          surface.textCallback(ptr[0..len]);
      }
  
@@ -27,6 +87,474 @@ index dcf8a6357..d73047a66 100644
 +        len: usize,
 +    ) void {
 +        surface.core_surface.io.processOutput(ptr[0..len]);
++    }
++    const remote_grid_max_columns = 1000;
++    const remote_grid_max_rows = 1000;
++    const remote_grid_max_cells = 250_000;
++    const remote_grid_max_row_bytes = 4096;
++    const remote_grid_color_default: c_int = 0;
++    const remote_grid_color_indexed: c_int = 1;
++    const remote_grid_color_rgb: c_int = 2;
++    const remote_grid_underline_none: c_int = 0;
++    const remote_grid_underline_single: c_int = 1;
++    const remote_grid_underline_double: c_int = 2;
++    const remote_grid_underline_curly: c_int = 3;
++    const remote_grid_underline_dotted: c_int = 4;
++    const remote_grid_underline_dashed: c_int = 5;
++    const remote_grid_cursor_shape_block: c_int = 0;
++    const remote_grid_cursor_shape_bar: c_int = 1;
++    const remote_grid_cursor_shape_underline: c_int = 2;
++
++    const ghostty_remote_grid_color_s = extern struct {
++        tag: c_int,
++        index: u8,
++        red: u8,
++        green: u8,
++        blue: u8,
++    };
++
++    const ghostty_remote_grid_style_s = extern struct {
++        foreground: ghostty_remote_grid_color_s,
++        background: ghostty_remote_grid_color_s,
++        underline_color: ghostty_remote_grid_color_s,
++        bold: u8,
++        faint: u8,
++        italic: u8,
++        blink: u8,
++        inverse: u8,
++        invisible: u8,
++        strikethrough: u8,
++        underline: c_int,
++    };
++
++    const ghostty_remote_grid_cell_s = extern struct {
++        text: [*]const u8,
++        len: usize,
++        width: u32,
++        style: ghostty_remote_grid_style_s,
++    };
++
++    fn remoteGridColor(color: ghostty_remote_grid_color_s) ?terminal.Style.Color {
++        return switch (color.tag) {
++            remote_grid_color_default => .none,
++            remote_grid_color_indexed => .{ .palette = color.index },
++            remote_grid_color_rgb => .{ .rgb = .{ .r = color.red, .g = color.green, .b = color.blue } },
++            else => null,
++        };
++    }
++
++    fn remoteGridUnderline(underline: c_int) ?terminal.Attribute.Underline {
++        return switch (underline) {
++            remote_grid_underline_none => .none,
++            remote_grid_underline_single => .single,
++            remote_grid_underline_double => .double,
++            remote_grid_underline_curly => .curly,
++            remote_grid_underline_dotted => .dotted,
++            remote_grid_underline_dashed => .dashed,
++            else => null,
++        };
++    }
++
++    fn remoteGridStyle(style: ghostty_remote_grid_style_s) ?terminal.Style {
++        return .{
++            .fg_color = remoteGridColor(style.foreground) orelse return null,
++            .bg_color = remoteGridColor(style.background) orelse return null,
++            .underline_color = remoteGridColor(style.underline_color) orelse return null,
++            .flags = .{
++                .bold = style.bold != 0,
++                .italic = style.italic != 0,
++                .faint = style.faint != 0,
++                .blink = style.blink != 0,
++                .inverse = style.inverse != 0,
++                .invisible = style.invisible != 0,
++                .strikethrough = style.strikethrough != 0,
++                .underline = remoteGridUnderline(style.underline) orelse return null,
++            },
++        };
++    }
++
++    fn remoteGridCursorStyle(shape: c_int) ?terminal.CursorStyle {
++        return switch (shape) {
++            remote_grid_cursor_shape_block => .block,
++            remote_grid_cursor_shape_bar => .bar,
++            remote_grid_cursor_shape_underline => .underline,
++            else => null,
++        };
++    }
++
++    fn remoteGridSize(columns: u32, rows: u32) ?struct {
++        columns: terminal.size.CellCountInt,
++        rows: terminal.size.CellCountInt,
++    } {
++        const max = std.math.maxInt(terminal.size.CellCountInt);
++        if (columns == 0 or rows == 0 or columns > max or rows > max) return null;
++        if (columns > remote_grid_max_columns or rows > remote_grid_max_rows) return null;
++        if (@as(u64, columns) * @as(u64, rows) > remote_grid_max_cells) return null;
++
++        return .{
++            .columns = @intCast(columns),
++            .rows = @intCast(rows),
++        };
++    }
++
++    fn remoteGridTerminalSize(t: *terminal.Terminal) struct {
++        columns: terminal.size.CellCountInt,
++        rows: terminal.size.CellCountInt,
++    } {
++        return .{
++            .columns = t.cols,
++            .rows = t.rows,
++        };
++    }
++
++    fn remoteGridRowDisplayWidth(
++        text: []const u8,
++        columns: terminal.size.CellCountInt,
++    ) ?terminal.size.CellCountInt {
++        if (text.len > remote_grid_max_row_bytes) return null;
++
++        const view = std.unicode.Utf8View.init(text) catch return null;
++        var width: u32 = 0;
++        var saw_spacing_scalar = false;
++        var it = view.iterator();
++        while (it.nextCodepoint()) |cp| {
++            if (cp < 0x20 or cp == 0x7F or (cp >= 0x80 and cp <= 0x9F)) return null;
++
++            const cell_width = unicode.table.get(cp).width;
++            if (cell_width == 0) {
++                if (!saw_spacing_scalar) return null;
++                continue;
++            }
++
++            saw_spacing_scalar = true;
++            width += cell_width;
++            if (width > columns) return null;
++        }
++
++        return @intCast(width);
++    }
++
++    fn remoteGridCellsDisplayWidth(
++        remote_cells: []const ghostty_remote_grid_cell_s,
++        columns: terminal.size.CellCountInt,
++    ) ?void {
++        var width: u32 = 0;
++        var byte_count: usize = 0;
++        for (remote_cells) |cell| {
++            if (cell.width > 2) return null;
++            if (cell.width == 0 and cell.len != 0) return null;
++            byte_count += cell.len;
++            if (byte_count > remote_grid_max_row_bytes) return null;
++
++            const text = cell.text[0..cell.len];
++            const text_width = remoteGridRowDisplayWidth(text, columns) orelse return null;
++            if (text_width != cell.width) return null;
++            width += cell.width;
++            if (width > columns) return null;
++            _ = remoteGridStyle(cell.style) orelse return null;
++        }
++        if (width != columns) return null;
++    }
++
++    fn remoteGridQueueRender(surface: *Surface) void {
++        surface.core_surface.renderer_thread.wakeup.notify() catch {};
++    }
++
++    fn remoteGridReleaseStagedStyles(
++        page: *terminal.Page,
++        style_ids: []const terminal.size.StyleCountInt,
++    ) void {
++        for (style_ids) |style_id| {
++            if (style_id != 0) page.styles.release(page.memory, style_id);
++        }
++    }
++
++    fn remoteGridStageCellStyles(
++        page: *terminal.Page,
++        remote_cells: []const ghostty_remote_grid_cell_s,
++        style_ids: []terminal.size.StyleCountInt,
++    ) bool {
++        @memset(style_ids, 0);
++        var column: usize = 0;
++        for (remote_cells) |cell| {
++            if (cell.width == 0) continue;
++            const cell_width: usize = @intCast(cell.width);
++            const style_value = remoteGridStyle(cell.style) orelse {
++                remoteGridReleaseStagedStyles(page, style_ids[0..column]);
++                return false;
++            };
++            if (style_value.default()) {
++                column += cell_width;
++                continue;
++            }
++
++            var offset: usize = 0;
++            while (offset < cell_width) : (offset += 1) {
++                const style_id = page.styles.add(page.memory, style_value) catch {
++                    remoteGridReleaseStagedStyles(page, style_ids[0..column]);
++                    return false;
++                };
++                style_ids[column] = style_id;
++                column += 1;
++            }
++        }
++        return true;
++    }
++
++    fn remoteGridWriteCluster(
++        page: *terminal.Page,
++        row: *terminal.page.Row,
++        cells: []terminal.Cell,
++        column: *usize,
++        width: terminal.size.CellCountInt,
++        cps: []const u21,
++        staged_style_ids: ?[]const terminal.size.StyleCountInt,
++    ) bool {
++        if (cps.len == 0) return true;
++        const cell_width: usize = @intCast(width);
++        if (cell_width == 0 or cell_width > 2) return false;
++        if (column.* + cell_width > cells.len) return false;
++
++        const x = column.*;
++        cells[x] = terminal.Cell.init(cps[0]);
++        if (cell_width == 2) {
++            cells[x].wide = .wide;
++            cells[x + 1] = terminal.Cell.init(0);
++            cells[x + 1].wide = .spacer_tail;
++        }
++
++        if (cps.len > 1) {
++            page.setGraphemes(row, &cells[x], cps) catch return false;
++        }
++        if (staged_style_ids) |style_ids| {
++            cells[x].style_id = style_ids[x];
++            if (style_ids[x] != 0) row.styled = true;
++            if (cell_width == 2) {
++                cells[x + 1].style_id = style_ids[x + 1];
++                if (style_ids[x + 1] != 0) row.styled = true;
++            }
++        }
++
++        column.* = x + cell_width;
++        return true;
++    }
++
++    fn remoteGridApplyRow(
++        t: *terminal.Terminal,
++        row_index: terminal.size.CellCountInt,
++        text: []const u8,
++    ) bool {
++        const screen: *terminal.Screen = t.screens.active;
++        const pin = screen.pages.pin(.{
++            .active = .{
++                .x = 0,
++                .y = row_index,
++            },
++        }) orelse return false;
++        const rac = pin.rowAndCell();
++        var page = &pin.node.data;
++        const cells_offset = rac.row.cells;
++        var cells = page.getCells(rac.row);
++
++        screen.clearCells(page, rac.row, cells);
++        rac.row.* = .{ .cells = cells_offset, .dirty = true };
++        cells = page.getCells(rac.row);
++
++        const view = std.unicode.Utf8View.init(text) catch return false;
++        var cluster: [remote_grid_max_row_bytes]u21 = undefined;
++        var cluster_len: usize = 0;
++        var cluster_width: terminal.size.CellCountInt = 0;
++        var column: usize = 0;
++        var it = view.iterator();
++        while (it.nextCodepoint()) |cp| {
++            const cell_width = unicode.table.get(cp).width;
++            if (cell_width == 0) {
++                if (cluster_len == 0 or cluster_len >= cluster.len) return false;
++                cluster[cluster_len] = cp;
++                cluster_len += 1;
++                continue;
++            }
++
++            if (!remoteGridWriteCluster(page, rac.row, cells, &column, cluster_width, cluster[0..cluster_len], null)) return false;
++            cluster[0] = cp;
++            cluster_len = 1;
++            cluster_width = @intCast(cell_width);
++        }
++
++        if (!remoteGridWriteCluster(page, rac.row, cells, &column, cluster_width, cluster[0..cluster_len], null)) return false;
++        rac.row.dirty = true;
++        return true;
++    }
++
++    fn remoteGridApplyCellRow(
++        t: *terminal.Terminal,
++        row_index: terminal.size.CellCountInt,
++        remote_cells: []const ghostty_remote_grid_cell_s,
++    ) bool {
++        const screen: *terminal.Screen = t.screens.active;
++        const pin = screen.pages.pin(.{
++            .active = .{
++                .x = 0,
++                .y = row_index,
++            },
++        }) orelse return false;
++        const rac = pin.rowAndCell();
++        var page = &pin.node.data;
++        var style_ids: [remote_grid_max_columns]terminal.size.StyleCountInt = undefined;
++        const columns_len: usize = @intCast(t.cols);
++        const staged_style_ids = style_ids[0..columns_len];
++        if (!remoteGridStageCellStyles(page, remote_cells, staged_style_ids)) return false;
++
++        const cells_offset = rac.row.cells;
++        var cells = page.getCells(rac.row);
++
++        screen.clearCells(page, rac.row, cells);
++        rac.row.* = .{ .cells = cells_offset, .dirty = true };
++        cells = page.getCells(rac.row);
++
++        var column: usize = 0;
++        for (remote_cells) |cell| {
++            if (cell.width == 0) continue;
++
++            const text = cell.text[0..cell.len];
++            const view = std.unicode.Utf8View.init(text) catch return false;
++            var cluster: [remote_grid_max_row_bytes]u21 = undefined;
++            var cluster_len: usize = 0;
++            var cluster_width: terminal.size.CellCountInt = 0;
++            var it = view.iterator();
++            while (it.nextCodepoint()) |cp| {
++                const cell_width = unicode.table.get(cp).width;
++                if (cell_width == 0) {
++                    if (cluster_len == 0 or cluster_len >= cluster.len) return false;
++                    cluster[cluster_len] = cp;
++                    cluster_len += 1;
++                    continue;
++                }
++
++                if (!remoteGridWriteCluster(page, rac.row, cells, &column, cluster_width, cluster[0..cluster_len], staged_style_ids)) return false;
++                cluster[0] = cp;
++                cluster_len = 1;
++                cluster_width = @intCast(cell_width);
++            }
++
++            if (!remoteGridWriteCluster(page, rac.row, cells, &column, cluster_width, cluster[0..cluster_len], staged_style_ids)) return false;
++        }
++
++        rac.row.dirty = true;
++        return true;
++    }
++
++    export fn ghostty_surface_remote_grid_reset(
++        surface: *Surface,
++        columns: u32,
++        rows: u32,
++    ) bool {
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lock();
++        defer core_surface.renderer_state.mutex.unlock();
++
++        const t: *terminal.Terminal = core_surface.renderer_state.terminal;
++        const size = remoteGridSize(columns, rows) orelse return false;
++        const current = remoteGridTerminalSize(t);
++        if (size.columns != current.columns or size.rows != current.rows) return false;
++
++        t.fullReset();
++        t.modes.set(.cursor_visible, false);
++        t.screens.active.cursorAbsolute(0, 0);
++        t.flags.dirty.clear = true;
++        remoteGridQueueRender(surface);
++        return true;
++    }
++
++    export fn ghostty_surface_remote_grid_set_row(
++        surface: *Surface,
++        row: u32,
++        ptr: [*]const u8,
++        len: usize,
++    ) bool {
++        if (row > std.math.maxInt(terminal.size.CellCountInt)) return false;
++        const y: terminal.size.CellCountInt = @intCast(row);
++        const text = ptr[0..len];
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lock();
++        defer core_surface.renderer_state.mutex.unlock();
++
++        const t: *terminal.Terminal = core_surface.renderer_state.terminal;
++        const current = remoteGridTerminalSize(t);
++        if (current.columns > remote_grid_max_columns) return false;
++        if (y >= current.rows) return false;
++        _ = remoteGridRowDisplayWidth(text, current.columns) orelse return false;
++
++        if (!remoteGridApplyRow(t, y, text)) return false;
++        remoteGridQueueRender(surface);
++        return true;
++    }
++
++    export fn ghostty_surface_remote_grid_set_row_cells(
++        surface: *Surface,
++        row: u32,
++        ptr: [*]const ghostty_remote_grid_cell_s,
++        len: usize,
++    ) bool {
++        if (row > std.math.maxInt(terminal.size.CellCountInt)) return false;
++        const y: terminal.size.CellCountInt = @intCast(row);
++        const remote_cells = ptr[0..len];
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lock();
++        defer core_surface.renderer_state.mutex.unlock();
++
++        const t: *terminal.Terminal = core_surface.renderer_state.terminal;
++        const current = remoteGridTerminalSize(t);
++        if (current.columns > remote_grid_max_columns) return false;
++        if (y >= current.rows) return false;
++        _ = remoteGridCellsDisplayWidth(remote_cells, current.columns) orelse return false;
++
++        if (!remoteGridApplyCellRow(t, y, remote_cells)) return false;
++        remoteGridQueueRender(surface);
++        return true;
++    }
++
++    export fn ghostty_surface_remote_grid_set_cursor(
++        surface: *Surface,
++        row: u32,
++        column: u32,
++        visible: bool,
++    ) bool {
++        return ghostty_surface_remote_grid_set_cursor_ex(
++            surface,
++            row,
++            column,
++            visible,
++            remote_grid_cursor_shape_block,
++        );
++    }
++
++    export fn ghostty_surface_remote_grid_set_cursor_ex(
++        surface: *Surface,
++        row: u32,
++        column: u32,
++        visible: bool,
++        shape: c_int,
++    ) bool {
++        if (row > std.math.maxInt(terminal.size.CellCountInt) or
++            column > std.math.maxInt(terminal.size.CellCountInt)) return false;
++        const y: terminal.size.CellCountInt = @intCast(row);
++        const x: terminal.size.CellCountInt = @intCast(column);
++        const cursor_style = remoteGridCursorStyle(shape) orelse return false;
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lock();
++        defer core_surface.renderer_state.mutex.unlock();
++
++        const t: *terminal.Terminal = core_surface.renderer_state.terminal;
++        const current = remoteGridTerminalSize(t);
++        if (x >= current.columns or y >= current.rows) return false;
++
++        t.screens.active.cursorAbsolute(x, y);
++        t.modes.set(.cursor_visible, visible);
++        t.screens.active.cursor.cursor_style = cursor_style;
++        t.screens.active.cursorMarkDirty();
++        remoteGridQueueRender(surface);
++        return true;
 +    }
 +
      /// Set the preedit text for the surface. This is used for IME

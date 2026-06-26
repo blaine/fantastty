@@ -42,45 +42,46 @@ class Session: ObservableObject, Identifiable, Hashable {
     var controlClient: TmuxControlClient?
 
     /// Reference to metadata store for persistence
-    private let metadataStore = SessionMetadataStore.shared
+    private let metadataStore: SessionMetadataStore
 
     /// Create a new session with explicit tabs and selection state.
     init(title: String, tabs: [TerminalTab], selectedTabID: UUID? = nil, type: SessionType = .local,
-         workspaceID: String) {
+         workspaceID: String, metadataStore: SessionMetadataStore = .shared) {
         self.type = type
         self.workspaceID = workspaceID
         self.defaultTitle = title
+        self.metadataStore = metadataStore
         self.tabs = tabs
         self.selectedTabID = selectedTabID ?? tabs.first?.id
         self.mode = .attached(Self.defaultAttachmentInfo(type: type, workspaceID: workspaceID))
-        self.totalActiveSeconds = SessionMetadataStore.shared.getOrCreate(forKey: workspaceID).totalActiveSeconds
+        self.totalActiveSeconds = metadataStore.metadata[workspaceID]?.totalActiveSeconds ?? 0
     }
 
     /// Create a new session with an initial tab.
     convenience init(title: String, initialTab: TerminalTab, type: SessionType = .local,
-                     workspaceID: String) {
+                     workspaceID: String, metadataStore: SessionMetadataStore = .shared) {
         self.init(title: title, tabs: [initialTab], selectedTabID: initialTab.id, type: type,
-                  workspaceID: workspaceID)
+                  workspaceID: workspaceID, metadataStore: metadataStore)
     }
 
     /// Create a new empty session with no tabs selected yet.
-    convenience init(title: String, type: SessionType = .local, workspaceID: String) {
-        self.init(title: title, tabs: [], selectedTabID: nil, type: type, workspaceID: workspaceID)
+    convenience init(title: String, type: SessionType = .local, workspaceID: String, metadataStore: SessionMetadataStore = .shared) {
+        self.init(title: title, tabs: [], selectedTabID: nil, type: type, workspaceID: workspaceID, metadataStore: metadataStore)
     }
 
     /// Convenience initializer for creating a session with a new surface.
     convenience init(type: SessionType, surfaceView: Ghostty.SurfaceView,
-                     workspaceID: String) {
+                     workspaceID: String, metadataStore: SessionMetadataStore = .shared) {
         let tab = TerminalTab(type: type, surfaceView: surfaceView)
         self.init(title: type.displayName, initialTab: tab, type: type,
-                  workspaceID: workspaceID)
+                  workspaceID: workspaceID, metadataStore: metadataStore)
     }
 
     // MARK: - Metadata Accessors
 
     /// The session's metadata (persistent, keyed by workspaceID)
     var metadata: SessionMetadata? {
-        return metadataStore.getOrCreate(forKey: workspaceID)
+        return metadataStore.metadata[workspaceID]
     }
 
     /// Custom name for the workspace (overrides default title)

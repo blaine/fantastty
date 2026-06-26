@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import GhosttyKit
 import Combine
 
@@ -39,8 +40,14 @@ struct SessionDetailView: View {
 
                     // Render the selected tab's content, or overview if none selected
                     if let tab = session.selectedTab {
-                        TabContentView(tab: tab, session: session)
-                            .id(tab.id) // Force recreation when tab changes
+                        ZStack(alignment: .top) {
+                            TabContentView(tab: tab, session: session)
+                                .id(tab.id) // Force recreation when tab changes
+                            if let statusOverlay {
+                                RemoteConnectionStatusBanner(info: statusOverlay)
+                                    .padding(.top, 8)
+                            }
+                        }
                     } else if !session.tabs.isEmpty {
                         WorkspaceOverviewView(session: session)
                     } else if case .attached = session.mode {
@@ -118,6 +125,33 @@ struct SessionDetailView: View {
 
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            sessionManager.handleRemoteSelectedTerminalBecameVisible(session: session)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            sessionManager.handleRemoteSelectedTerminalBecameVisible(session: session)
+        }
+    }
+
+    private var statusOverlay: SessionDisplayInfo? {
+        let info = SessionDisplayInfo(mode: session.mode, backingState: session.backingState)
+        return info.showsStatusOverlay ? info : nil
+    }
+}
+
+private struct RemoteConnectionStatusBanner: View {
+    let info: SessionDisplayInfo
+
+    var body: some View {
+        Text(info.statusMessage)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.primary)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.regularMaterial, in: Capsule())
+            .accessibilityLabel(info.accessibilityLabel)
     }
 }
 
@@ -134,6 +168,7 @@ private struct PlaceholderRecoveryView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
+                .accessibilityLabel(accessibilityLabel)
 
             if isConnecting {
                 ProgressView()
@@ -162,18 +197,8 @@ private struct PlaceholderRecoveryView: View {
     }
 
     private var message: String {
-        if case .attached(let info) = session.mode {
-            switch info.connectionState {
-            case .connecting:
-                return "Connecting to tmux session..."
-            case .connected:
-                return "Connected to tmux session. Waiting for windows..."
-            case .disconnected(let reason):
-                if let reason, !reason.isEmpty {
-                    return "This workspace was restored, but its tmux session is unavailable: \(reason)"
-                }
-                return "This workspace was restored, but its tmux session is unavailable."
-            }
+        if case .attached = session.mode {
+            return SessionDisplayInfo(mode: session.mode, backingState: session.backingState).statusMessage
         }
 
         switch session.backingState {
@@ -187,9 +212,20 @@ private struct PlaceholderRecoveryView: View {
         }
     }
 
+    private var accessibilityLabel: String {
+        if case .attached = session.mode {
+            return SessionDisplayInfo(mode: session.mode, backingState: session.backingState).accessibilityLabel
+        }
+        return message
+    }
+
     private var isConnecting: Bool {
         if case .attached(let info) = session.mode,
            case .connecting = info.connectionState {
+            return true
+        }
+        if case .attached(let info) = session.mode,
+           case .reconnecting = info.connectionState {
             return true
         }
         return false
@@ -230,6 +266,7 @@ struct TabContentView: View {
                         if let focused = tab.focusedSurface {
                             Ghostty.moveFocus(to: focused)
                         }
+                        sessionManager.handleRemoteTerminalTabBecameVisible(session: session, tab: tab)
                         tab.requestThumbnailRefresh()
                     }
                     .onChange(of: geometry.size) { _, _ in
