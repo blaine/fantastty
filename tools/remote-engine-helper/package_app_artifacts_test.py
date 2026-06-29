@@ -16,6 +16,7 @@ XCODE_PROJECT = ROOT / "Fantastty.xcodeproj" / "project.pbxproj"
 REMOTE_ENGINE_CLIENT = ROOT / "Fantastty" / "Models" / "RemoteEngineClient.swift"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "build-and-release.yml"
 LOCAL_RELEASE_SCRIPT = ROOT / "scripts" / "build-release.sh"
+NOTARIZE_DMG_SCRIPT = ROOT / "scripts" / "notarize-dmg.sh"
 
 
 class PackageAppArtifactsTests(unittest.TestCase):
@@ -190,6 +191,7 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS: \"1\"", workflow)
         self.assertIn("make remote-engine-verify-app-artifacts", workflow)
         self.assertIn("- name: Notarize DMG\n      if: startsWith(github.ref, 'refs/tags/')", workflow)
+        self.assertIn("scripts/notarize-dmg.sh", workflow)
 
         local_release = LOCAL_RELEASE_SCRIPT.read_text()
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS=1", local_release)
@@ -204,6 +206,119 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("if ! xcodebuild \\", workflow)
         self.assertIn("exit 1", workflow)
         self.assertNotIn("| grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true", workflow)
+
+    def test_notarize_dmg_reports_invalid_submission_before_stapling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            log_marker = tmp_path / "log-called"
+            staple_marker = tmp_path / "staple-called"
+            self.write_fake_tool(
+                fake_bin / "xcrun",
+                f"""#!/bin/sh
+set -eu
+if [ "$1" = "notarytool" ] && [ "$2" = "submit" ]; then
+  cat <<'EOF'
+Submission ID received
+  id: abc-123
+Processing complete
+  id: abc-123
+  status: Invalid
+EOF
+  exit 0
+fi
+if [ "$1" = "notarytool" ] && [ "$2" = "log" ]; then
+  printf '%s\\n' "$3" >"{log_marker}"
+  printf '{{"status":"Invalid","issues":[{{"message":"bad signature"}}]}}\\n'
+  exit 0
+fi
+if [ "$1" = "stapler" ] && [ "$2" = "staple" ]; then
+  touch "{staple_marker}"
+  exit 0
+fi
+exit 64
+""",
+            )
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
+                    "DMG_NAME": "Fantastty-test.dmg",
+                    "APPLE_ID": "dev@example.com",
+                    "APPLE_ID_PASSWORD": "app-password",
+                    "APPLE_TEAM_ID": "TEAMID1234",
+                }
+            )
+
+            result = subprocess.run(
+                [str(NOTARIZE_DMG_SCRIPT)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("status: Invalid", result.stdout)
+            self.assertIn("bad signature", result.stdout)
+            self.assertEqual(log_marker.read_text().strip(), "abc-123")
+            self.assertFalse(staple_marker.exists())
+
+    def test_notarize_dmg_staples_accepted_submission(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            log_marker = tmp_path / "log-called"
+            staple_marker = tmp_path / "staple-called"
+            self.write_fake_tool(
+                fake_bin / "xcrun",
+                f"""#!/bin/sh
+set -eu
+if [ "$1" = "notarytool" ] && [ "$2" = "submit" ]; then
+  cat <<'EOF'
+Submission ID received
+  id: abc-123
+Processing complete
+  id: abc-123
+  status: Accepted
+EOF
+  exit 0
+fi
+if [ "$1" = "notarytool" ] && [ "$2" = "log" ]; then
+  touch "{log_marker}"
+  exit 0
+fi
+if [ "$1" = "stapler" ] && [ "$2" = "staple" ]; then
+  printf '%s\\n' "$3" >"{staple_marker}"
+  exit 0
+fi
+exit 64
+""",
+            )
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
+                    "DMG_NAME": "Fantastty-test.dmg",
+                    "APPLE_ID": "dev@example.com",
+                    "APPLE_ID_PASSWORD": "app-password",
+                    "APPLE_TEAM_ID": "TEAMID1234",
+                }
+            )
+
+            result = subprocess.run(
+                [str(NOTARIZE_DMG_SCRIPT)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(staple_marker.read_text().strip(), "Fantastty-test.dmg")
+            self.assertFalse(log_marker.exists())
 
     def test_app_target_gates_sdk26_typed_quic_symbols(self):
         source = REMOTE_ENGINE_CLIENT.read_text()
