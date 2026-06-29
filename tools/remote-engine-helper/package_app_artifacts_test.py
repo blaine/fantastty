@@ -17,6 +17,7 @@ REMOTE_ENGINE_CLIENT = ROOT / "Fantastty" / "Models" / "RemoteEngineClient.swift
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "build-and-release.yml"
 LOCAL_RELEASE_SCRIPT = ROOT / "scripts" / "build-release.sh"
 NOTARIZE_DMG_SCRIPT = ROOT / "scripts" / "notarize-dmg.sh"
+SIGN_REMOTE_ENGINE_SCRIPT = ROOT / "scripts" / "sign-remote-engine-artifacts.sh"
 
 
 class PackageAppArtifactsTests(unittest.TestCase):
@@ -190,6 +191,7 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("go-version-file: tools/remote-engine-helper/helper/go.mod", workflow)
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS: \"1\"", workflow)
         self.assertIn("make remote-engine-verify-app-artifacts", workflow)
+        self.assertIn("scripts/sign-remote-engine-artifacts.sh", workflow)
         self.assertIn("- name: Notarize DMG\n      if: startsWith(github.ref, 'refs/tags/')", workflow)
         self.assertIn("scripts/notarize-dmg.sh", workflow)
 
@@ -319,6 +321,48 @@ exit 64
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(staple_marker.read_text().strip(), "Fantastty-test.dmg")
             self.assertFalse(log_marker.exists())
+
+    def test_sign_remote_engine_artifacts_signs_nested_macos_binaries_before_app(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            app = tmp_path / "Fantastty.app"
+            remote_engine = app / "Contents" / "Resources" / "RemoteEngine" / "darwin-arm64"
+            helper = remote_engine / "fantastty-helper"
+            library = remote_engine / "lib" / "libghostty-vt.dylib"
+            library.parent.mkdir(parents=True)
+            helper.write_text("helper")
+            library.write_text("library")
+            (app / "Contents").mkdir(exist_ok=True)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            calls = tmp_path / "codesign-calls.txt"
+            self.write_fake_tool(
+                fake_bin / "codesign",
+                f"""#!/bin/sh
+set -eu
+printf '%s\\n' "$*" >>"{calls}"
+""",
+            )
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
+                    "APP_PATH": str(app),
+                    "DEVELOPER_ID_NAME": "Developer ID Application: Example",
+                }
+            )
+
+            subprocess.run([str(SIGN_REMOTE_ENGINE_SCRIPT)], cwd=ROOT, env=env, check=True)
+
+            recorded = calls.read_text().splitlines()
+            self.assertEqual(len(recorded), 4)
+            self.assertIn("--options runtime", recorded[0])
+            self.assertIn("--timestamp", recorded[0])
+            self.assertTrue(recorded[0].endswith(str(helper)))
+            self.assertTrue(recorded[1].endswith(str(library)))
+            self.assertIn("--entitlements Fantastty/Fantastty.entitlements", recorded[2])
+            self.assertTrue(recorded[2].endswith(str(app)))
+            self.assertEqual(recorded[3], f"--verify --deep --strict {app}")
 
     def test_app_target_gates_sdk26_typed_quic_symbols(self):
         source = REMOTE_ENGINE_CLIENT.read_text()

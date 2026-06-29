@@ -130,6 +130,9 @@ jobs:
         # Verify bundled remote-engine helpers before signing and packaging.
         make remote-engine-verify-app-artifacts APP="$APP_PATH"
 
+        # Sign nested macOS remote-engine artifacts before verifying the app bundle.
+        APP_PATH="$APP_PATH" scripts/sign-remote-engine-artifacts.sh
+
         # Verify code signature
         echo "Verifying code signature..."
         codesign --verify --deep --strict "$APP_PATH"
