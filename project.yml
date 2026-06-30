@@ -21,7 +21,10 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "Resources/Themes/**"
+          - "Resources/RemoteEngine/**"
       - path: Fantastty/Resources/Themes
+        type: folder
+      - path: Fantastty/Resources/RemoteEngine
         type: folder
     settings:
       base:

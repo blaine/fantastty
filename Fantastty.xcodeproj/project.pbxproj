@@ -125,6 +125,7 @@
 		B3BF18AD220C752BF7F07122 /* AttachedTmuxWindowRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10D7C97F1EF377FE182565F /* AttachedTmuxWindowRuntime.swift */; };
 		B52A2DC8C8CE83573062AD62 /* Themes in Resources */ = {isa = PBXBuildFile; fileRef = 3628253E8921BA4426DB6BC2 /* Themes */; };
 		B8793A4986A7A6214EB45F67 /* TmuxLayoutMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743CB5FA81E80070E17C07D7 /* TmuxLayoutMapperTests.swift */; };
+		B921EE534BE6D3916554BDE8 /* RemoteEngine in Resources */ = {isa = PBXBuildFile; fileRef = BEFCA6FAB4DE283EDD3E2E4D /* RemoteEngine */; };
 		B9DD76BDA1B4560EFBDEC70F /* GhosttyRemoteGridSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FB1025F6560D84B9323F49F /* GhosttyRemoteGridSmokeTests.swift */; };
 		BB98D303E99E1EA106BD2E42 /* NSPasteboard+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B106ED8690839C967CF7EB4 /* NSPasteboard+Extension.swift */; };
 		BC14E76875E00603E4B6E874 /* NSView+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F89AB559009B06C7920573 /* NSView+Extension.swift */; };
@@ -294,7 +295,6 @@
 		A36DB46CB9A118448C24392F /* TabThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabThumbnailPanel.swift; sourceTree = "<group>"; };
 		A48AE8BFE05BF6651F542082 /* LayoutPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutPersistenceTests.swift; sourceTree = "<group>"; };
 		A518E4FB9A2186B6AD6B40E3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		A6741ED2060C882942F13528 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		A7853BE82119C0EA4791CEA7 /* RemoteWorkspaceRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteWorkspaceRuntime.swift; sourceTree = "<group>"; };
 		AD0AF64D08F1CC1727C185AB /* SurfaceGrabHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceGrabHandle.swift; sourceTree = "<group>"; };
 		AE97949570F28A92FF0FE503 /* AttachedWorkspaceRuntimeV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachedWorkspaceRuntimeV2.swift; sourceTree = "<group>"; };
@@ -311,6 +311,7 @@
 		BD13C61B9554FEFFB64DA8C8 /* TmuxProtocolParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxProtocolParserTests.swift; sourceTree = "<group>"; };
 		BD1D338D289FD19693A24A32 /* RemoteEngineClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteEngineClientTests.swift; sourceTree = "<group>"; };
 		BE832441EC2FD6E2C3DAB641 /* TmuxPaneControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxPaneControllerTests.swift; sourceTree = "<group>"; };
+		BEFCA6FAB4DE283EDD3E2E4D /* RemoteEngine */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RemoteEngine; path = Fantastty/Resources/RemoteEngine; sourceTree = SOURCE_ROOT; };
 		C1E9764DA805E1A31953689F /* TmuxLayoutParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxLayoutParser.swift; sourceTree = "<group>"; };
 		C2BDE21EAC85EAAB7FAD5F1B /* TmuxSessionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSessionBridge.swift; sourceTree = "<group>"; };
 		C4E3E169FE066C4A1638B2A8 /* ThemeCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeCatalogTests.swift; sourceTree = "<group>"; };
@@ -372,14 +373,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		040B57F29FFD81935BECFBCB /* RemoteEngine */ = {
-			isa = PBXGroup;
-			children = (
-				A6741ED2060C882942F13528 /* .gitkeep */,
-			);
-			path = RemoteEngine;
-			sourceTree = "<group>";
-		};
 		17527B5BD7B51A297F1D40C0 /* shell-integration */ = {
 			isa = PBXGroup;
 			children = (
@@ -521,8 +514,8 @@
 		7A6A8FF2B6057EE1391E00F9 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				BEFCA6FAB4DE283EDD3E2E4D /* RemoteEngine */,
 				3628253E8921BA4426DB6BC2 /* Themes */,
-				040B57F29FFD81935BECFBCB /* RemoteEngine */,
 				17527B5BD7B51A297F1D40C0 /* shell-integration */,
 			);
 			path = Resources;
@@ -810,6 +803,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				47821B73E1E8A92CB69251A7 /* Assets.xcassets in Resources */,
+				B921EE534BE6D3916554BDE8 /* RemoteEngine in Resources */,
 				B52A2DC8C8CE83573062AD62 /* Themes in Resources */,
 				25C133A6066C09E29CF27024 /* fantastty.sh in Resources */,
 			);

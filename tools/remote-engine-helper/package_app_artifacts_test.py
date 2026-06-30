@@ -174,10 +174,12 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("Package RemoteEngine Artifacts", spec)
         self.assertIn("remote-engine-app-artifacts", spec)
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS", spec)
+        self.assertIn("Fantastty/Resources/RemoteEngine", spec)
 
         self.assertIn("Package RemoteEngine Artifacts", project)
         self.assertIn("remote-engine-app-artifacts", project)
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS", project)
+        self.assertIn("RemoteEngine in Resources", project)
 
         target_start = project.index("CB5692159373E500BD905E3F /* Fantastty */ = {")
         phases_start = project.index("buildPhases = (", target_start)
