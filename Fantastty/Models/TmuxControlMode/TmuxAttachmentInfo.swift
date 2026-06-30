@@ -1,5 +1,10 @@
 import Foundation
 
+let fantasttySSHConnectionArguments = [
+    "-o", "ControlMaster=no",
+    "-o", "ControlPath=none"
+]
+
 // MARK: - ConnectionState
 
 /// The state of a tmux control mode connection.
@@ -36,6 +41,7 @@ struct SSHHostInfo: Codable, Hashable {
     /// e.g. "ssh -t hostname" or "ssh -t -p 2222 user@hostname"
     var sshCommandPrefix: String {
         var parts = ["ssh", "-t"]
+        parts.append(contentsOf: fantasttySSHConnectionArguments)
         if let port, port != 22 {
             parts.append("-p")
             parts.append("\(port)")

@@ -2,6 +2,7 @@ import XCTest
 @testable import Fantastty
 
 final class TmuxAttachmentInfoTests: XCTestCase {
+    private let sshConnectionOptions = "-o ControlMaster=no -o ControlPath=none"
 
     // MARK: - SSHHostInfo.displayName
 
@@ -34,12 +35,18 @@ final class TmuxAttachmentInfoTests: XCTestCase {
 
     func testSSHCommandPrefixSimple() {
         let info = SSHHostInfo(user: nil, hostname: "example.com", port: nil)
-        XCTAssertEqual(info.sshCommandPrefix, "ssh -t example.com")
+        XCTAssertEqual(
+            info.sshCommandPrefix,
+            "ssh -t \(sshConnectionOptions) example.com"
+        )
     }
 
     func testSSHCommandPrefixFull() {
         let info = SSHHostInfo(user: "alice", hostname: "example.com", port: 2222)
-        XCTAssertEqual(info.sshCommandPrefix, "ssh -t -p 2222 alice@example.com")
+        XCTAssertEqual(
+            info.sshCommandPrefix,
+            "ssh -t \(sshConnectionOptions) -p 2222 alice@example.com"
+        )
     }
 
     // MARK: - TmuxHost.displayName
@@ -75,7 +82,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         )
         XCTAssertEqual(
             info.controlCommand(),
-            "ssh -t -p 2222 alice@example.com tmux -CC attach-session -t 'work'"
+            "ssh -t \(sshConnectionOptions) -p 2222 alice@example.com tmux -CC attach-session -t 'work'"
         )
     }
 
@@ -127,7 +134,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
 
         XCTAssertEqual(
             info.createSessionCommand(),
-            "ssh -t -p 2222 alice@example.com \"tmux has-session -t 'work' 2>/dev/null || tmux new-session -d -s 'work' -c ~\""
+            "ssh -t \(sshConnectionOptions) -p 2222 alice@example.com \"tmux has-session -t 'work' 2>/dev/null || tmux new-session -d -s 'work' -c ~\""
         )
     }
 

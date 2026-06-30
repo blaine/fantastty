@@ -232,6 +232,32 @@ final class RemoteEngineClientTests: XCTestCase {
         XCTAssertTrue(scpCalls[1].arguments.contains(fixture.helperURL.path))
     }
 
+    func testHelperDeployerUsesBoundedIndependentSSHConnections() async throws {
+        let fixture = try makeRemoteEngineArtifactFixture(version: "abc123")
+        let runner = RecordingRemoteEngineProcessRunner(results: [
+            .success("Linux\nx86_64\n"),
+            .success(""),
+            .failure(RemoteEngineError.bootstrapFailed("remote artifact checksum mismatch")),
+            .success(""),
+            .success(""),
+            .success(""),
+            .success(""),
+            .success("fantastty-helper version=abc123 arch=amd64\n")
+        ])
+        let deployer = RemoteEngineHelperDeployer(
+            artifactStore: RemoteEngineBundledArtifactStore(rootURL: fixture.rootURL),
+            processRunner: runner
+        )
+
+        _ = try await deployer.ensureDeployed(
+            host: Fantastty.SSHHostInfo(user: "jesse", hostname: "remote.example.invalid", port: nil)
+        )
+
+        for call in runner.calls where call.executable == "/usr/bin/ssh" || call.executable == "/usr/bin/scp" {
+            assertRemoteEngineSSHOptions(call.arguments)
+        }
+    }
+
     func testHelperDeployerUploadsWhenRemoteLibraryLinksAreMissing() async throws {
         let fixture = try makeRemoteEngineArtifactFixture(version: "abc123")
         let runner = MissingRemoteLibraryLinksProcessRunner(helperVersion: "abc123")
@@ -286,12 +312,53 @@ final class RemoteEngineClientTests: XCTestCase {
             let targetIndex = try XCTUnwrap(call.arguments.firstIndex(of: host.hostname))
             XCTAssertGreaterThan(targetIndex, 0)
             XCTAssertEqual(call.arguments[targetIndex - 1], "--")
+            assertRemoteEngineSSHOptions(call.arguments)
         }
         for call in runner.calls where call.executable == "/usr/bin/scp" {
             let target = "\(host.hostname):"
             let targetIndex = try XCTUnwrap(call.arguments.firstIndex { $0.hasPrefix(target) })
             let terminatorIndex = try XCTUnwrap(call.arguments.firstIndex(of: "--"))
             XCTAssertLessThan(terminatorIndex, targetIndex)
+            assertRemoteEngineSSHOptions(call.arguments)
+        }
+    }
+
+    func testSSHBootstrapperDisablesControlMultiplexingForBootstrapCommands() async throws {
+        let fixture = try makeRemoteEngineArtifactFixture(version: "abc123")
+        let runner = RecordingRemoteEngineProcessRunner(results: [
+            .success("hostname remote-test-host\n"),
+            .success("10.205.1.96\n"),
+            .success("Linux\nx86_64\n"),
+            .success(""),
+            .failure(RemoteEngineError.bootstrapFailed("remote artifact checksum mismatch")),
+            .success(""),
+            .success(""),
+            .success(""),
+            .success(""),
+            .success("fantastty-helper version=abc123 arch=amd64\n"),
+            .success("""
+            FANTASTTY_REMOTE port=53196 session=\(RemoteEngineClientFixtureValues.sessionID) key=\(RemoteEngineClientFixtureValues.attachKey) expires=2026-06-20T17:28:38Z helper_pid=3108381 version=abc123 arch=amd64 quic_addr=remote.example:33324 quic_cert_sha256=\(RemoteEngineClientFixtureValues.certificatePin) quic_alpn=fantastty-remote-engine-v1
+            """)
+        ])
+        let deployer = RemoteEngineHelperDeployer(
+            artifactStore: RemoteEngineBundledArtifactStore(rootURL: fixture.rootURL),
+            processRunner: runner
+        )
+        let bootstrapper = SSHRemoteEngineBootstrapper(
+            helperDeployer: deployer,
+            processRunner: runner,
+            localIPv4Networks: {
+                [RemoteEngineLocalIPv4Network(address: "10.205.1.12", netmask: "255.255.255.0")!]
+            }
+        )
+
+        _ = try await bootstrapper.attachMaterial(
+            workspaceID: "workspace-1",
+            host: Fantastty.SSHHostInfo(user: "jesse", hostname: "remote.example.invalid", port: nil)
+        )
+
+        for call in runner.calls where call.executable == "/usr/bin/ssh" || call.executable == "/usr/bin/scp" {
+            assertRemoteEngineSSHOptions(call.arguments)
         }
     }
 
@@ -395,8 +462,8 @@ final class RemoteEngineClientTests: XCTestCase {
             "/usr/bin/ssh",
             "/usr/bin/ssh"
         ])
-        XCTAssertEqual(runner.calls[0].arguments, ["-G", "--", "jesse@remote.example.invalid"])
-        XCTAssertEqual(Array(runner.calls[1].arguments.prefix(2)), ["--", "jesse@remote.example.invalid"])
+        assertRemoteEngineSSHCommand(runner.calls[0].arguments, target: "jesse@remote.example.invalid", usesConfigDump: true)
+        assertRemoteEngineSSHCommand(runner.calls[1].arguments, target: "jesse@remote.example.invalid")
         XCTAssertTrue(runner.calls[5].arguments.contains(libraryURL.path))
         XCTAssertTrue(runner.calls[7].arguments.contains(helperURL.path))
         XCTAssertTrue(runner.calls[10].arguments.last?.contains("FANTASTTY_REMOTE_ADVERTISE_HOST='10.205.1.96'") == true)
@@ -524,8 +591,8 @@ final class RemoteEngineClientTests: XCTestCase {
 
         XCTAssertEqual(material.host, "10.205.1.96")
         XCTAssertEqual(runner.calls.map(\.executable), ["/usr/bin/ssh", "/usr/bin/ssh", "/usr/bin/ssh"])
-        XCTAssertEqual(runner.calls[0].arguments, ["-G", "--", "jesse@mk-alias"])
-        XCTAssertEqual(Array(runner.calls[1].arguments.prefix(2)), ["--", "jesse@mk-alias"])
+        assertRemoteEngineSSHCommand(runner.calls[0].arguments, target: "jesse@mk-alias", usesConfigDump: true)
+        assertRemoteEngineSSHCommand(runner.calls[1].arguments, target: "jesse@mk-alias")
         XCTAssertTrue(runner.calls[2].arguments.last?.contains("FANTASTTY_REMOTE_ADVERTISE_HOST='10.205.1.96'") == true)
     }
 
@@ -557,9 +624,9 @@ final class RemoteEngineClientTests: XCTestCase {
 
         XCTAssertEqual(material.host, "10.205.1.96")
         XCTAssertEqual(runner.calls.map(\.executable), ["/usr/bin/ssh", "/usr/bin/ssh", "/usr/bin/ssh", "/usr/bin/ssh"])
-        XCTAssertEqual(runner.calls[0].arguments, ["-G", "--", "jesse@mk-alias"])
-        XCTAssertEqual(Array(runner.calls[1].arguments.prefix(2)), ["--", "jesse@mk-alias"])
-        XCTAssertEqual(Array(runner.calls[2].arguments.prefix(2)), ["--", "jesse@mk-alias"])
+        assertRemoteEngineSSHCommand(runner.calls[0].arguments, target: "jesse@mk-alias", usesConfigDump: true)
+        assertRemoteEngineSSHCommand(runner.calls[1].arguments, target: "jesse@mk-alias")
+        assertRemoteEngineSSHCommand(runner.calls[2].arguments, target: "jesse@mk-alias")
         XCTAssertTrue(runner.calls[3].arguments.last?.contains("FANTASTTY_REMOTE_ADVERTISE_HOST='10.205.1.96'") == true)
     }
 
@@ -614,7 +681,7 @@ final class RemoteEngineClientTests: XCTestCase {
 
         XCTAssertEqual(material.host, "public.example.com")
         XCTAssertEqual(runner.calls.map(\.executable), ["/usr/bin/ssh", "/usr/bin/ssh"])
-        XCTAssertEqual(runner.calls[0].arguments, ["-G", "--", "jesse@prod"])
+        assertRemoteEngineSSHCommand(runner.calls[0].arguments, target: "jesse@prod", usesConfigDump: true)
         XCTAssertTrue(runner.calls[1].arguments.last?.contains("FANTASTTY_REMOTE_ADVERTISE_HOST='public.example.com'") == true)
     }
 
@@ -642,7 +709,7 @@ final class RemoteEngineClientTests: XCTestCase {
 
         XCTAssertEqual(material.host, "remote-test-host")
         XCTAssertEqual(runner.calls.map(\.executable), ["/usr/bin/ssh", "/usr/bin/ssh", "/usr/bin/ssh"])
-        XCTAssertEqual(runner.calls[0].arguments, ["-G", "--", "jesse@mk-alias"])
+        assertRemoteEngineSSHCommand(runner.calls[0].arguments, target: "jesse@mk-alias", usesConfigDump: true)
         XCTAssertTrue(runner.calls[2].arguments.last?.contains("FANTASTTY_REMOTE_ADVERTISE_HOST='remote-test-host'") == true)
     }
 
@@ -665,7 +732,7 @@ final class RemoteEngineClientTests: XCTestCase {
 
         XCTAssertEqual(material.host, "10.205.1.96")
         XCTAssertEqual(runner.calls.count, 1)
-        XCTAssertEqual(Array(runner.calls[0].arguments.prefix(2)), ["--", "jesse@remote.example.invalid"])
+        assertRemoteEngineSSHCommand(runner.calls[0].arguments, target: "jesse@remote.example.invalid")
         let command = try XCTUnwrap(runner.calls[0].arguments.last)
         assertRemoteEngineLaunchCommand(
             command,
@@ -3476,6 +3543,49 @@ private func assertRemoteEngineLaunchCommand(
             line: line
         )
     }
+}
+
+private func assertRemoteEngineSSHOptions(
+    _ arguments: [String],
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    func assertContainsOption(_ option: String, _ value: String, file: StaticString = #filePath, line: UInt = #line) {
+        let containsPair = arguments.indices.contains { index in
+            arguments[index] == option
+                && arguments.indices.contains(index + 1)
+                && arguments[index + 1] == value
+        }
+        guard containsPair else {
+            XCTFail("missing \(option) \(value) in \(arguments)", file: file, line: line)
+            return
+        }
+    }
+
+    assertContainsOption("-o", "BatchMode=yes", file: file, line: line)
+    assertContainsOption("-o", "ConnectTimeout=10", file: file, line: line)
+    assertContainsOption("-o", "ConnectionAttempts=1", file: file, line: line)
+    assertContainsOption("-o", "ControlMaster=no", file: file, line: line)
+    assertContainsOption("-o", "ControlPath=none", file: file, line: line)
+}
+
+private func assertRemoteEngineSSHCommand(
+    _ arguments: [String],
+    target: String,
+    usesConfigDump: Bool = false,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    if usesConfigDump {
+        XCTAssertEqual(arguments.first, "-G", file: file, line: line)
+    }
+    assertRemoteEngineSSHOptions(arguments, file: file, line: line)
+    guard let terminatorIndex = arguments.firstIndex(of: "--"),
+          arguments.indices.contains(terminatorIndex + 1) else {
+        XCTFail("missing SSH target after option terminator in \(arguments)", file: file, line: line)
+        return
+    }
+    XCTAssertEqual(arguments[terminatorIndex + 1], target, file: file, line: line)
 }
 
 private func recursiveStringValues(in value: Any) -> Set<String> {

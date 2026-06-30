@@ -160,7 +160,10 @@ class TmuxManager {
     func listRemoteSessions(host: SSHHostInfo) -> [TmuxSessionInfo] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-        var args = ["-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
+        var args = [
+            "-o", "ConnectTimeout=5",
+            "-o", "BatchMode=yes"
+        ] + fantasttySSHConnectionArguments
         if let port = host.port, port != 22 {
             args += ["-p", "\(port)"]
         }

@@ -2618,7 +2618,7 @@ private extension ISO8601DateFormatter {
 }
 
 private func sshConfigArguments(host: SSHHostInfo) -> [String] {
-    var arguments = ["-G"]
+    var arguments = ["-G"] + remoteEngineSSHArguments()
     if let port = host.port, port != 22 {
         arguments.append(contentsOf: ["-p", "\(port)"])
     }
@@ -2628,7 +2628,7 @@ private func sshConfigArguments(host: SSHHostInfo) -> [String] {
 }
 
 private func sshArguments(host: SSHHostInfo, remoteCommand: String) -> [String] {
-    var arguments: [String] = []
+    var arguments = remoteEngineSSHArguments()
     if let port = host.port, port != 22 {
         arguments.append(contentsOf: ["-p", "\(port)"])
     }
@@ -2639,7 +2639,7 @@ private func sshArguments(host: SSHHostInfo, remoteCommand: String) -> [String] 
 }
 
 private func scpArguments(host: SSHHostInfo, localURL: URL, remotePath: String) -> [String] {
-    var arguments: [String] = []
+    var arguments = remoteEngineSSHArguments()
     if let port = host.port, port != 22 {
         arguments.append(contentsOf: ["-P", "\(port)"])
     }
@@ -2647,6 +2647,14 @@ private func scpArguments(host: SSHHostInfo, localURL: URL, remotePath: String) 
     arguments.append(localURL.path)
     arguments.append("\(scpTarget(host)):\(remotePath)")
     return arguments
+}
+
+private func remoteEngineSSHArguments() -> [String] {
+    [
+        "-o", "BatchMode=yes",
+        "-o", "ConnectTimeout=10",
+        "-o", "ConnectionAttempts=1"
+    ] + fantasttySSHConnectionArguments
 }
 
 private func sshTarget(_ host: SSHHostInfo) -> String {
