@@ -18,7 +18,6 @@ import "C"
 
 import (
 	"fmt"
-	"strings"
 	"unsafe"
 
 	"fantastty/remote-engine-helper/internal/engine"
@@ -62,13 +61,7 @@ func (r *Renderer) SeedPane(pane remotegrid.WorkspacePane) (remotegrid.PaneKeyfr
 	if err != nil {
 		return remotegrid.PaneKeyframe{}, false, err
 	}
-	if pane.InitialCapture.ActiveScreen == remotegrid.ActiveScreenAlternate {
-		state.write([]byte("\x1b[?1049h"))
-	}
-	if err := state.seedInitialRows(pane.InitialRows, size); err != nil {
-		state.close()
-		return remotegrid.PaneKeyframe{}, false, err
-	}
+	state.write(seedPaneTerminalInput(pane, size))
 	if pane.InitialCapture.ScrollRegion != nil {
 		upper := pane.InitialCapture.ScrollRegion.Upper + 1
 		lower := pane.InitialCapture.ScrollRegion.Lower + 1
@@ -185,15 +178,6 @@ func (s *paneState) close() {
 	}
 }
 
-func (s *paneState) seedInitialRows(rows []string, size remotegrid.GridSize) error {
-	data := initialRowsTerminalInput(rows, size)
-	if len(data) == 0 {
-		return nil
-	}
-	s.write(data)
-	return nil
-}
-
 func (s *paneState) seedCapturedCursor(cursor remotegrid.CursorState) {
 	row := cursor.Row + 1
 	column := cursor.Column + 1
@@ -213,22 +197,6 @@ func (s *paneState) write(data []byte) {
 		(*C.uint8_t)(unsafe.Pointer(&data[0])),
 		C.size_t(len(data)),
 	)
-}
-
-func initialRowsTerminalInput(rows []string, size remotegrid.GridSize) []byte {
-	var builder strings.Builder
-	limit := len(rows)
-	if limit > size.Rows {
-		limit = size.Rows
-	}
-	for rowIndex := 0; rowIndex < limit; rowIndex++ {
-		fmt.Fprintf(&builder, "\x1b[%d;1H%s", rowIndex+1, rows[rowIndex])
-	}
-	if builder.Len() == 0 {
-		return nil
-	}
-	builder.WriteString("\x1b[H")
-	return []byte(builder.String())
 }
 
 func (s *paneState) snapshot() (snapshotResult, error) {
