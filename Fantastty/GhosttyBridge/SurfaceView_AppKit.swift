@@ -749,17 +749,17 @@ extension Ghostty {
         }
 
         func focusDidChange(_ focused: Bool) {
-            guard let surface = self.surface else { return }
-            guard self.focused != focused else {
-                if let paneID = tmuxPaneID, let remotePaneFocusHandler {
-                    remotePaneFocusHandler(paneID, focused)
-                }
-                return
+            let focusChanged = self.focused != focused
+            if focusChanged {
+                self.focused = focused
             }
-            self.focused = focused
             if let paneID = tmuxPaneID, let remotePaneFocusHandler {
                 remotePaneFocusHandler(paneID, focused)
             }
+            guard focusChanged else {
+                return
+            }
+            guard let surface = self.surface else { return }
 
             // For tmux-attached surfaces, skip the Ghostty focus call.
             // The child process is cat >/dev/null, so focus events are

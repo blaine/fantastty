@@ -3567,6 +3567,12 @@ private func assertRemoteEngineSSHOptions(
     assertContainsOption("-o", "ConnectionAttempts=1", file: file, line: line)
     assertContainsOption("-o", "ControlMaster=no", file: file, line: line)
     assertContainsOption("-o", "ControlPath=none", file: file, line: line)
+    assertContainsOption(
+        "-o",
+        "KexAlgorithms=curve25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256@libssh.org",
+        file: file,
+        line: line
+    )
 }
 
 private func assertRemoteEngineSSHCommand(

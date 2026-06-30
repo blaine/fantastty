@@ -2,7 +2,8 @@ import Foundation
 
 let fantasttySSHConnectionArguments = [
     "-o", "ControlMaster=no",
-    "-o", "ControlPath=none"
+    "-o", "ControlPath=none",
+    "-o", "KexAlgorithms=curve25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256@libssh.org"
 ]
 
 // MARK: - ConnectionState

@@ -523,6 +523,9 @@ private extension RemoteWorkspaceBridge {
         if let surfaceSize = remoteGridSize(from: surface.surfaceSize),
            let stateSize = state.gridSize,
            surfaceSize != stateSize {
+            if nativeRemoteGridSize(from: surface) != surfaceSize {
+                _ = paneGridResizeOperation(surface, surfaceSize)
+            }
             let shouldRequestKeyframe = recordKeyframeRequest(
                 workspaceID: binding.runtime.workspaceID,
                 paneID: paneID,

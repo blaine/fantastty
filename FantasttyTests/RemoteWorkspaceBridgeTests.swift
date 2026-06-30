@@ -826,7 +826,7 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         XCTAssertEqual(diagnostics.map(\.workspaceID), ["workspace-1"])
         XCTAssertEqual(diagnostics.map(\.paneID), [7])
         XCTAssertEqual(diagnostics.map(\.result), [.rendered])
-        XCTAssertEqual(diagnostics.map(\.hasSurfaceModel), [true])
+        XCTAssertEqual(diagnostics.map(\.hasSurface), [true])
     }
 
     func testNotReadyAuthoritativeRenderRetriesUntilSurfaceCanRender() async {
@@ -905,11 +905,16 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         let bridge = RemoteWorkspaceBridge()
         let session = makeRemoteSession()
         var createdSurface: Ghostty.SurfaceView?
+        var resized: [RemoteGridSize] = []
 
         bridge.surfaceFactory = { _ in
             let surface = self.makeSurface()
             createdSurface = surface
             return surface
+        }
+        bridge.paneGridResizeOperation = { surface, size in
+            resized.append(size)
+            return surface.resizeRemoteGrid(columns: size.columns, rows: size.rows)
         }
 
         bridge.registerRemoteWorkspaceSession(session)
@@ -922,7 +927,8 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
             )
         ])))
 
-        XCTAssertEqual(nativeRemoteGridSize(from: createdSurface), RemoteGridSize(columns: 17, rows: 3))
+        XCTAssertNotNil(createdSurface)
+        XCTAssertEqual(resized, [RemoteGridSize(columns: 17, rows: 3)])
     }
 
     func testNewerSnapshotUpdatesTabsReusesSurfacesAndPrunesRemovedPanes() {
@@ -1196,7 +1202,8 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         XCTAssertNil(renderPlans[0].rowsToRender)
         XCTAssertEqual(renderPlans[1].rowsToRender, [0])
         XCTAssertEqual(renderPlans[2].rowsToRender, [0])
-        XCTAssertEqual(resized, [RemoteGridSize(columns: 2, rows: 1)])
+        XCTAssertEqual(resized.first, RemoteGridSize(columns: 2, rows: 1))
+        XCTAssertTrue(resized.allSatisfy { $0 == RemoteGridSize(columns: 2, rows: 1) })
     }
 
     func testSameSizeKeyframeRendersFullGridResetEvenWhenRowVersionsMatch() {
@@ -1488,9 +1495,17 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         let session = makeRemoteSession()
         var requestedKeyframes: [(paneID: Int, reason: RemotePaneGridKeyframeRequestReason)] = []
         var resizeIntents: [(paneID: Int, size: RemoteGridSize)] = []
+        var surfaceResizes: [RemoteGridSize] = []
         var diagnostics: [RemoteWorkspaceRenderDiagnostic] = []
 
         bridge.surfaceFactory = { _ in self.makeSurface() }
+        bridge.paneGridResizeOperation = { surface, size in
+            surfaceResizes.append(size)
+            return surface.resizeRemoteGrid(columns: size.columns, rows: size.rows)
+        }
+        bridge.paneGridRenderer = { _, _ in
+            .rendered
+        }
         bridge.keyframeRequestHandler = { _, paneID, reason in
             requestedKeyframes.append((paneID, reason))
             return Task {}
@@ -1509,7 +1524,6 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         guard let surface = session.tabs.first?.surfaceTree?.root?.leaves().first else {
             return XCTFail("Expected remote pane surface")
         }
-        XCTAssertEqual(nativeRemoteGridSize(from: surface), RemoteGridSize(columns: 2, rows: 1))
         surface.surfaceSize = ghostty_surface_size_s(
             columns: 4,
             rows: 1,
@@ -1529,7 +1543,10 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
             RemoteGridSize(columns: 4, rows: 1)
         ])
         XCTAssertEqual(remoteGridSize(from: surface.surfaceSize), RemoteGridSize(columns: 4, rows: 1))
-        XCTAssertEqual(nativeRemoteGridSize(from: surface), RemoteGridSize(columns: 2, rows: 1))
+        XCTAssertEqual(Array(surfaceResizes.prefix(2)), [
+            RemoteGridSize(columns: 2, rows: 1),
+            RemoteGridSize(columns: 4, rows: 1)
+        ])
         XCTAssertEqual(diagnostics.count, 2)
         XCTAssertFalse(diagnostics.contains { $0.result == .rendered })
         XCTAssertEqual(diagnostics.map(\.requestedResizeKeyframe), [true, false])
@@ -1561,7 +1578,6 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         }
         XCTAssertEqual(renderedDiagnostic.result, .rendered)
         XCTAssertFalse(renderedDiagnostic.requestedResizeKeyframe)
-        XCTAssertTrue(renderedDiagnostic.hasSurfaceModel)
         XCTAssertEqual(renderedDiagnostic.surfaceSize, RemoteGridSize(columns: 4, rows: 1))
         XCTAssertEqual(renderedDiagnostic.stateSize, RemoteGridSize(columns: 4, rows: 1))
     }
