@@ -84,6 +84,13 @@ extension Ghostty {
             if let overlayPath = ThemeManager.shared.configOverlayPath {
                 ghostty_config_load_file(cfg, overlayPath)
             }
+
+            // Load the in-app appearance overlay LAST so explicit user choices
+            // (font family/style/size, and later the theme) override everything
+            // else — including the user's own Ghostty config — for those keys.
+            if let appearancePath = AppearanceManager.shared.overlayPath {
+                ghostty_config_load_file(cfg, appearancePath)
+            }
 #endif
 
             if finalize {
@@ -177,6 +184,33 @@ extension Ghostty {
             guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return "" }
             guard let ptr = v else { return "" }
             return String(cString: ptr)
+        }
+
+        /// The resolved terminal foreground (text) color.
+        var foregroundColor: Color? { colorValue(forKey: "foreground") }
+
+        /// The first 16 ANSI palette colors, for rendering colorized previews.
+        var ansiPalette: [Color] {
+            guard let config = self.config else { return [] }
+            var p = ghostty_config_palette_s()
+            let key = "palette"
+            guard ghostty_config_get(config, &p, key, UInt(key.utf8.count)) else { return [] }
+            return withUnsafePointer(to: &p.colors) { tuplePtr -> [Color] in
+                tuplePtr.withMemoryRebound(to: ghostty_config_color_s.self, capacity: 256) { base in
+                    (0..<16).map { Self.color(base[$0]) }
+                }
+            }
+        }
+
+        private func colorValue(forKey key: String) -> Color? {
+            guard let config = self.config else { return nil }
+            var v = ghostty_config_color_s()
+            guard ghostty_config_get(config, &v, key, UInt(key.utf8.count)) else { return nil }
+            return Self.color(v)
+        }
+
+        private static func color(_ c: ghostty_config_color_s) -> Color {
+            Color(.sRGB, red: Double(c.r) / 255, green: Double(c.g) / 255, blue: Double(c.b) / 255, opacity: 1)
         }
 
         var windowPositionX: Int16? {

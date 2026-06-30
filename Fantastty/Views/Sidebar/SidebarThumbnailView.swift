@@ -15,13 +15,18 @@ struct SidebarThumbnailView: View {
     @State private var terminalSnapshot: NSImage?
     @State private var browserSnapshot: NSImage?
 
+    /// A tab reads as selected in the sidebar only while its session is the active one.
+    /// Each session remembers its own selected tab, so without this an inactive session
+    /// would keep highlighting the tab you last left it on.
+    private var isActiveSelection: Bool { isSelected && isSessionActive }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack {
                 thumbnailImage
 
                 // Hover overlay with close button
-                if isHovered && !isSelected {
+                if isHovered && !isActiveSelection {
                     VStack {
                         HStack {
                             Spacer()
@@ -42,7 +47,7 @@ struct SidebarThumbnailView: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+                    .stroke(isActiveSelection ? Color.accentColor : Color.clear, lineWidth: 2)
             )
             .onTapGesture {
                 onSelect()
@@ -53,12 +58,12 @@ struct SidebarThumbnailView: View {
                 .font(.caption2)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .foregroundStyle(isSelected ? .primary : .secondary)
+                .foregroundStyle(isActiveSelection ? .primary : .secondary)
         }
         .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.15) : (isHovered ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.1) : Color.clear))
+                .fill(isActiveSelection ? Color.accentColor.opacity(0.15) : (isHovered ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.1) : Color.clear))
         )
         .onHover { hovering in
             isHovered = hovering

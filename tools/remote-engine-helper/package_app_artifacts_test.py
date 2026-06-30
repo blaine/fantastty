@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "remote-engine-helper" / "package_app_artifacts.sh"
 VERIFY_SCRIPT = ROOT / "tools" / "remote-engine-helper" / "verify_app_artifacts.py"
 XCODE_PROJECT = ROOT / "Fantastty.xcodeproj" / "project.pbxproj"
+PROJECT_SPEC = ROOT / "project.yml"
 REMOTE_ENGINE_CLIENT = ROOT / "Fantastty" / "Models" / "RemoteEngineClient.swift"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "build-and-release.yml"
 LOCAL_RELEASE_SCRIPT = ROOT / "scripts" / "build-release.sh"
@@ -167,6 +168,12 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
 
     def test_fantastty_target_packages_remote_engine_artifacts_when_enabled(self):
         project = XCODE_PROJECT.read_text()
+        spec = PROJECT_SPEC.read_text()
+
+        self.assertIn("preBuildScripts:", spec)
+        self.assertIn("Package RemoteEngine Artifacts", spec)
+        self.assertIn("remote-engine-app-artifacts", spec)
+        self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS", spec)
 
         self.assertIn("Package RemoteEngine Artifacts", project)
         self.assertIn("remote-engine-app-artifacts", project)
@@ -180,9 +187,13 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         resources_index = phases.index("Resources")
         self.assertLess(package_index, resources_index)
 
-        phase_start = project.index("D4A0C7F0B9E84C109573B4A2 /* Package RemoteEngine Artifacts */ = {")
-        phase_end = project.index("};", phase_start)
-        phase = project[phase_start:phase_end]
+        match = re.search(
+            r"\t\t[A-F0-9]+ /\* Package RemoteEngine Artifacts \*/ = \{.*?^\t\t\};",
+            project,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        phase = match.group(0)
         self.assertNotIn("alwaysOutOfDate = 1", phase)
 
     def test_release_paths_package_and_verify_remote_engine_artifacts(self):

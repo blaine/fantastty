@@ -20,6 +20,9 @@ targets:
       - path: Fantastty
         excludes:
           - "**/.DS_Store"
+          - "Resources/Themes/**"
+      - path: Fantastty/Resources/Themes
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.blainecook.fantastty
@@ -43,5 +46,49 @@ targets:
       - framework: xcframework/GhosttyKit.xcframework
         embed: false
       - sdk: Carbon.framework
-    entitlements:
-      path: Fantastty/Fantastty.entitlements
+    preBuildScripts:
+      - name: Package RemoteEngine Artifacts
+        script: |
+          if [ "${FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS:-}" = "1" ]; then
+              make -C "$SRCROOT" remote-engine-app-artifacts
+          else
+              echo "Skipping remote engine artifact packaging; set FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS=1 to rebuild bundled helpers."
+          fi
+        outputFiles:
+          - "$(SRCROOT)/Fantastty/Resources/RemoteEngine/manifest.json"
+
+  FantasttyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: FantasttyTests
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.blainecook.fantastty.tests
+        GENERATE_INFOPLIST_FILE: true
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/xcframework"
+        CODE_SIGN_IDENTITY: "-"
+        SWIFT_STRICT_CONCURRENCY: "minimal"
+    dependencies:
+      - target: Fantastty
+
+schemes:
+  Fantastty:
+    build:
+      targets:
+        Fantastty: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FantasttyTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

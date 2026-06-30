@@ -1195,7 +1195,12 @@ class SessionManager: ObservableObject {
 
     /// Close the currently selected tab.
     func closeSelectedTab() {
-        guard let tab = selectedTab else { return }
+        guard let session = selectedSession, let tab = session.selectedTab else { return }
+        // Cmd-W closes a tab, but must never tear down the whole workspace:
+        // closing the final tab cascades to closeSession, which is far too
+        // destructive for Cmd-W. Closing the workspace is reserved for the
+        // explicit "Close Workspace" command (Cmd-Shift-W).
+        guard session.tabs.count > 1 else { return }
         closeTab(id: tab.id)
     }
 
@@ -1480,6 +1485,15 @@ class SessionManager: ObservableObject {
 
     @objc private func handleCloseSurface(_ notification: Foundation.Notification) {
         guard let surfaceView = notification.object as? Ghostty.SurfaceView else { return }
+        // Ghostty's close_surface (Cmd-W) must never tear down the whole
+        // workspace. If this is the only pane of the only tab, closing it would
+        // cascade closeSurface -> closeTab -> closeSession. Closing the
+        // workspace is reserved for the explicit Close Workspace command.
+        if let (session, tab) = findSessionAndTab(for: surfaceView),
+           session.tabs.count <= 1,
+           (tab.surfaceTree?.root?.leaves().count ?? 1) <= 1 {
+            return
+        }
         closeSurface(surfaceView)
     }
 
