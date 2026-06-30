@@ -83,6 +83,14 @@ final class TmuxControlClientTests: XCTestCase {
         XCTAssertEqual(closed, [3])
     }
 
+    func testUnlinkedWindowCloseNotifiesDelegate() async {
+        await client.processLine("%window-add @3")
+        await client.processLine("%unlinked-window-close @3")
+
+        let closed = await MainActor.run { delegate.closedWindowIDs }
+        XCTAssertEqual(closed, [3])
+    }
+
     func testWindowRenamedNotifiesDelegate() async {
         await client.processLine("%window-add @1")
         await client.processLine("%window-renamed @1 new-name")

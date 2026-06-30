@@ -250,6 +250,34 @@ func TestModelKeepsOneActivePaneWhenActivePaneDisappears(t *testing.T) {
 	}
 }
 
+func TestModelTreatsUnlinkedWindowCloseAsWindowRemoval(t *testing.T) {
+	model := NewModel("workspace-1")
+	_ = mustApplyLines(t, model,
+		"%window-add @1",
+		"%window-renamed @1 one",
+		"%layout-change @1 b25d,80x24,0,0,%7",
+		"%window-add @2",
+		"%window-renamed @2 two",
+		"%layout-change @2 e1dd,80x24,0,0,%9",
+	)
+
+	actions := mustApplyLines(t, model, "%unlinked-window-close @2")
+
+	if len(actions) != 1 {
+		t.Fatalf("actions = %#v, want one snapshot", actions)
+	}
+	snapshot, ok := actions[0].WorkspaceSnapshot()
+	if !ok {
+		t.Fatalf("action = %#v, want workspace snapshot", actions[0])
+	}
+	if got := windowIDs(snapshot.Windows); !reflect.DeepEqual(got, []int{1}) {
+		t.Fatalf("window ids = %v, want [1]", got)
+	}
+	if got := paneIDs(snapshot.Panes); !reflect.DeepEqual(got, []int{7}) {
+		t.Fatalf("pane ids = %v, want [7]", got)
+	}
+}
+
 func TestModelSeedsInitialWorkspaceFromTmuxListOutput(t *testing.T) {
 	model := NewModel("workspace-1")
 
@@ -451,6 +479,14 @@ func paneIDs(panes []remotegrid.WorkspacePane) []int {
 	ids := make([]int, len(panes))
 	for i, pane := range panes {
 		ids[i] = pane.PaneID
+	}
+	return ids
+}
+
+func windowIDs(windows []remotegrid.WorkspaceWindow) []int {
+	ids := make([]int, len(windows))
+	for i, window := range windows {
+		ids[i] = window.WindowID
 	}
 	return ids
 }

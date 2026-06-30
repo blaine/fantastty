@@ -127,9 +127,9 @@ func (m *Model) ApplyLine(line string) ([]Action, error) {
 		}
 		window.title = title
 		return m.snapshotIfReady()
-	case "%window-close":
+	case "%window-close", "%unlinked-window-close":
 		if len(fields) < 2 {
-			return nil, fmt.Errorf("tmuxcc: %%window-close missing window id")
+			return nil, fmt.Errorf("tmuxcc: %s missing window id", fields[0])
 		}
 		windowID, err := parseTmuxID(fields[1], '@')
 		if err != nil {

@@ -903,7 +903,8 @@ actor TmuxControlClient {
             recordDebugTrace("event:window-add id=\(windowID)")
             #endif
 
-        case .windowClose(let windowID):
+        case .windowClose(let windowID),
+             .unlinkedWindowClose(let windowID):
             windows.removeValue(forKey: windowID)
             await delegate?.controlClient(self, didCloseWindowID: windowID)
 
@@ -968,7 +969,6 @@ actor TmuxControlClient {
              .sessionRenamed,
              .subscriptionChanged,
              .unlinkedWindowAdd,
-             .unlinkedWindowClose,
              .unlinkedWindowRenamed,
              .unknown:
             break
