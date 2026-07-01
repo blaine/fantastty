@@ -981,7 +981,7 @@ final class TmuxControlTransportTests: XCTestCase {
     }
 }
 
-final class ScriptedTmuxControlTransport: TmuxControlTransport {
+final class ScriptedTmuxControlTransport: TmuxControlTransport, @unchecked Sendable {
     typealias Handler = (ScriptedTmuxControlTransport) -> Void
     typealias WriteHandler = (String, ScriptedTmuxControlTransport) -> Void
 
@@ -1282,6 +1282,84 @@ final class TmuxConnectFSMTests: XCTestCase {
             "alternate bootstrap replay should enter the local alternate screen before drawing"
         )
         XCTAssertTrue(replay.contains(Data("visible alternate".utf8)))
+    }
+
+    func testDeferredBootstrapContinuesWhenPaneBecomesReadyBeforePauseCompletes() async throws {
+        let issuedCommands = Locked<[String]>([])
+        var nextBlockID = 2
+        var client: TmuxControlClient?
+
+        func respondOK(_ transport: ScriptedTmuxControlTransport, outputLine: String? = nil) {
+            let id = nextBlockID
+            nextBlockID += 1
+            transport.emitLine("%begin \(id) \(id) 0")
+            if let outputLine {
+                transport.emitLine(outputLine)
+            }
+            transport.emitLine("%end \(id) \(id) 0")
+        }
+
+        let transport = ScriptedTmuxControlTransport(
+            startHandler: { transport in
+                transport.emitLine("%begin 1 1 0")
+                transport.emitLine("%end 1 1 0")
+            },
+            writeHandler: { command, transport in
+                issuedCommands.withLock { $0.append(command) }
+
+                if command == TmuxControlClient.readyCommand() {
+                    respondOK(transport)
+                    return
+                }
+
+                if command.hasPrefix("list-windows -F ") {
+                    respondOK(transport, outputLine: "@10\tactive\tb25d,80x24,0,0,1\t0\t1")
+                    return
+                }
+
+                if command == "refresh-client -A '%1:pause'" {
+                    Task {
+                        await client?.continueDeferredBootstrap(paneIDs: [1])
+                    }
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+                        respondOK(transport)
+                    }
+                    return
+                }
+
+                if command.hasPrefix("display-message -p -t %1 '#{alternate_on}'") {
+                    respondOK(transport, outputLine: "0")
+                    return
+                }
+
+                if command.hasPrefix("capture-pane -p -e -t %1") {
+                    respondOK(transport, outputLine: "ready-before-pause")
+                    return
+                }
+
+                if command.hasPrefix("display-message -p -t %1 '#{cursor_x} #{cursor_y}'") {
+                    respondOK(transport, outputLine: "0 0")
+                    return
+                }
+
+                respondOK(transport)
+            }
+        )
+        client = TmuxControlClient(
+            attachmentInfo: makeInfo(name: "ready-before-pause"),
+            transportFactory: { transport }
+        )
+
+        try await client?.connect()
+        defer {
+            Task {
+                await client?.disconnect()
+            }
+        }
+
+        let commands = issuedCommands.withLock { $0 }
+        XCTAssertTrue(commands.contains("capture-pane -p -e -t %1"))
+        XCTAssertTrue(commands.contains("refresh-client -A '%1:continue'"))
     }
 }
 

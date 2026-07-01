@@ -374,6 +374,7 @@ actor TmuxControlClient {
     /// Pane IDs paused during bootstrap, awaiting deferred content capture after first resize.
     /// Access from nonisolated context via `hasPausedPanes()`.
     private var _pausedPaneIDs: Set<Int> = []
+    private var bootstrapReadyPaneIDsBeforePause: Set<Int> = []
     private var initialGreetingState: InitialGreetingState = .idle
     private var initialGreetingContinuation: CheckedContinuation<Void, any Error>?
     #if DEBUG
@@ -608,6 +609,11 @@ actor TmuxControlClient {
             // until after the first resize (see continueDeferredBootstrap).
             _ = try await send(Self.clientPaneOutputStateCommand(paneIDs: paneIDs, state: "pause"))
             _pausedPaneIDs = Set(paneIDs)
+            let readyPaneIDs = Array(bootstrapReadyPaneIDsBeforePause.intersection(_pausedPaneIDs)).sorted()
+            bootstrapReadyPaneIDsBeforePause.subtract(readyPaneIDs)
+            if !readyPaneIDs.isEmpty {
+                await continueDeferredBootstrap(paneIDs: readyPaneIDs)
+            }
         }
     }
 
@@ -627,7 +633,12 @@ actor TmuxControlClient {
 
     func continueDeferredBootstrap(paneIDs: [Int]) async {
         let toCapture = paneIDs.filter { _pausedPaneIDs.contains($0) }
-        guard !toCapture.isEmpty else { return }
+        guard !toCapture.isEmpty else {
+            if connectStage == .bootstrappingWindows {
+                bootstrapReadyPaneIDsBeforePause.formUnion(paneIDs)
+            }
+            return
+        }
 
         do {
             try await bootstrapPaneContent(for: toCapture)
