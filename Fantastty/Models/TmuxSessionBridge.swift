@@ -68,6 +68,18 @@ final class TmuxSessionBridge: ObservableObject {
         bindingStore.hasBinding(workspaceID: workspaceID)
     }
 
+    func handleTabBecameVisible(session: Session, tab: TerminalTab) {
+        guard tab.kind == .terminal,
+              session.selectedTabID == tab.id,
+              let client = session.controlClient,
+              bindingStore.session(for: client) === session,
+              let windowID = tab.tmuxWindowID else {
+            return
+        }
+
+        tmuxWindowSelector(client, windowID)
+    }
+
     /// Fallback coalescing injectors for surfaces not managed by a
     /// TmuxWindowController (e.g. during initial window setup).
     /// Keyed by pane ID; each limits to one in-flight inject.
@@ -183,8 +195,10 @@ private extension TmuxSessionBridge {
             case .selectWindow(let windowID):
                 guard let tab = session.tabs.first(where: { $0.tmuxWindowID == windowID }) else { continue }
                 activeWindowIDByWorkspaceID[session.workspaceID] = windowID
-                withSuppressedTabSelectionSync(for: session.workspaceID) {
-                    session.selectedTabID = tab.id
+                if session.selectedTabID != tab.id {
+                    withSuppressedTabSelectionSync(for: session.workspaceID) {
+                        session.selectedTabID = tab.id
+                    }
                 }
 
             case .applyLayout(let windowID, let layout, _):

@@ -253,6 +253,89 @@ final class TmuxSessionBridgeTests: XCTestCase {
     }
 
     @MainActor
+    func testTmuxDrivenSelectionForAlreadySelectedTabDoesNotRepublishSelection() async {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-select-window-idempotent")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 1,
+                name: "one",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: true
+            )
+        )
+
+        var republishedSelections = 0
+        let cancellable = session.$selectedTabID.dropFirst().sink { _ in
+            republishedSelections += 1
+        }
+
+        manager.controlClient(client, didChangeActiveWindowID: 1)
+        await Task.yield()
+
+        XCTAssertEqual(republishedSelections, 0)
+        cancellable.cancel()
+    }
+
+    @MainActor
+    func testVisibleSelectedTabSelectsBackingTmuxWindow() {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "v2-visible-select")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        var selectedWindowIDs: [Int] = []
+        manager.tmuxWindowSelector = { sentClient, windowID in
+            XCTAssertTrue(sentClient === client)
+            selectedWindowIDs.append(windowID)
+        }
+
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 1,
+                name: "one",
+                paneIDs: [],
+                windowIndex: 0,
+                isActive: true
+            )
+        )
+        manager.controlClient(
+            client,
+            didAddWindow: Fantastty.TmuxWindow(
+                windowID: 2,
+                name: "two",
+                paneIDs: [],
+                windowIndex: 1,
+                isActive: false
+            )
+        )
+
+        guard let secondTab = session.tabs.first(where: { $0.tmuxWindowID == 2 }) else {
+            return XCTFail("Expected second tab")
+        }
+        session.selectedTabID = secondTab.id
+        selectedWindowIDs.removeAll()
+
+        manager.handleTabBecameVisible(session: session, tab: secondTab)
+
+        XCTAssertEqual(selectedWindowIDs, [2])
+    }
+
+    @MainActor
     func testBootstrapWindowAddsDoNotEchoSelectWindowCommand() async {
         let manager = TmuxSessionBridge()
         manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp

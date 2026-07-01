@@ -1898,6 +1898,8 @@ class SessionManager: ObservableObject {
     }
 
     func handleRemoteTerminalTabBecameVisible(session: Session, tab: TerminalTab) {
+        attachedTmuxSessionBridge.handleTabBecameVisible(session: session, tab: tab)
+
         guard isRemoteEngineSession(session) else { return }
         for surface in tab.surfaceTree?.root?.leaves() ?? [] {
             guard let paneID = surface.tmuxPaneID else { continue }
