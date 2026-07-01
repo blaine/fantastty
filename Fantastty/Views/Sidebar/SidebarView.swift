@@ -161,15 +161,21 @@ struct SidebarView: View {
                 }
 
                 Menu {
-                    Button("New Workspace") {
+                    Button("New Workspace...") {
+                        sessionManager.showSessionLauncher(.local())
+                    }
+                    Button("New Local Workspace") {
                         sessionManager.createSession()
                     }
                     Button("New SSH Workspace...") {
-                        sessionManager.showSSHSheet = true
+                        sessionManager.showSessionLauncher(.ssh())
+                    }
+                    Button("New Sprite Workspace...") {
+                        sessionManager.showSessionLauncher(.sprite())
                     }
                     Divider()
                     Button("Attach to tmux Session...") {
-                        sessionManager.showTmuxAttachSheet = true
+                        sessionManager.showSessionLauncher(.local(focus: .existingSessions))
                     }
                 } label: {
                     Label("New Workspace", systemImage: "plus")

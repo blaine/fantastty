@@ -16,20 +16,30 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("b", modifiers: .command)
 
-            Button("New Workspace") {
-                sessionManager.createSession()
+            Button("New Workspace...") {
+                sessionManager.showSessionLauncher(.local())
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
 
+            Button("New Local Workspace") {
+                sessionManager.createSession()
+            }
+
             Button("New SSH Workspace...") {
-                sessionManager.showSSHSheet = true
+                sessionManager.showSessionLauncher(.ssh())
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])
 
             Button("New Sprite Workspace...") {
-                sessionManager.showSpriteSheet = true
+                sessionManager.showSessionLauncher(.sprite())
             }
             .keyboardShortcut("k", modifiers: [.command, .option])
+
+            Divider()
+
+            Button("Attach to tmux Session...") {
+                sessionManager.showSessionLauncher(.local(focus: .existingSessions))
+            }
 
             Divider()
 

@@ -221,24 +221,37 @@ class SessionManager: ObservableObject {
     /// Currently selected session ID (sidebar selection)
     @Published var selectedSessionID: UUID?
 
-    /// Whether to show the SSH connection sheet
-    @Published var showSSHSheet: Bool = false
-
-    /// Whether to show the Sprite connection sheet
-    @Published var showSpriteSheet: Bool = false
-
-    /// Whether to show the tmux attach sheet
-    @Published var showTmuxAttachSheet: Bool = false
+    /// The pending request for the unified session launcher sheet.
+    @Published var sessionLauncherRequest: SessionLauncherRequest?
 
     /// The set of tmux sessions currently attached in the app.
-    var attachedTmuxSessionKeys: Set<TmuxAttachSheet.AttachedSessionKey> {
-        var keys = Set<TmuxAttachSheet.AttachedSessionKey>()
+    var attachedTmuxSessionKeys: Set<AttachedSessionKey> {
+        var keys = Set<AttachedSessionKey>()
         for session in sessions {
             if case .attached(let info) = session.mode {
                 keys.insert(.init(sessionName: info.sessionName, host: info.host))
             }
         }
         return keys
+    }
+
+    func showSessionLauncher(_ request: SessionLauncherRequest = .local()) {
+        sessionLauncherRequest = request
+    }
+
+    func performSessionLauncherAction(_ action: SessionLauncherAction) {
+        switch action {
+        case .createSession(let type):
+            createSession(type: type)
+        case .createRemoteEngine(let host):
+            createRemoteEngineSession(host: host)
+        case .attachTmux(let info):
+            attachToTmuxSession(info: info)
+        case .connectSprite(let name):
+            createSession(type: .sprite(name: name))
+        case .createSprite:
+            assertionFailure("Sprite creation is asynchronous and belongs in SessionLauncherSheet")
+        }
     }
 
     /// Whether the notes panel is expanded
