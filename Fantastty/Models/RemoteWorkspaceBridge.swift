@@ -74,6 +74,8 @@ final class RemoteWorkspaceBridge {
 
     static let remoteRenderRetryDelay: DispatchTimeInterval = .milliseconds(50)
     static let remoteRenderRetryLimit = 20
+    static let remoteKeyframeRequestRetryDelay: DispatchTimeInterval = .milliseconds(250)
+    static let remoteKeyframeRequestRetryLimit = 40
     static let remoteWorkspaceSilentCommand = "/bin/cat"
 
     var ghosttyApp: Ghostty.App?
@@ -186,6 +188,8 @@ final class RemoteWorkspaceBridge {
         }
 
         binding.pendingKeyframeRequests.removeAll()
+        binding.pendingKeyframeRetryRequests.removeAll()
+        binding.keyframeRequestRetryCounts.removeAll()
         binding.pendingRenderRetryPaneIDs.removeAll()
         binding.renderRetryCounts.removeAll()
         binding.renderedGridSizesByPaneID.removeAll()
@@ -199,6 +203,7 @@ final class RemoteWorkspaceBridge {
             renderAuthoritativePane(paneID: paneID, binding: &binding, notifyAuthoritativeRender: false)
         }
         let actions = binding.runtime.handleReattach()
+        var keyframeRequestTasks: [Task<Void, Never>] = []
         for action in actions {
             if case .requestKeyframe(let paneID, let reason) = action {
                 if recordKeyframeRequest(
@@ -206,14 +211,22 @@ final class RemoteWorkspaceBridge {
                     paneID: paneID,
                     reason: reason,
                     binding: &binding
+                ), let task = sendKeyframeRequest(
+                    workspaceID: workspaceID,
+                    paneID: paneID,
+                    reason: reason,
+                    binding: &binding
                 ) {
-                    await keyframeRequestHandler?(workspaceID, paneID, reason)?.value
+                    keyframeRequestTasks.append(task)
                 }
                 continue
             }
             apply(action, workspaceID: workspaceID, binding: &binding)
         }
         bindings[workspaceID] = binding
+        for task in keyframeRequestTasks {
+            await task.value
+        }
     }
 
     func handleRemotePaneBecameVisible(workspaceID: String, paneID: Int) {
@@ -358,7 +371,29 @@ private extension RemoteWorkspaceBridge {
             binding: &binding
         ) else { return nil }
 
-        return keyframeRequestHandler?(workspaceID, paneID, reason)
+        return sendKeyframeRequest(
+            workspaceID: workspaceID,
+            paneID: paneID,
+            reason: reason,
+            binding: &binding
+        )
+    }
+
+    @discardableResult
+    func sendKeyframeRequest(
+        workspaceID: String,
+        paneID: Int,
+        reason: RemotePaneGridKeyframeRequestReason,
+        binding: inout RemoteWorkspaceBinding
+    ) -> Task<Void, Never>? {
+        let task = keyframeRequestHandler?(workspaceID, paneID, reason)
+        scheduleKeyframeRequestRetry(
+            workspaceID: workspaceID,
+            paneID: paneID,
+            reason: reason,
+            binding: &binding
+        )
+        return task
     }
 
     func recordKeyframeRequest(
@@ -379,7 +414,54 @@ private extension RemoteWorkspaceBridge {
             return false
         }
         binding.pendingKeyframeRequests[paneID] = request
+        binding.pendingKeyframeRetryRequests.removeValue(forKey: paneID)
+        binding.keyframeRequestRetryCounts.removeValue(forKey: paneID)
         return true
+    }
+
+    func scheduleKeyframeRequestRetry(
+        workspaceID: String,
+        paneID: Int,
+        reason: RemotePaneGridKeyframeRequestReason,
+        binding: inout RemoteWorkspaceBinding
+    ) {
+        guard let request = binding.pendingKeyframeRequests[paneID] else { return }
+        let retryCount = binding.keyframeRequestRetryCounts[paneID] ?? 0
+        guard retryCount < Self.remoteKeyframeRequestRetryLimit else { return }
+        guard binding.pendingKeyframeRetryRequests[paneID] == nil else { return }
+
+        binding.keyframeRequestRetryCounts[paneID] = retryCount + 1
+        binding.pendingKeyframeRetryRequests[paneID] = request
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.remoteKeyframeRequestRetryDelay) { [weak self] in
+            self?.retryKeyframeRequest(
+                workspaceID: workspaceID,
+                paneID: paneID,
+                reason: reason,
+                request: request
+            )
+        }
+    }
+
+    func retryKeyframeRequest(
+        workspaceID: String,
+        paneID: Int,
+        reason: RemotePaneGridKeyframeRequestReason,
+        request: RemotePendingKeyframeRequest
+    ) {
+        guard var binding = bindings[workspaceID] else { return }
+        guard binding.pendingKeyframeRetryRequests[paneID] == request else { return }
+        binding.pendingKeyframeRetryRequests.removeValue(forKey: paneID)
+        guard binding.pendingKeyframeRequests[paneID] == request else {
+            bindings[workspaceID] = binding
+            return
+        }
+        _ = sendKeyframeRequest(
+            workspaceID: workspaceID,
+            paneID: paneID,
+            reason: reason,
+            binding: &binding
+        )
+        bindings[workspaceID] = binding
     }
 
     func shouldSuppressKeyframeRequest(
@@ -413,6 +495,9 @@ private extension RemoteWorkspaceBridge {
             binding.renderedGridRowVersionsByPaneID.removeValue(forKey: paneID)
             binding.renderedGridIdentitiesByPaneID.removeValue(forKey: paneID)
             binding.surfaceSizeSubscriptions.removeValue(forKey: paneID)
+            binding.pendingKeyframeRequests.removeValue(forKey: paneID)
+            binding.pendingKeyframeRetryRequests.removeValue(forKey: paneID)
+            binding.keyframeRequestRetryCounts.removeValue(forKey: paneID)
             binding.pendingRenderRetryPaneIDs.remove(paneID)
             binding.renderRetryCounts.removeValue(forKey: paneID)
         }
@@ -535,7 +620,12 @@ private extension RemoteWorkspaceBridge {
             let keyframeRequestTask: Task<Void, Never>?
             if shouldRequestKeyframe {
                 paneResizeHandler?(binding.runtime.workspaceID, paneID, surfaceSize)
-                keyframeRequestTask = keyframeRequestHandler?(binding.runtime.workspaceID, paneID, .resizeMismatch)
+                keyframeRequestTask = sendKeyframeRequest(
+                    workspaceID: binding.runtime.workspaceID,
+                    paneID: paneID,
+                    reason: .resizeMismatch,
+                    binding: &binding
+                )
             } else {
                 keyframeRequestTask = nil
             }
@@ -578,6 +668,8 @@ private extension RemoteWorkspaceBridge {
         }
 
         binding.pendingKeyframeRequests.removeValue(forKey: paneID)
+        binding.pendingKeyframeRetryRequests.removeValue(forKey: paneID)
+        binding.keyframeRequestRetryCounts.removeValue(forKey: paneID)
         if let stateSize = renderState.gridSize,
            nativeRemoteGridSize(from: surface) != stateSize {
             _ = paneGridResizeOperation(surface, stateSize)
@@ -1148,6 +1240,8 @@ private struct RemoteWorkspaceBinding {
     var tabIDsByWindowID: [Int: UUID] = [:]
     var surfaceSizeSubscriptions: [Int: AnyCancellable] = [:]
     var pendingKeyframeRequests: [Int: RemotePendingKeyframeRequest] = [:]
+    var pendingKeyframeRetryRequests: [Int: RemotePendingKeyframeRequest] = [:]
+    var keyframeRequestRetryCounts: [Int: Int] = [:]
     var pendingRenderRetryPaneIDs: Set<Int> = []
     var renderRetryCounts: [Int: Int] = [:]
     var renderedGridSizesByPaneID: [Int: RemoteGridSize] = [:]

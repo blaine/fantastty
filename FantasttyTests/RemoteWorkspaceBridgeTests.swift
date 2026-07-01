@@ -1457,6 +1457,46 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         XCTAssertEqual(requestedKeyframes.map(\.reason), [.noKeyframe, .noKeyframe])
     }
 
+    func testDeltaMismatchRecoveryRequestRetriesUntilFreshKeyframeRenders() async {
+        let bridge = RemoteWorkspaceBridge()
+        let session = makeRemoteSession()
+        var requestedKeyframes: [(paneID: Int, reason: RemotePaneGridKeyframeRequestReason)] = []
+
+        bridge.surfaceFactory = { _ in self.makeSurface() }
+        bridge.paneGridRenderer = { _, _ in .rendered }
+        bridge.keyframeRequestHandler = { _, paneID, reason in
+            requestedKeyframes.append((paneID, reason))
+            return nil
+        }
+
+        bridge.registerRemoteWorkspaceSession(session)
+        bridge.handle(.workspaceSnapshot(makeSnapshot(panes: [
+            makePane(paneID: 7, windowID: 1, isActive: true)
+        ])))
+        bridge.handle(.paneKeyframe(makeKeyframe(paneGeneration: 3, keyframeID: 11, rowVersion: 10, rowText: "ok")))
+        bridge.handle(.paneDelta(makeSpanDelta(
+            paneGeneration: 3,
+            baseKeyframeID: 11,
+            deltaSequence: 1,
+            baseRowVersion: 9,
+            rowVersion: 12,
+            text: "x"
+        )))
+
+        await waitUntilRemoteWorkspaceBridge {
+            requestedKeyframes.count >= 3
+        }
+        XCTAssertGreaterThanOrEqual(requestedKeyframes.count, 3)
+        XCTAssertEqual(requestedKeyframes.map(\.paneID).prefix(3), [7, 7, 7])
+        XCTAssertEqual(requestedKeyframes.map(\.reason).prefix(3), [.noKeyframe, .rowVersionMismatch, .rowVersionMismatch])
+
+        bridge.handle(.paneKeyframe(makeKeyframe(paneGeneration: 3, keyframeID: 12, rowVersion: 20, rowText: "re")))
+        let countAfterFreshKeyframe = requestedKeyframes.count
+        try? await Task.sleep(nanoseconds: 350_000_000)
+
+        XCTAssertEqual(requestedKeyframes.count, countAfterFreshKeyframe)
+    }
+
     func testRuntimeResizeMismatchReplacesPendingNoKeyframeRequest() {
         let bridge = RemoteWorkspaceBridge()
         let session = makeRemoteSession()
@@ -1796,6 +1836,38 @@ private extension RemoteWorkspaceBridgeTests {
                 )
             ],
             cursor: cursor ?? RemoteCursorState(row: 0, column: max(rowText.count - 1, 0), visible: true, shape: .bar)
+        )
+    }
+
+    func makeSpanDelta(
+        workspaceID: String = "workspace-1",
+        paneID: Int = 7,
+        paneGeneration: UInt64 = 3,
+        baseKeyframeID: UInt64 = 11,
+        deltaSequence: UInt64 = 1,
+        baseRowVersion: UInt64,
+        rowVersion: UInt64,
+        text: String
+    ) -> RemotePaneDelta {
+        RemotePaneDelta(
+            workspaceID: workspaceID,
+            paneID: paneID,
+            paneGeneration: paneGeneration,
+            baseKeyframeID: baseKeyframeID,
+            deltaSequence: deltaSequence,
+            rowUpdates: [
+                RemoteRowUpdate(
+                    rowIndex: 0,
+                    rowVersion: rowVersion,
+                    update: .span(
+                        baseRowVersion: baseRowVersion,
+                        startColumn: 0,
+                        cells: text.map { RemoteGridCell.text(String($0)) },
+                        clearToColumn: nil
+                    )
+                )
+            ],
+            cursor: nil
         )
     }
 

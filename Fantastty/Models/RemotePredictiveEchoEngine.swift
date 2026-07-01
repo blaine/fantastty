@@ -1100,7 +1100,8 @@ private extension RemotePredictiveEchoEngine {
     ) -> RemoteGridCell {
         var style = baseStyle
         style.faint = true
-        style.underline = .single
+        style.underline = .dotted
+        style.blink = true
         return RemoteGridCell.text(text, width: width, style: style)
     }
 }

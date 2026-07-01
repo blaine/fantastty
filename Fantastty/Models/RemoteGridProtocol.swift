@@ -42,7 +42,8 @@ struct RemoteCellStyle: Codable, Equatable, Sendable {
     static var tentativePrediction: RemoteCellStyle {
         var style = RemoteCellStyle.normal
         style.faint = true
-        style.underline = .single
+        style.underline = .dotted
+        style.blink = true
         return style
     }
 }

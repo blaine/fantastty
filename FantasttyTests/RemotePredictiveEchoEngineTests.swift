@@ -514,7 +514,8 @@ final class RemotePredictiveEchoEngineTests: XCTestCase {
         XCTAssertEqual(cell?.style.foreground, .indexed(2))
         XCTAssertEqual(cell?.style.bold, true)
         XCTAssertEqual(cell?.style.faint, true)
-        XCTAssertEqual(cell?.style.underline, .single)
+        XCTAssertEqual(cell?.style.underline, .dotted)
+        XCTAssertEqual(cell?.style.blink, true)
     }
 
     func testAuthoritativeMismatchClearsOverlayAndStartsCooldownWithoutKeyframeRequest() {

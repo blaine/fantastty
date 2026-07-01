@@ -24,6 +24,7 @@ xcframework/
 
 # Generated remote engine helper bundle artifacts
 Fantastty/Resources/RemoteEngine/manifest.json
+Fantastty/Resources/RemoteEngine/darwin-*/
 Fantastty/Resources/RemoteEngine/linux-*/
 
 # macOS
