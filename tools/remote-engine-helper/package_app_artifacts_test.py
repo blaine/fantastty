@@ -203,7 +203,7 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
         self.assertIn("actions/setup-go@v6", workflow)
         self.assertIn("go-version-file: tools/remote-engine-helper/helper/go.mod", workflow)
         self.assertIn("cache-dependency-path: tools/remote-engine-helper/helper/go.sum", workflow)
-        self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS: \"1\"", workflow)
+        self.assertIn("- name: Package remote engine artifacts\n      run: make remote-engine-app-artifacts", workflow)
         self.assertIn("make remote-engine-verify-app-artifacts", workflow)
         self.assertIn("scripts/sign-remote-engine-artifacts.sh", workflow)
         self.assertIn("- name: Notarize DMG\n      if: startsWith(github.ref, 'refs/tags/')", workflow)
