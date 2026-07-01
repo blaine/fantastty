@@ -75,6 +75,11 @@ enum TmuxHost: Codable, Hashable {
     }
 }
 
+struct AttachedSessionKey: Hashable {
+    let sessionName: String
+    let host: TmuxHost
+}
+
 enum TmuxAttachmentLaunchMode: String, Codable, Equatable {
     case attach
     case create

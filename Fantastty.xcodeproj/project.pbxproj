@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		007D7C21C591874F14DB92F1 /* SessionLauncherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1815EBA2B25BC58ABB8A54B6 /* SessionLauncherModel.swift */; };
 		0DFAD349E4BF46E263DFB5A5 /* FullscreenMode+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = B111E018710AF420B53079CD /* FullscreenMode+Extension.swift */; };
 		0E2E09180514E7EEEE0D6E11 /* SidebarThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B07D980DE9CEFB0A5BB6B1 /* SidebarThumbnailView.swift */; };
+		10AEB1C0869B7C26DD15B9C2 /* SessionLauncherModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57D1D7F6B7CA089DD353245E /* SessionLauncherModelTests.swift */; };
 		11D378560049D22BFC54BB2F /* TmuxProtocolParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD13C61B9554FEFFB64DA8C8 /* TmuxProtocolParserTests.swift */; };
 		12EC0D1EC1411B31D90EEF7D /* TmuxLayoutMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38DFF48337119863584D9067 /* TmuxLayoutMapper.swift */; };
 		1884DE631C79ECB3F202F6C8 /* SurfaceView+Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FF2DE822A85FD96FD0DBEC /* SurfaceView+Image.swift */; };
@@ -207,6 +209,7 @@
 		140C34BE75F8E35B9803CA1B /* fantastty.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = fantastty.sh; sourceTree = "<group>"; };
 		1510F9A7E38176B08E80CE9D /* NSMenuItem+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSMenuItem+Extension.swift"; sourceTree = "<group>"; };
 		1812BD19DF20F00CB5F0D675 /* ThemeCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeCatalog.swift; sourceTree = "<group>"; };
+		1815EBA2B25BC58ABB8A54B6 /* SessionLauncherModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLauncherModel.swift; sourceTree = "<group>"; };
 		1835B8957F6D2CA41E99A931 /* CoalescingInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoalescingInjector.swift; sourceTree = "<group>"; };
 		183FF99DD0A2C890DD7FB3AA /* String+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extension.swift"; sourceTree = "<group>"; };
 		19F5AF5110165901A629DA1E /* NSEvent+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSEvent+Extension.swift"; sourceTree = "<group>"; };
@@ -246,6 +249,7 @@
 		5157848A4CCB892D4C76075E /* SplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitView.swift; sourceTree = "<group>"; };
 		54F89AB559009B06C7920573 /* NSView+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSView+Extension.swift"; sourceTree = "<group>"; };
 		57C576F46E002ADD95360E83 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
+		57D1D7F6B7CA089DD353245E /* SessionLauncherModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLauncherModelTests.swift; sourceTree = "<group>"; };
 		586ED08E0691B05D1745B1FB /* TmuxAttachmentInfoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxAttachmentInfoTests.swift; sourceTree = "<group>"; };
 		5BC90F34BF7DF01189C8C19A /* RemoteGridProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteGridProtocol.swift; sourceTree = "<group>"; };
 		5C3EB0C7D8E97B87FFC4DAE5 /* RemotePredictiveEchoEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemotePredictiveEchoEngineTests.swift; sourceTree = "<group>"; };
@@ -449,6 +453,7 @@
 				DC71494450F49AF3C3EF59D6 /* Session.swift */,
 				95AAE4A95D3B35DE00383DBD /* SessionBackingState.swift */,
 				3F579B2060B68EC58FBD3F2F /* SessionDisplayInfo.swift */,
+				1815EBA2B25BC58ABB8A54B6 /* SessionLauncherModel.swift */,
 				6A288EE4B731A40F8A2C9450 /* SessionManager.swift */,
 				07DF09D816789200644A34F6 /* SessionMetadata.swift */,
 				CE7614C13A5B0B575404F8D0 /* SessionType.swift */,
@@ -590,6 +595,7 @@
 				9ABB68F4FF544DE26CA69F7A /* RemoteWorkspaceBridgeTests.swift */,
 				F6F845630FF38B9448026DB3 /* RemoteWorkspaceRuntimeTests.swift */,
 				8AA0D6D299784B012B4D2227 /* SessionDisplayInfoTests.swift */,
+				57D1D7F6B7CA089DD353245E /* SessionLauncherModelTests.swift */,
 				DE5C065C673FF1F18175BD62 /* SplitLayoutPipelineTests.swift */,
 				793B52D59FC2DC474473D514 /* TerminalLifecycleRouterTests.swift */,
 				C4E3E169FE066C4A1638B2A8 /* ThemeCatalogTests.swift */,
@@ -856,6 +862,7 @@
 				219964F20DE5EDD622C45E9C /* RemoteWorkspaceBridgeTests.swift in Sources */,
 				1FB6A3679EA18353BA1B75A5 /* RemoteWorkspaceRuntimeTests.swift in Sources */,
 				7F2E9C70581B4A6E5467A82A /* SessionDisplayInfoTests.swift in Sources */,
+				10AEB1C0869B7C26DD15B9C2 /* SessionLauncherModelTests.swift in Sources */,
 				35F31819EF8AB53BF8792497 /* SplitLayoutPipelineTests.swift in Sources */,
 				9CD23ABDB81A5CCC495D0BEC /* TerminalLifecycleRouterTests.swift in Sources */,
 				765C8BDD2D5271286CC844EB /* ThemeCatalogTests.swift in Sources */,
@@ -953,6 +960,7 @@
 				944CFB6009417E026B399F5C /* SessionBackingState.swift in Sources */,
 				E08E4B4826F9751910B4129F /* SessionDetailView.swift in Sources */,
 				525033CDFAF8701DF6321632 /* SessionDisplayInfo.swift in Sources */,
+				007D7C21C591874F14DB92F1 /* SessionLauncherModel.swift in Sources */,
 				736B9E4E4372EB1E2F39096E /* SessionManager.swift in Sources */,
 				213129F20F04DEE88E770036 /* SessionMetadata.swift in Sources */,
 				EE1CACE3AE24CB9CEA14EA90 /* SessionNotesPanel.swift in Sources */,
