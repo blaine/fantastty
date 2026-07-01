@@ -882,6 +882,10 @@ final class RemoteWorkspaceBridgeTests: XCTestCase {
         guard let surface = session.tabs.first?.surfaceTree?.root?.leaves().first else {
             return XCTFail("Expected remote pane surface")
         }
+        await waitUntilRemoteWorkspaceBridge {
+            self.remoteGridSize(from: surface.surfaceSize) == RemoteGridSize(columns: 2, rows: 1)
+        }
+        XCTAssertEqual(resizeIntents.count, 0)
 
         surface.surfaceSize = ghostty_surface_size_s(
             columns: 100,
