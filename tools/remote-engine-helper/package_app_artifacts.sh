@@ -41,9 +41,10 @@ package_target() {
   local library_path="$output_tmp/lib/$library_name"
   local installed_library="$install_dir/lib/$library_name"
   local pkg_config_path="$install_dir/share/pkgconfig/libghostty-vt.pc"
+  local go_cache="$BUILD_ROOT/$label/go-cache"
 
-  rm -rf "$install_dir" "$output_tmp"
-  mkdir -p "$output_tmp/lib"
+  rm -rf "$install_dir" "$output_tmp" "$go_cache"
+  mkdir -p "$output_tmp/lib" "$go_cache"
 
   printf '[remote-engine-artifacts] building libghostty-vt target=%s\n' "$zig_target"
   (
@@ -68,6 +69,7 @@ package_target() {
       CGO_ENABLED=1 \
       GOOS="$goos" \
       GOARCH="$goarch" \
+      GOCACHE="$go_cache" \
       CC="zig cc -target $zig_target" \
       PKG_CONFIG_LIBDIR="$install_dir/share/pkgconfig" \
       PKG_CONFIG_PATH= \
