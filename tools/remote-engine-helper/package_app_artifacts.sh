@@ -3,8 +3,9 @@ set -Eeuo pipefail
 
 ROOT="${FANTASTTY_REPO_ROOT:-$(git rev-parse --show-toplevel)}"
 OUTPUT_DIR="${FANTASTTY_REMOTE_ENGINE_ARTIFACTS_OUTPUT:-$ROOT/Fantastty/Resources/RemoteEngine}"
-DEFAULT_BUILD_TMP="${TMPDIR:-/tmp}"
+DEFAULT_BUILD_TMP="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 DEFAULT_BUILD_TMP="${DEFAULT_BUILD_TMP%/}"
+mkdir -p "$DEFAULT_BUILD_TMP"
 BUILD_ROOT="${FANTASTTY_REMOTE_ENGINE_BUILD_ROOT:-$(mktemp -d "$DEFAULT_BUILD_TMP/fantastty-remote-engine-artifacts.XXXXXX")}"
 VERSION="${FANTASTTY_REMOTE_ENGINE_VERSION:-$(git -C "$ROOT" rev-parse --short HEAD)}"
 HELPER_DIR="$ROOT/tools/remote-engine-helper/helper"
