@@ -691,15 +691,14 @@ actor TmuxControlClient {
         for paneID in paneIDs {
             let alternateScreenResponse = try await send(Self.alternateScreenStateCommand(paneID: paneID))
             let useAlternateScreen = Self.parseAlternateScreenState(from: alternateScreenResponse)
-            let response = try await send(
-                Self.capturePaneCommand(paneID: paneID, useAlternateScreen: useAlternateScreen)
-            )
+            let response = try await send(Self.capturePaneCommand(paneID: paneID))
             let cursorResponse = try await send(Self.capturePaneCursorCommand(paneID: paneID))
             let cursor = Self.parseCapturePaneCursor(from: cursorResponse)
             let data = Self.capturePaneReplayData(
                 from: Self.capturePaneData(from: response),
                 cursorX: cursor?.x ?? 0,
-                cursorY: cursor?.y ?? 0
+                cursorY: cursor?.y ?? 0,
+                useAlternateScreen: useAlternateScreen
             )
             captured.append(TmuxCapturedPane(paneID: paneID, data: data))
         }
@@ -1058,10 +1057,9 @@ actor TmuxControlClient {
         )
     }
 
-    static func capturePaneCommand(paneID: Int, useAlternateScreen: Bool = false) -> String {
-        let alternateFlag = useAlternateScreen ? " -a" : ""
+    static func capturePaneCommand(paneID: Int) -> String {
         // Keep wrapped lines as separate rows so replay matches pane geometry.
-        return "capture-pane -p -e\(alternateFlag) -t %\(paneID)"
+        return "capture-pane -p -e -t %\(paneID)"
     }
 
     static func currentWindowInfoCommand() -> String {
@@ -1183,11 +1181,20 @@ actor TmuxControlClient {
         return Data(sanitized)
     }
 
-    static func capturePaneReplayData(from data: Data, cursorX: Int, cursorY: Int) -> Data {
+    static func capturePaneReplayData(
+        from data: Data,
+        cursorX: Int,
+        cursorY: Int,
+        useAlternateScreen: Bool = false
+    ) -> Data {
         let sanitized = sanitizePaneOutput(data)
         // Always start from a known frame; tmux capture data is a full-screen snapshot.
         // Clearing here prevents stale glyphs from prior frames during bootstrap/recapture.
-        var replay = Data("\u{1b}[H\u{1b}[2J".utf8)
+        var replay = Data()
+        if useAlternateScreen {
+            replay.append(Data("\u{1b}[?1049h".utf8))
+        }
+        replay.append(Data("\u{1b}[H\u{1b}[2J".utf8))
         var normalized = normalizeCapturedPaneLineEndings(in: sanitized)
         trimTrailingCapturedRowSeparator(in: &normalized)
         replay.append(normalized)

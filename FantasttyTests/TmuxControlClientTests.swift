@@ -707,13 +707,6 @@ final class TmuxControlClientTests: XCTestCase {
         XCTAssertEqual(TmuxControlClient.capturePaneCommand(paneID: 7), "capture-pane -p -e -t %7")
     }
 
-    func testCapturePaneCommandUsesAlternateScreenWhenRequested() {
-        XCTAssertEqual(
-            TmuxControlClient.capturePaneCommand(paneID: 7, useAlternateScreen: true),
-            "capture-pane -p -e -a -t %7"
-        )
-    }
-
     func testCapturePaneCursorCommandFormat() {
         XCTAssertEqual(
             TmuxControlClient.capturePaneCursorCommand(paneID: 7),
@@ -1199,6 +1192,89 @@ final class TmuxConnectFSMTests: XCTestCase {
         XCTAssertTrue(outputStateCommands.contains("refresh-client -A '%1:pause' -A '%2:pause'"))
 
         XCTAssertFalse(commands.contains(where: { $0 == "refresh-client" || $0.hasPrefix("refresh-client -C ") }))
+    }
+
+    @MainActor
+    func testDeferredBootstrapReplayEntersAlternateScreenWhenTmuxPaneIsAlternate() async throws {
+        let issuedCommands = Locked<[String]>([])
+        var nextBlockID = 2
+
+        func respondOK(_ transport: ScriptedTmuxControlTransport, outputLine: String? = nil) {
+            let id = nextBlockID
+            nextBlockID += 1
+            transport.emitLine("%begin \(id) \(id) 0")
+            if let outputLine {
+                transport.emitLine(outputLine)
+            }
+            transport.emitLine("%end \(id) \(id) 0")
+        }
+
+        let transport = ScriptedTmuxControlTransport(
+            startHandler: { transport in
+                transport.emitLine("%begin 1 1 0")
+                transport.emitLine("%end 1 1 0")
+            },
+            writeHandler: { command, transport in
+                issuedCommands.withLock { $0.append(command) }
+
+                if command == TmuxControlClient.readyCommand() {
+                    respondOK(transport)
+                    return
+                }
+
+                if command.hasPrefix("list-windows -F ") {
+                    let id = nextBlockID
+                    nextBlockID += 1
+                    transport.emitLine("%begin \(id) \(id) 0")
+                    transport.emitLine("@10\tactive\tb25d,80x24,0,0,1\t0\t1")
+                    transport.emitLine("%end \(id) \(id) 0")
+                    return
+                }
+
+                if command.hasPrefix("display-message -p -t %1 '#{alternate_on}'") {
+                    respondOK(transport, outputLine: "1")
+                    return
+                }
+
+                if command.hasPrefix("capture-pane -p -e -t %1") {
+                    respondOK(transport, outputLine: "visible alternate")
+                    return
+                }
+
+                if command.hasPrefix("display-message -p -t %1 '#{cursor_x} #{cursor_y}'") {
+                    respondOK(transport, outputLine: "0 0")
+                    return
+                }
+
+                respondOK(transport)
+            }
+        )
+        let client = TmuxControlClient(
+            attachmentInfo: makeInfo(name: "fsm-bootstrap-alternate"),
+            transportFactory: { transport }
+        )
+        let delegate = MockControlClientDelegate()
+        client.delegate = delegate
+
+        try await client.connect()
+        defer {
+            Task {
+                await client.disconnect()
+            }
+        }
+
+        await client.continueDeferredBootstrap(paneIDs: [1])
+
+        let commands = issuedCommands.withLock { $0 }
+        XCTAssertTrue(commands.contains("capture-pane -p -e -t %1"))
+        XCTAssertFalse(commands.contains("capture-pane -p -e -a -t %1"))
+
+        let replay = try XCTUnwrap(delegate.outputReceived.first?.data)
+        XCTAssertTrue(
+            replay.starts(with: Data("\u{1b}[?1049h".utf8)),
+            "alternate bootstrap replay should enter the local alternate screen before drawing"
+        )
+        XCTAssertTrue(replay.contains(Data("visible alternate".utf8)))
     }
 }
 
