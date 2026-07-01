@@ -371,10 +371,9 @@ actor TmuxControlClient {
     private var transportEventContinuation: AsyncStream<TransportEvent>.Continuation?
     private var transportEventTask: Task<Void, Never>?
     private var paneOutputSanitizers: [Int: ScreenTitleSequenceSanitizer] = [:]
-    /// Pane IDs paused during bootstrap, awaiting deferred content capture after first resize.
-    /// Access from nonisolated context via `hasPausedPanes()`.
-    private var _pausedPaneIDs: Set<Int> = []
-    private var bootstrapReadyPaneIDsBeforePause: Set<Int> = []
+    /// Pane IDs with output paused during bootstrap, awaiting deferred content capture after first resize.
+    private var deferredBootstrapPaneIDs: Set<Int> = []
+    private var bootstrapReadyPaneIDsBeforeOutputPaused: Set<Int> = []
     private var initialGreetingState: InitialGreetingState = .idle
     private var initialGreetingContinuation: CheckedContinuation<Void, any Error>?
     #if DEBUG
@@ -604,13 +603,13 @@ actor TmuxControlClient {
             )
         ).sorted()
         if !paneIDs.isEmpty {
-            // Pause %output delivery so nothing flows until the client has had
-            // a chance to size the window correctly. Content capture is deferred
-            // until after the first resize (see continueDeferredBootstrap).
+            // Pause %output delivery so tmux keeps its pane state current
+            // without sending raw startup bytes before the first correctly
+            // sized capture.
             _ = try await send(Self.clientPaneOutputStateCommand(paneIDs: paneIDs, state: "pause"))
-            _pausedPaneIDs = Set(paneIDs)
-            let readyPaneIDs = Array(bootstrapReadyPaneIDsBeforePause.intersection(_pausedPaneIDs)).sorted()
-            bootstrapReadyPaneIDsBeforePause.subtract(readyPaneIDs)
+            deferredBootstrapPaneIDs = Set(paneIDs)
+            let readyPaneIDs = Array(bootstrapReadyPaneIDsBeforeOutputPaused.intersection(deferredBootstrapPaneIDs)).sorted()
+            bootstrapReadyPaneIDsBeforeOutputPaused.subtract(readyPaneIDs)
             if !readyPaneIDs.isEmpty {
                 await continueDeferredBootstrap(paneIDs: readyPaneIDs)
             }
@@ -626,16 +625,16 @@ actor TmuxControlClient {
 
     /// Complete the deferred bootstrap: capture pane content at the correct size, then resume %output.
     /// Called after the first resize is sent so content is captured at the right dimensions.
-    /// Returns the subset of `paneIDs` that are currently paused awaiting deferred bootstrap.
-    func pausedPanes(among paneIDs: [Int]) -> [Int] {
-        paneIDs.filter { _pausedPaneIDs.contains($0) }
+    /// Returns the subset of `paneIDs` that are currently awaiting deferred bootstrap.
+    func deferredBootstrapPanes(among paneIDs: [Int]) -> [Int] {
+        paneIDs.filter { deferredBootstrapPaneIDs.contains($0) }
     }
 
     func continueDeferredBootstrap(paneIDs: [Int]) async {
-        let toCapture = paneIDs.filter { _pausedPaneIDs.contains($0) }
+        let toCapture = paneIDs.filter { deferredBootstrapPaneIDs.contains($0) }
         guard !toCapture.isEmpty else {
             if connectStage == .bootstrappingWindows {
-                bootstrapReadyPaneIDsBeforePause.formUnion(paneIDs)
+                bootstrapReadyPaneIDsBeforeOutputPaused.formUnion(paneIDs)
             }
             return
         }
@@ -644,11 +643,12 @@ actor TmuxControlClient {
             try await bootstrapPaneContent(for: toCapture)
         } catch {}
 
-        // Resume %output for captured panes
-        let toContinue = toCapture.filter { _pausedPaneIDs.contains($0) }
+        // Drop paused raw startup output before re-enabling live %output.
+        let toContinue = toCapture.filter { deferredBootstrapPaneIDs.contains($0) }
         guard !toContinue.isEmpty else { return }
-        _pausedPaneIDs.subtract(toContinue)
-        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "continue"))
+        deferredBootstrapPaneIDs.subtract(toContinue)
+        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "off"))
+        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "on"))
     }
 
     func disconnect() async {
