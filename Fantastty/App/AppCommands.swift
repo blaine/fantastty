@@ -1,9 +1,16 @@
 import SwiftUI
 import GhosttyKit
+import Sparkle
 
 struct AppCommands: Commands {
     @ObservedObject var sessionManager: SessionManager
+    let updater: SPUUpdater
+
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            CheckForUpdatesView(updater: updater)
+        }
+
         // Replace the default "New Window" command
         CommandGroup(replacing: .newItem) {
             Button("New Tab") {
@@ -208,5 +215,31 @@ struct AppCommands: Commands {
                 }
             }
         }
+    }
+}
+
+private final class CheckForUpdatesViewModel: ObservableObject {
+    @Published var canCheckForUpdates = false
+
+    init(updater: SPUUpdater) {
+        updater.publisher(for: \.canCheckForUpdates)
+            .assign(to: &$canCheckForUpdates)
+    }
+}
+
+private struct CheckForUpdatesView: View {
+    @ObservedObject private var viewModel: CheckForUpdatesViewModel
+    private let updater: SPUUpdater
+
+    init(updater: SPUUpdater) {
+        self.updater = updater
+        viewModel = CheckForUpdatesViewModel(updater: updater)
+    }
+
+    var body: some View {
+        Button("Check for Updates...") {
+            updater.checkForUpdates()
+        }
+        .disabled(!viewModel.canCheckForUpdates)
     }
 }

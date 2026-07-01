@@ -179,6 +179,12 @@ jobs:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       run: scripts/notarize-dmg.sh
 
+    - name: Generate Sparkle appcast
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+      run: scripts/generate-sparkle-appcast.sh
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -191,9 +197,12 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release create "$GITHUB_REF_NAME" \
-          "$DMG_NAME" \
           --title "Fantastty $GITHUB_REF_NAME" \
           --generate-notes
+        gh release upload "$GITHUB_REF_NAME" \
+          "$DMG_NAME" \
+          appcast.xml \
+          --clobber
 
     - name: Cleanup keychain
       if: always()

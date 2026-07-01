@@ -77,6 +77,11 @@ The `scripts/build-release.sh` script builds a signed, notarized DMG:
 
 Output lands in `build/release/Fantastty.dmg`.
 
+Tagged GitHub Actions releases attach the notarized DMG and Sparkle appcast to
+GitHub Releases. Installed builds check
+`https://github.com/blaine/fantastty/releases/latest/download/appcast.xml` via
+the **Check for Updates...** app menu item.
+
 ## Architecture
 
 Fantastty is a SwiftUI app that uses Ghostty's libghostty as a static library for terminal rendering. Session persistence is handled through tmux:

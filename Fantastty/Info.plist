@@ -26,6 +26,10 @@
 	<string></string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUFeedURL</key>
+	<string>https://github.com/blaine/fantastty/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>kvhQmHfNKpeuv3TxXW68JI8G9KvoOp6IE+zg3kOobKI=</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

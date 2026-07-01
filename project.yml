@@ -12,6 +12,11 @@ settings:
     SWIFT_VERSION: "5"
     MACOSX_DEPLOYMENT_TARGET: "15.0"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.3
+
 targets:
   Fantastty:
     type: application
@@ -49,6 +54,8 @@ targets:
       - framework: xcframework/GhosttyKit.xcframework
         embed: false
       - sdk: Carbon.framework
+      - package: Sparkle
+        product: Sparkle
     preBuildScripts:
       - name: Package RemoteEngine Artifacts
         script: |

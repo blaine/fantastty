@@ -13,7 +13,7 @@ You need:
 ## Required GitHub Secrets
 
 Go to your repository **Settings > Secrets and variables > Actions** and add
-these 6 secrets:
+these 7 secrets:
 
 ### 1. `DEVELOPER_ID_APPLICATION` — Signing certificate (base64)
 
@@ -84,6 +84,26 @@ Your 10-character Apple Developer Team ID.
   ```
   The team ID is the string in parentheses at the end.
 
+### 7. `SPARKLE_EDDSA_PRIVATE_KEY` — Sparkle update signing key
+
+The private EdDSA key used by Sparkle to sign update archives in the appcast.
+This is separate from the Apple Developer ID certificate. The matching public
+key is committed in `Fantastty/Info.plist` as `SUPublicEDKey`.
+
+**How to create it:**
+
+1. Download the Sparkle distribution that matches `project.yml`
+2. Generate a Fantastty-specific key:
+   ```bash
+   ./bin/generate_keys --account com.blainecook.fantastty
+   ```
+3. Export the private key:
+   ```bash
+   ./bin/generate_keys --account com.blainecook.fantastty -x fantastty-sparkle-private-key.txt
+   ```
+4. Paste the file contents as the `SPARKLE_EDDSA_PRIVATE_KEY` secret.
+5. Keep the private key file somewhere secure, then remove local scratch copies.
+
 ## How It Works
 
 ### Triggers
@@ -91,7 +111,7 @@ Your 10-character Apple Developer Team ID.
 | Event | What happens |
 |---|---|
 | Push to `main` | Build, sign, notarize, upload artifact |
-| Push tag `v*` | Build, sign, notarize, create GitHub Release with DMG |
+| Push tag `v*` | Build, sign, notarize, create GitHub Release with DMG and Sparkle appcast |
 | Manual dispatch | Build, sign, notarize, upload artifact (optional version override) |
 
 ### Build Steps
@@ -102,8 +122,17 @@ Your 10-character Apple Developer Team ID.
 4. Build the app with `xcodebuild` using the Developer ID certificate
 5. Create a DMG with Applications symlink
 6. Sign and notarize the DMG with Apple
-7. Upload the DMG as a build artifact
-8. For tagged releases: create a GitHub Release with the DMG attached
+7. For tagged releases: generate `appcast.xml` with Sparkle's EdDSA signature
+8. Upload the DMG as a build artifact
+9. For tagged releases: create a GitHub Release with the DMG and appcast attached
+
+Fantastty's `SUFeedURL` points at:
+
+```text
+https://github.com/blaine/fantastty/releases/latest/download/appcast.xml
+```
+
+The appcast points each update at that release's versioned DMG asset.
 
 ### Releasing a New Version
 
@@ -159,6 +188,7 @@ xcrun notarytool history \
 ## Security Notes
 
 - Certificates are stored as encrypted GitHub secrets — never committed to the repo
+- The Sparkle private key is stored as a GitHub secret — never committed to the repo
 - A temporary keychain is created per build and destroyed afterward
 - App-specific passwords have limited scope (they can't access your full Apple account)
 - Only `codesign` and `security` are granted keychain access
