@@ -132,6 +132,25 @@ final class TmuxWindowControllerTests: XCTestCase {
         XCTAssertEqual(String(data: injected[0], encoding: .utf8), "early")
     }
 
+    @MainActor
+    func testBootstrapTimeoutWaitsForLayoutBeforeContinuingPanes() async {
+        let controller = makeController()
+        var callbackPaneIDs: [[Int]] = []
+        controller.onBootstrapReady = { [weak controller] in
+            callbackPaneIDs.append(controller?.paneControllers.keys.sorted() ?? [])
+        }
+
+        controller.startBootstrapTimeout(seconds: 0)
+        await Task.yield()
+
+        XCTAssertTrue(callbackPaneIDs.isEmpty)
+
+        controller.applyLayout("bb62,213x55,0,0,7")
+        await Task.yield()
+
+        XCTAssertEqual(callbackPaneIDs, [[7]])
+    }
+
     // MARK: - Teardown
 
     @MainActor

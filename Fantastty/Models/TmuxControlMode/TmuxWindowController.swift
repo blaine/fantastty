@@ -17,6 +17,7 @@ final class TmuxWindowController {
     private var surfaceSizeSubscriptions: [Int: AnyCancellable] = [:]  // keyed by paneID
     private var panesWithReportedSize: Set<Int> = []
     private var bootstrapCompleted: Bool = false
+    private var bootstrapTimeoutElapsed: Bool = false
     var onBootstrapReady: (() -> Void)?
 
     init(
@@ -90,6 +91,7 @@ final class TmuxWindowController {
         } else if tab.focusedSurface == nil {
             tab.focusedSurface = leaves.first
         }
+        checkBootstrapReadiness()
     }
 
     func deliverOutput(paneID: Int, data: Data) {
@@ -139,15 +141,20 @@ final class TmuxWindowController {
     func startBootstrapTimeout(seconds: TimeInterval = 2.0) {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
             guard let self, !self.bootstrapCompleted else { return }
-            self.bootstrapCompleted = true
-            self.onBootstrapReady?()
+            self.bootstrapTimeoutElapsed = true
+            self.completeBootstrapIfReady()
         }
     }
 
     private func checkBootstrapReadiness() {
         guard !bootstrapCompleted else { return }
+        completeBootstrapIfReady()
+    }
+
+    private func completeBootstrapIfReady() {
         let allPaneIDs = Set(paneControllers.keys)
-        guard !allPaneIDs.isEmpty, panesWithReportedSize.isSuperset(of: allPaneIDs) else { return }
+        guard !allPaneIDs.isEmpty else { return }
+        guard bootstrapTimeoutElapsed || panesWithReportedSize.isSuperset(of: allPaneIDs) else { return }
         bootstrapCompleted = true
         onBootstrapReady?()
     }
