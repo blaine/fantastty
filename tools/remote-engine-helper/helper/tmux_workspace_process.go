@@ -224,6 +224,32 @@ func (r *tmuxWorkspaceRuntime) RequestKeyframe(workspaceID string, paneID int) (
 	return payload, nil
 }
 
+func (r *tmuxWorkspaceRuntime) RequestKeyframes(workspaceID string) (remoteWorkspacePayload, error) {
+	if r == nil {
+		return remoteWorkspacePayload{}, errors.New("tmux workspace source is unavailable")
+	}
+	fmt.Fprintf(r.log, "remote_tmux_request_keyframes_repaint_started=true workspace=%s\n", workspaceID)
+	payload, err := r.captureWorkspaceKeyframesPayload()
+	if err != nil {
+		fmt.Fprintf(r.log, "remote_tmux_request_keyframes_repaint_failed=true workspace=%s reason=%s\n", workspaceID, controlErrorDetail(err))
+		return remoteWorkspacePayload{}, err
+	}
+	fmt.Fprintf(r.log, "remote_tmux_request_keyframes_repaint_completed=true workspace=%s\n", workspaceID)
+	return payload, nil
+}
+
+func (r *tmuxWorkspaceRuntime) SubscribeKeyframes(workspaceID string, pump *engine.StreamPump) (remoteWorkspacePayload, func(), error) {
+	payload, err := r.RequestKeyframes(workspaceID)
+	if err != nil {
+		return remoteWorkspacePayload{}, func() {}, err
+	}
+	if pump != nil {
+		pump.PublishReliable(payload.Reliable)
+		pump.PublishDatagrams(payload.Datagrams)
+	}
+	return payload, r.Subscribe(pump), nil
+}
+
 func (r *tmuxWorkspaceRuntime) ResizePane(workspaceID string, paneID int, columns int, rows int) (remoteWorkspacePayload, error) {
 	if r == nil {
 		return remoteWorkspacePayload{}, errors.New("tmux workspace source is unavailable")
@@ -415,6 +441,27 @@ func (r *tmuxWorkspaceRuntime) repaintPaneFromCapture(paneID int) (bool, error) 
 		return false, err
 	}
 	return payloadContainsPaneKeyframe(payload, paneID), nil
+}
+
+func (r *tmuxWorkspaceRuntime) captureWorkspaceKeyframesPayload() (remoteWorkspacePayload, error) {
+	windowLines, paneLines, err := waitForTmuxListSnapshotLines(r.socketPath, r.sessionName, tmuxListSnapshotTimeout)
+	if err != nil {
+		return remoteWorkspacePayload{}, err
+	}
+	paneInitialCaptures, err := tmuxCapturePaneInitialCapturesByListLines(r.socketPath, paneLines)
+	if err != nil {
+		return remoteWorkspacePayload{}, err
+	}
+	payload, err := r.handleListSnapshotPayload(windowLines, paneLines, paneInitialCaptures)
+	if err != nil {
+		return remoteWorkspacePayload{}, err
+	}
+	for paneID := range paneInitialCaptures {
+		if payloadContainsPaneKeyframe(payload, paneID) {
+			r.rememberPaneCaptured(paneID)
+		}
+	}
+	return payload, nil
 }
 
 func (r *tmuxWorkspaceRuntime) capturePaneKeyframePayload(paneID int) (remoteWorkspacePayload, error) {

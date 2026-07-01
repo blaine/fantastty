@@ -681,6 +681,162 @@ esac
 	}
 }
 
+func TestTmuxWorkspaceRuntimeRequestKeyframesRecapturesActiveAlternateScreen(t *testing.T) {
+	logPath := installFakeTmuxProgram(t, `#!/bin/sh
+set -eu
+for arg in "$@"; do
+  printf '%s\t' "$arg" >>"$FAKE_TMUX_LOG"
+done
+printf '\n' >>"$FAKE_TMUX_LOG"
+case " $* " in
+  *" list-windows "*)
+    printf '@1\tclaude\t0000,20x2,0,0,%%7\t0\t1\n'
+    ;;
+  *" list-panes "*)
+    count_file="$FAKE_TMUX_LOG.list_panes_count"
+    count=0
+    if [ -f "$count_file" ]; then count="$(cat "$count_file")"; fi
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    if [ "$count" -eq 1 ]; then
+      printf '@1\t%%7\t1\t0\t0\t0\t0\t1\t1\n'
+    else
+      printf '@1\t%%7\t1\t1\t0\t0\t0\t1\t1\n'
+    fi
+    ;;
+  *" capture-pane "*)
+    mode="visible"
+    case " $* " in *" -a "*) mode="alternate-flag" ;; esac
+    count_file="$FAKE_TMUX_LOG.capture_count.$mode"
+    count=0
+    if [ -f "$count_file" ]; then count="$(cat "$count_file")"; fi
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    if [ "$mode" = "visible" ]; then
+      if [ "$count" -eq 1 ]; then printf 'regular-initial\n'; else printf 'alt-current\n'; fi
+    else
+      if [ "$count" -eq 1 ]; then printf '\n\n'; else printf 'regular-current\n'; fi
+    fi
+    ;;
+  *" -C new-session "*)
+    IFS= read -r refresh
+    printf 'STDIN:%s\n' "$refresh" >>"$FAKE_TMUX_LOG"
+    IFS= read -r detach || true
+    printf 'STDIN:%s\n' "$detach" >>"$FAKE_TMUX_LOG"
+    ;;
+esac
+`)
+	renderer := &sourceFakeRenderer{seedFromInitialRows: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runtime, err := startTmuxWorkspaceSource(ctx, tmuxWorkspaceSourceOptions{
+		WorkspaceID: "workspace-1",
+		SessionName: "fantastty-remote-workspace-1",
+		SocketPath:  filepath.Join(t.TempDir(), "remote-tmux.sock"),
+		Renderer:    renderer,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+
+	initial, err := runtime.CurrentPayload("workspace-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := sourceKeyframeText(sourceKeyframeForPane(t, initial.Reliable, 7)); !strings.Contains(got, "regular-initial") {
+		t.Fatalf("initial keyframe text = %q, want regular screen before tmux flips", got)
+	}
+
+	payload, err := runtime.RequestKeyframes("workspace-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyframe := sourceKeyframeForPane(t, payload.Reliable, 7)
+	if got := sourceKeyframeText(keyframe); !strings.Contains(got, "alt-current") || strings.Contains(got, "regular-current") || strings.Contains(got, "regular-initial") {
+		t.Fatalf("request keyframes text = %q, want current visible alternate screen", got)
+	}
+	capture := renderer.seededCaptures[7]
+	if capture.ActiveScreen != remotegrid.ActiveScreenAlternate {
+		t.Fatalf("recaptured active screen = %q, want alternate", capture.ActiveScreen)
+	}
+	logData := readTmuxProcessTextFile(t, logPath)
+	if got := strings.Count(logData, "capture-pane\t-peqJN\t-S\t-2000\t-t\t%7"); got != 2 {
+		t.Fatalf("visible capture count = %d, want initial seed plus full-keyframe recapture; log=%s", got, logData)
+	}
+	if got := strings.Count(logData, "capture-pane\t-peqJN\t-a\t-S\t-2000\t-t\t%7"); got != 2 {
+		t.Fatalf("alternate-flag capture count = %d, want initial seed plus full-keyframe recapture; log=%s", got, logData)
+	}
+}
+
+func TestTmuxWorkspaceRuntimeSubscribeKeyframesRecapturesActiveAlternateScreen(t *testing.T) {
+	installFakeTmuxProgram(t, `#!/bin/sh
+set -eu
+case " $* " in
+  *" list-windows "*)
+    printf '@1\tclaude\t0000,20x2,0,0,%%7\t0\t1\n'
+    ;;
+  *" list-panes "*)
+    count_file="$FAKE_TMUX_LOG.list_panes_count"
+    count=0
+    if [ -f "$count_file" ]; then count="$(cat "$count_file")"; fi
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    if [ "$count" -eq 1 ]; then
+      printf '@1\t%%7\t1\t0\t0\t0\t0\t1\t1\n'
+    else
+      printf '@1\t%%7\t1\t1\t0\t0\t0\t1\t1\n'
+    fi
+    ;;
+  *" capture-pane "*)
+    mode="visible"
+    case " $* " in *" -a "*) mode="alternate-flag" ;; esac
+    count_file="$FAKE_TMUX_LOG.capture_count.$mode"
+    count=0
+    if [ -f "$count_file" ]; then count="$(cat "$count_file")"; fi
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    if [ "$mode" = "visible" ]; then
+      if [ "$count" -eq 1 ]; then printf 'regular-initial\n'; else printf 'alt-current\n'; fi
+    else
+      if [ "$count" -eq 1 ]; then printf '\n\n'; else printf 'regular-current\n'; fi
+    fi
+    ;;
+  *" -C new-session "*)
+    IFS= read -r refresh
+    IFS= read -r detach || true
+    ;;
+esac
+`)
+	renderer := &sourceFakeRenderer{seedFromInitialRows: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runtime, err := startTmuxWorkspaceSource(ctx, tmuxWorkspaceSourceOptions{
+		WorkspaceID: "workspace-1",
+		SessionName: "fantastty-remote-workspace-1",
+		SocketPath:  filepath.Join(t.TempDir(), "remote-tmux.sock"),
+		Renderer:    renderer,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+
+	payload, unsubscribe, err := runtime.SubscribeKeyframes("workspace-1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unsubscribe()
+
+	keyframe := sourceKeyframeForPane(t, payload.Reliable, 7)
+	if got := sourceKeyframeText(keyframe); !strings.Contains(got, "alt-current") || strings.Contains(got, "regular-current") || strings.Contains(got, "regular-initial") {
+		t.Fatalf("subscribe keyframes text = %q, want current visible alternate screen", got)
+	}
+}
+
 func TestTmuxWorkspaceRuntimeRequestKeyframeRecapturesStalePane(t *testing.T) {
 	logPath := installFakeTmuxProgram(t, `#!/bin/sh
 set -eu
