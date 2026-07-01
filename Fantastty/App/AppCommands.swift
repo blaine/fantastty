@@ -73,12 +73,16 @@ struct AppCommands: Commands {
         // Tab navigation (top tabs within session)
         CommandGroup(after: .windowArrangement) {
             Button("Select Next Tab") {
-                sessionManager.selectedSession?.selectNextTab()
+                if let session = sessionManager.selectedSession {
+                    sessionManager.selectNextTabFromKeyBinding(in: session)
+                }
             }
             .keyboardShortcut("]", modifiers: [.command, .shift])
 
             Button("Select Previous Tab") {
-                sessionManager.selectedSession?.selectPreviousTab()
+                if let session = sessionManager.selectedSession {
+                    sessionManager.selectPreviousTabFromKeyBinding(in: session)
+                }
             }
             .keyboardShortcut("[", modifiers: [.command, .shift])
 
@@ -88,7 +92,7 @@ struct AppCommands: Commands {
             if let session = sessionManager.selectedSession {
                 ForEach(Array(session.tabs.enumerated().prefix(9)), id: \.element.id) { index, tab in
                     Button("Select Tab \(index + 1)") {
-                        session.selectedTabID = tab.id
+                        sessionManager.selectTabFromKeyBinding(tab, in: session)
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
                 }

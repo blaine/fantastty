@@ -99,6 +99,8 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     }
 
     func requestThumbnailRefresh() {
-        thumbnailRefreshes.send(())
+        DispatchQueue.main.async { [weak self] in
+            self?.thumbnailRefreshes.send(())
+        }
     }
 }

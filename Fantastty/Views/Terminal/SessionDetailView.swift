@@ -126,10 +126,14 @@ struct SessionDetailView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            sessionManager.handleRemoteSelectedTerminalBecameVisible(session: session)
+            DispatchQueue.main.async {
+                sessionManager.handleRemoteSelectedTerminalBecameVisible(session: session)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            sessionManager.handleRemoteSelectedTerminalBecameVisible(session: session)
+            DispatchQueue.main.async {
+                sessionManager.handleRemoteSelectedTerminalBecameVisible(session: session)
+            }
         }
     }
 
@@ -263,14 +267,18 @@ struct TabContentView: View {
                     )
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .onAppear {
-                        if let focused = tab.focusedSurface {
-                            Ghostty.moveFocus(to: focused)
+                        DispatchQueue.main.async {
+                            if let focused = tab.focusedSurface {
+                                Ghostty.moveFocus(to: focused)
+                            }
+                            sessionManager.handleRemoteTerminalTabBecameVisible(session: session, tab: tab)
+                            tab.requestThumbnailRefresh()
                         }
-                        sessionManager.handleRemoteTerminalTabBecameVisible(session: session, tab: tab)
-                        tab.requestThumbnailRefresh()
                     }
                     .onChange(of: geometry.size) { _, _ in
-                        tab.requestThumbnailRefresh()
+                        DispatchQueue.main.async {
+                            tab.requestThumbnailRefresh()
+                        }
                     }
                 }
             }

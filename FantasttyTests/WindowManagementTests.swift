@@ -34,6 +34,61 @@ private enum WindowManagementTestSupport {
 
 final class WindowManagementTests: XCTestCase {
     @MainActor
+    func testDefaultTestSessionManagerDoesNotWriteAttachedMetadataToSharedStore() {
+        let workspaceID = "test-isolated-\(UUID().uuidString.prefix(8).lowercased())"
+        Fantastty.SessionMetadataStore.shared.remove(forKey: workspaceID)
+        let manager = Fantastty.SessionManager()
+        manager.ghosttyApp = WindowManagementTestSupport.ghosttyApp
+        manager.attachedSessionReconnectStarter = { _ in }
+
+        _ = manager.createSession(type: .local, workspaceID: workspaceID)
+
+        XCTAssertNil(Fantastty.SessionMetadataStore.shared.metadata[workspaceID])
+    }
+
+    @MainActor
+    func testDefaultTestSessionManagerDoesNotWriteLayoutToUserFile() {
+        let workspaceID = "layout-isolated-\(UUID().uuidString.prefix(8).lowercased())"
+        let manager = Fantastty.SessionManager()
+        manager.persistentSessionsEnabled = true
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "fantastty-ws-\(workspaceID)",
+            host: .local,
+            connectionState: .disconnected(reason: nil)
+        )
+        let session = manager.makeAttachedSession(info: info, workspaceID: workspaceID)
+        manager.sessions = [session]
+
+        manager.saveLayout()
+
+        let userLayoutURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".fantastty/layout.json")
+        let userLayoutData = try? Data(contentsOf: userLayoutURL)
+        let userLayoutText = userLayoutData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        XCTAssertFalse(userLayoutText.contains(workspaceID))
+    }
+
+    @MainActor
+    func testKeyBindingTabSelectionRunsAfterCurrentUpdate() async {
+        let manager = Fantastty.SessionManager()
+        let firstTab = Fantastty.TerminalTab(type: .local, title: "one")
+        let secondTab = Fantastty.TerminalTab(type: .local, title: "two")
+        let session = Fantastty.Session(title: "tabs", tabs: [firstTab, secondTab], workspaceID: "key-binding-tabs")
+        let expectation = expectation(description: "selected tab changed")
+        let cancellable = session.$selectedTabID.dropFirst().sink { selectedTabID in
+            if selectedTabID == secondTab.id {
+                expectation.fulfill()
+            }
+        }
+
+        manager.selectTabFromKeyBinding(secondTab, in: session)
+
+        XCTAssertEqual(session.selectedTabID, firstTab.id)
+        await fulfillment(of: [expectation], timeout: 1)
+        cancellable.cancel()
+    }
+
+    @MainActor
     func testAttachToTmuxSessionStartsWithoutPlaceholderTabs() {
         let manager = Fantastty.SessionManager()
         manager.attachedSessionReconnectStarter = { _ in }

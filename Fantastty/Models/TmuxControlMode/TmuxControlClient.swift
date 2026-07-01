@@ -104,7 +104,7 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        proc.arguments = ["-lc", command]
+        proc.arguments = Self.shellArguments(for: command)
         proc.environment = environment
 
         let slaveHandle = FileHandle(fileDescriptor: slave, closeOnDealloc: false)
@@ -134,6 +134,10 @@ final class PtyTmuxControlTransport: NSObject, TmuxControlTransport {
         readTask = Task.detached { [weak self] in
             self?.readLoop()
         }
+    }
+
+    static func shellArguments(for command: String) -> [String] {
+        ["-lc", "exec \(command)"]
     }
 
     func write(_ data: Data) throws {

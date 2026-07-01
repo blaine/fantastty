@@ -96,6 +96,32 @@ class SessionManager: ObservableObject {
         category: "session-manager"
     )
     static var layoutURLOverride: URL?
+    private var testLayoutURL: URL?
+
+    private static func defaultSessionMetadataStore(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> SessionMetadataStore {
+        guard environment["XCTestConfigurationFilePath"] != nil else {
+            return .shared
+        }
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fantastty-tests", isDirectory: true)
+            .appendingPathComponent("\(UUID().uuidString).json")
+        return SessionMetadataStore(fileURL: fileURL)
+    }
+
+    private static func defaultLayoutURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL? {
+        guard environment["XCTestConfigurationFilePath"] != nil else {
+            return nil
+        }
+
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("fantastty-tests", isDirectory: true)
+            .appendingPathComponent("\(UUID().uuidString)-layout.json")
+    }
 
     /// Whether persistent tmux sessions are enabled
     @AppStorage("persistentSessions") var persistentSessionsEnabled: Bool = false
@@ -309,6 +335,8 @@ class SessionManager: ObservableObject {
     }
 
     init() {
+        sessionMetadataStore = Self.defaultSessionMetadataStore()
+        testLayoutURL = Self.defaultLayoutURL()
         tmuxAvailabilityProvider = { TmuxManager.shared.isTmuxAvailable }
         liveTmuxWorkspaceProvider = { TmuxManager.shared.groupSessionsByWorkspace() }
         attachedSessionReconnectStarter = SessionManager.defaultAttachedSessionReconnectStarter
@@ -413,7 +441,7 @@ class SessionManager: ObservableObject {
     // MARK: - Layout Persistence
 
     private var layoutPersistence: LayoutPersistence {
-        LayoutPersistence(layoutURL: Self.layoutURLOverride)
+        LayoutPersistence(layoutURL: Self.layoutURLOverride ?? testLayoutURL)
     }
 
     private func tmuxHost(for sessionType: SessionType) -> TmuxHost {
@@ -1003,6 +1031,31 @@ class SessionManager: ObservableObject {
     func selectTab(_ tab: TerminalTab, in session: Session) {
         selectedSessionID = session.id
         session.selectedTabID = tab.id
+    }
+
+    func selectTabFromKeyBinding(_ tab: TerminalTab, in session: Session) {
+        DispatchQueue.main.async { [weak session] in
+            session?.selectedTabID = tab.id
+        }
+    }
+
+    func selectNextTabFromKeyBinding(in session: Session) {
+        DispatchQueue.main.async { [weak session] in
+            session?.selectNextTab()
+        }
+    }
+
+    func selectPreviousTabFromKeyBinding(in session: Session) {
+        DispatchQueue.main.async { [weak session] in
+            session?.selectPreviousTab()
+        }
+    }
+
+    func selectLastTabFromKeyBinding(in session: Session) {
+        DispatchQueue.main.async { [weak session] in
+            guard let lastTab = session?.tabs.last else { return }
+            session?.selectedTabID = lastTab.id
+        }
     }
 
     // MARK: - Workspace Archiving
@@ -1595,18 +1648,16 @@ class SessionManager: ObservableObject {
         let rawValue = Int(tab.rawValue)
         if rawValue > 0 && rawValue <= session.tabs.count {
             // Direct tab index (1-based in Ghostty)
-            session.selectedTabID = session.tabs[rawValue - 1].id
+            selectTabFromKeyBinding(session.tabs[rawValue - 1], in: session)
         } else {
             // Special values: previous/next/last
             switch tab {
             case GHOSTTY_GOTO_TAB_PREVIOUS:
-                session.selectPreviousTab()
+                selectPreviousTabFromKeyBinding(in: session)
             case GHOSTTY_GOTO_TAB_NEXT:
-                session.selectNextTab()
+                selectNextTabFromKeyBinding(in: session)
             case GHOSTTY_GOTO_TAB_LAST:
-                if let lastTab = session.tabs.last {
-                    session.selectedTabID = lastTab.id
-                }
+                selectLastTabFromKeyBinding(in: session)
             default:
                 break
             }

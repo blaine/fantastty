@@ -147,6 +147,7 @@ final class PersistenceTests: XCTestCase {
         workspaceIDsToCleanup.append(workspaceID)
 
         let manager = Fantastty.SessionManager()
+        manager.sessionMetadataStore = .shared
         let session = Fantastty.Session(title: "Close Me", type: .local, workspaceID: workspaceID)
         let survivor = Fantastty.Session(title: "Keep Me", type: .local, workspaceID: "survivor")
         manager.sessions = [session, survivor]
@@ -385,6 +386,7 @@ final class PersistenceTests: XCTestCase {
         try encoder.encode(snapshot).write(to: layoutURL)
 
         let manager = Fantastty.SessionManager()
+        manager.sessionMetadataStore = .shared
         manager.persistentSessionsEnabled = true
         manager.tmuxAvailabilityProvider = { true }
         manager.liveTmuxWorkspaceProvider = { [:] }
@@ -705,6 +707,7 @@ final class PersistenceTests: XCTestCase {
         SessionMetadataStore.shared.update(meta)
 
         let manager = Fantastty.SessionManager()
+        manager.sessionMetadataStore = .shared
         manager.persistentSessionsEnabled = true
         manager.tmuxAvailabilityProvider = { true }
         manager.liveTmuxWorkspaceProvider = { [:] }
@@ -803,6 +806,7 @@ final class PersistenceTests: XCTestCase {
         SessionMetadataStore.shared.update(meta)
 
         let manager = Fantastty.SessionManager()
+        manager.sessionMetadataStore = .shared
         manager.ghosttyApp = Fantastty.Ghostty.App()
         manager.persistentSessionsEnabled = false
 

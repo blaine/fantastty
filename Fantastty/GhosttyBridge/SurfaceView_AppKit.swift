@@ -837,17 +837,12 @@ extension Ghostty {
             // Update our core surface
             ghostty_surface_set_size(surface, width, height)
 
-            // Update our cached size metrics
+            // Update our cached size metrics after SwiftUI finishes the current
+            // representable update. Publishing synchronously here can leave
+            // SwiftUI-rendered terminal containers stale.
             let size = ghostty_surface_size(surface)
-            // Published changes need to happen on the main thread. This can be
-            // called by SwiftUI off-main on macOS <= 14, but main-thread callers
-            // should publish synchronously so resize events keep their order.
-            if Thread.isMainThread {
-                self.surfaceSize = size
-            } else {
-                DispatchQueue.main.async {
-                    self.surfaceSize = size
-                }
+            DispatchQueue.main.async { [weak self] in
+                self?.surfaceSize = size
             }
         }
 

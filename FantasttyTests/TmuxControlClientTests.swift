@@ -922,6 +922,13 @@ final class FakeTmuxControlTransport: TmuxControlTransport {
 }
 
 final class TmuxControlTransportTests: XCTestCase {
+    func testPtyTransportExecsControlCommandFromShell() {
+        XCTAssertEqual(
+            PtyTmuxControlTransport.shellArguments(for: "ssh host tmux -CC attach-session -t '0'"),
+            ["-lc", "exec ssh host tmux -CC attach-session -t '0'"]
+        )
+    }
+
     func testClientUsesInjectedTransportForConnectHandshake() async throws {
         let info = TmuxAttachmentInfo(
             sessionName: "transport-test",
