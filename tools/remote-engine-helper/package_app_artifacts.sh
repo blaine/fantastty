@@ -36,6 +36,8 @@ package_target() {
   local library_rel="$label/lib/$library_name"
   local helper_path="$output_tmp/fantastty-helper"
   local library_path="$output_tmp/lib/$library_name"
+  local installed_library="$install_dir/lib/$library_name"
+  local pkg_config_path="$install_dir/share/pkgconfig/libghostty-vt.pc"
 
   rm -rf "$install_dir" "$output_tmp"
   mkdir -p "$output_tmp/lib"
@@ -43,8 +45,18 @@ package_target() {
   printf '[remote-engine-artifacts] building libghostty-vt target=%s\n' "$zig_target"
   (
     cd "$ROOT/vendor/ghostty"
-    zig build -Demit-lib-vt=true -Dtarget="$zig_target" -Doptimize=ReleaseFast --prefix "$install_dir"
+    zig build install -Demit-lib-vt=true -Dtarget="$zig_target" -Doptimize=ReleaseFast --prefix "$install_dir"
   )
+  if [ ! -f "$installed_library" ]; then
+    printf '[remote-engine-artifacts] missing %s after libghostty-vt build\n' "$installed_library" >&2
+    find "$install_dir" -maxdepth 4 -print >&2 || true
+    exit 1
+  fi
+  if [ ! -f "$pkg_config_path" ]; then
+    printf '[remote-engine-artifacts] missing %s after libghostty-vt build\n' "$pkg_config_path" >&2
+    find "$install_dir" -maxdepth 4 -print >&2 || true
+    exit 1
+  fi
 
   printf '[remote-engine-artifacts] building helper label=%s arch=%s\n' "$label" "$goarch"
   (
@@ -59,7 +71,7 @@ package_target() {
       go build -tags ghostty_vt -ldflags "-X main.version=$VERSION -X main.arch=$goarch" -o "$helper_path" .
   )
 
-  cp "$install_dir/lib/$library_name" "$library_path"
+  cp "$installed_library" "$library_path"
   chmod 700 "$helper_path"
   chmod 600 "$library_path"
 
