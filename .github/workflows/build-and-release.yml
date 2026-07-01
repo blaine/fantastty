@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         submodules: recursive
 
@@ -28,15 +28,38 @@ jobs:
         xcode-version: '26.2'
 
     - name: Setup Zig
-      uses: mlugg/setup-zig@v2
-      with:
+      env:
         # Must match minimum_zig_version in vendor/ghostty/build.zig.zon
-        version: 0.15.2
+        ZIG_VERSION: 0.15.2
+      run: |
+        case "$(uname -m)" in
+          arm64)
+            ZIG_TARGET="aarch64-macos"
+            ZIG_SHA256="3cc2bab367e185cdfb27501c4b30b1b0653c28d9f73df8dc91488e66ece5fa6b"
+            ;;
+          x86_64)
+            ZIG_TARGET="x86_64-macos"
+            ZIG_SHA256="375b6909fc1495d16fc2c7db9538f707456bfc3373b14ee83fdd3e22b3d43f7f"
+            ;;
+          *)
+            echo "Unsupported macOS architecture: $(uname -m)" >&2
+            exit 1
+            ;;
+        esac
+
+        ZIG_ARCHIVE="zig-${ZIG_TARGET}-${ZIG_VERSION}.tar.xz"
+        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/${ZIG_ARCHIVE}"
+        curl -fsSLo "$RUNNER_TEMP/$ZIG_ARCHIVE" "$ZIG_URL"
+        echo "$ZIG_SHA256  $RUNNER_TEMP/$ZIG_ARCHIVE" | shasum -a 256 -c -
+        tar -xf "$RUNNER_TEMP/$ZIG_ARCHIVE" -C "$RUNNER_TEMP"
+        echo "$RUNNER_TEMP/zig-${ZIG_TARGET}-${ZIG_VERSION}" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/zig-${ZIG_TARGET}-${ZIG_VERSION}/zig" version
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: tools/remote-engine-helper/helper/go.mod
+        cache-dependency-path: tools/remote-engine-helper/helper/go.sum
 
     - name: Determine version
       id: version
@@ -56,7 +79,7 @@ jobs:
 
     - name: Cache GhosttyKit xcframework
       id: cache-xcframework
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: xcframework/
         key: ghosttykit-${{ runner.os }}-${{ hashFiles('vendor/ghostty/**/*.zig', 'vendor/ghostty/**/*.zon', 'Fantastty/BridgingHeader.h', 'Fantastty/**/*.h', 'patches/*.patch') }}
@@ -189,7 +212,7 @@ jobs:
       run: scripts/generate-sparkle-appcast.sh
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: Fantastty-${{ steps.version.outputs.version }}-build${{ steps.version.outputs.build_number }}
         path: ${{ env.DMG_NAME }}

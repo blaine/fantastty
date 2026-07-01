@@ -200,8 +200,9 @@ printf 'fake helper for %s\n' "${GOARCH:-missing}" >"$out"
 
     def test_release_paths_package_and_verify_remote_engine_artifacts(self):
         workflow = RELEASE_WORKFLOW.read_text()
-        self.assertIn("actions/setup-go@v5", workflow)
+        self.assertIn("actions/setup-go@v6", workflow)
         self.assertIn("go-version-file: tools/remote-engine-helper/helper/go.mod", workflow)
+        self.assertIn("cache-dependency-path: tools/remote-engine-helper/helper/go.sum", workflow)
         self.assertIn("FANTASTTY_PACKAGE_REMOTE_ENGINE_ARTIFACTS: \"1\"", workflow)
         self.assertIn("make remote-engine-verify-app-artifacts", workflow)
         self.assertIn("scripts/sign-remote-engine-artifacts.sh", workflow)
