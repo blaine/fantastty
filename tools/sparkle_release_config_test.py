@@ -14,6 +14,7 @@ APP_COMMANDS = ROOT / "Fantastty" / "App" / "AppCommands.swift"
 APP_ENTRYPOINT = ROOT / "Fantastty" / "App" / "MickeyTermApp.swift"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "build-and-release.yml"
 GENERATE_APPCAST_SCRIPT = ROOT / "scripts" / "generate-sparkle-appcast.sh"
+SIGN_SPARKLE_SCRIPT = ROOT / "scripts" / "sign-sparkle-framework.sh"
 GITHUB_ACTIONS_DOC = ROOT / "doc" / "GITHUB_ACTIONS_SETUP.md"
 README = ROOT / "README.md"
 
@@ -68,10 +69,76 @@ class SparkleReleaseConfigTests(unittest.TestCase):
         workflow = RELEASE_WORKFLOW.read_text()
 
         self.assertIn("SPARKLE_EDDSA_PRIVATE_KEY", workflow)
+        self.assertIn("scripts/sign-sparkle-framework.sh", workflow)
         self.assertIn("Generate Sparkle appcast", workflow)
         self.assertIn("scripts/generate-sparkle-appcast.sh", workflow)
         self.assertIn("appcast.xml", workflow)
         self.assertIn("gh release upload", workflow)
+
+    def test_sparkle_signing_script_re_signs_nested_code_for_notarization(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            app_path = tmp_path / "Fantastty.app"
+            sparkle_framework = app_path / "Contents" / "Frameworks" / "Sparkle.framework"
+            sparkle_version_dir = sparkle_framework / "Versions" / "B"
+            expected_paths = [
+                sparkle_version_dir / "XPCServices" / "Downloader.xpc",
+                sparkle_version_dir / "XPCServices" / "Installer.xpc",
+                sparkle_version_dir / "Updater.app",
+                sparkle_version_dir / "Autoupdate",
+                sparkle_framework,
+            ]
+
+            for path in expected_paths:
+                if path.suffix in {".xpc", ".app", ".framework"}:
+                    path.mkdir(parents=True, exist_ok=True)
+                else:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("fake executable")
+
+            log_path = tmp_path / "codesign.log"
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_codesign = fake_bin / "codesign"
+            fake_codesign.write_text(
+                f"""#!/bin/sh
+set -eu
+case "$1" in
+  --force)
+    for last_arg do :; done
+    printf '%s\\t%s\\n' "$last_arg" "$*" >>"{log_path}"
+    ;;
+  --verify)
+    ;;
+  -dvv)
+    printf 'TeamIdentifier=TESTTEAM\\nTimestamp=Jul 1, 2026 at 12:00:00 PM\\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+""",
+            )
+            fake_codesign.chmod(0o755)
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "APP_PATH": str(app_path),
+                    "APPLE_TEAM_ID": "TESTTEAM",
+                    "DEVELOPER_ID_NAME": "Developer ID Application: Example (TESTTEAM)",
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                }
+            )
+
+            subprocess.run([str(SIGN_SPARKLE_SCRIPT)], cwd=ROOT, env=env, check=True)
+
+            signed = [line.split("\t", 1) for line in log_path.read_text().splitlines()]
+            self.assertEqual([Path(path) for path, _ in signed], expected_paths)
+            for _, args in signed:
+                self.assertIn("--timestamp", args)
+                self.assertIn("--options runtime", args)
+                self.assertIn("--preserve-metadata=identifier", args)
 
     def test_appcast_script_uses_secret_key_and_release_asset_url(self):
         with tempfile.TemporaryDirectory() as tmp:

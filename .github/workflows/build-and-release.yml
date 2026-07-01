@@ -130,6 +130,9 @@ jobs:
         # Verify bundled remote-engine helpers before signing and packaging.
         make remote-engine-verify-app-artifacts APP="$APP_PATH"
 
+        # Re-sign Sparkle's nested updater helpers with our Developer ID certificate.
+        APP_PATH="$APP_PATH" scripts/sign-sparkle-framework.sh
+
         # Sign nested macOS remote-engine artifacts before verifying the app bundle.
         APP_PATH="$APP_PATH" scripts/sign-remote-engine-artifacts.sh
 
