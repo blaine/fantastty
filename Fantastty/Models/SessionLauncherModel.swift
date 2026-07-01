@@ -173,6 +173,32 @@ enum SessionLauncherSessionList {
     }
 }
 
+enum SessionLauncherDiscovery {
+    static func discoveredSessions(
+        location: SessionLauncherLocation,
+        sshHost: SSHHostInfo?,
+        listLocalTmux: () -> [TmuxSessionInfo],
+        listRemoteTmux: (SSHHostInfo) -> [TmuxSessionInfo],
+        listSprites: () -> [SpriteInfo]
+    ) -> [SessionLauncherDiscoveredSession] {
+        switch location {
+        case .local:
+            return listLocalTmux().map {
+                .tmux(name: $0.name, host: .local, windowCount: $0.windowCount)
+            }
+        case .ssh:
+            guard let sshHost else { return [] }
+            return listRemoteTmux(sshHost).map {
+                .tmux(name: $0.name, host: .ssh(sshHost), windowCount: $0.windowCount)
+            }
+        case .sprite:
+            return listSprites().map {
+                .sprite(name: $0.name)
+            }
+        }
+    }
+}
+
 enum SessionLauncherAction: Equatable {
     case createSession(SessionType)
     case createRemoteEngine(SSHHostInfo)

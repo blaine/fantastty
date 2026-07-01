@@ -23,19 +23,9 @@ struct MainWindow: View {
         .navigationTitle("")
         .frame(minWidth: 800, minHeight: 500)
         .background(WindowAccessor(onWindow: appDelegate.registerMainWindow))
-        .sheet(isPresented: $sessionManager.showSSHSheet) {
-            SSHConnectionSheet()
-        }
-        .sheet(isPresented: $sessionManager.showSpriteSheet) {
-            SpriteConnectionSheet()
-        }
-        .sheet(isPresented: $sessionManager.showTmuxAttachSheet) {
-            TmuxAttachSheet(
-                attachedSessionKeys: sessionManager.attachedTmuxSessionKeys,
-                onAttach: { info in
-                    sessionManager.attachToTmuxSession(info: info)
-                }
-            )
+        .sheet(item: $sessionManager.sessionLauncherRequest) { request in
+            SessionLauncherSheet(request: request)
+                .environmentObject(sessionManager)
         }
     }
 }

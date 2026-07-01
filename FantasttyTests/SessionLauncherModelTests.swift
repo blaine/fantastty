@@ -37,6 +37,16 @@ final class SessionLauncherModelTests: XCTestCase {
         XCTAssertEqual(rows.first?.selection, .newSession)
     }
 
+    func testEmptyExistingSessionsStillShowsNewSessionOnly() {
+        let rows = SessionLauncherSessionList.rows(
+            for: [],
+            attachedKeys: []
+        )
+
+        XCTAssertEqual(rows.map(\.title), ["New session"])
+        XCTAssertEqual(rows.first?.selection, .newSession)
+    }
+
     func testAttachedSessionsAreFilteredFromExistingRows() {
         let rows = SessionLauncherSessionList.rows(
             for: [
@@ -75,6 +85,79 @@ final class SessionLauncherModelTests: XCTestCase {
         XCTAssertEqual(hostRows.map(\.title), ["New session", "build"])
     }
 
+    func testLocalDiscoveryMapsTmuxSessions() {
+        let sessions = SessionLauncherDiscovery.discoveredSessions(
+            location: .local,
+            sshHost: nil,
+            listLocalTmux: {
+                [
+                    TmuxSessionInfo(name: "alpha", createdAt: .distantPast, windowCount: 2),
+                    TmuxSessionInfo(name: "beta", createdAt: .distantPast, windowCount: 1),
+                ]
+            },
+            listRemoteTmux: { _ in
+                XCTFail("Remote discovery should not be used for local sessions")
+                return []
+            },
+            listSprites: {
+                XCTFail("Sprite discovery should not be used for local sessions")
+                return []
+            }
+        )
+
+        XCTAssertEqual(sessions, [
+            .tmux(name: "alpha", host: .local, windowCount: 2),
+            .tmux(name: "beta", host: .local, windowCount: 1),
+        ])
+    }
+
+    func testRemoteDiscoveryRequiresValidHost() {
+        let sessions = SessionLauncherDiscovery.discoveredSessions(
+            location: .ssh,
+            sshHost: nil,
+            listLocalTmux: {
+                XCTFail("Local discovery should not be used for SSH sessions")
+                return []
+            },
+            listRemoteTmux: { _ in
+                XCTFail("Remote discovery should not run without a valid host")
+                return []
+            },
+            listSprites: {
+                XCTFail("Sprite discovery should not be used for SSH sessions")
+                return []
+            }
+        )
+
+        XCTAssertTrue(sessions.isEmpty)
+    }
+
+    func testSpriteDiscoveryMapsSprites() {
+        let sessions = SessionLauncherDiscovery.discoveredSessions(
+            location: .sprite,
+            sshHost: nil,
+            listLocalTmux: {
+                XCTFail("Local discovery should not be used for Sprite sessions")
+                return []
+            },
+            listRemoteTmux: { _ in
+                XCTFail("Remote discovery should not be used for Sprite sessions")
+                return []
+            },
+            listSprites: {
+                [
+                    SpriteInfo(name: "api"),
+                    SpriteInfo(name: "worker"),
+                ]
+            }
+        )
+
+        XCTAssertEqual(sessions, [
+            .sprite(name: "api"),
+            .sprite(name: "worker"),
+        ])
+    }
+
     func testExistingSSHSessionUsesRemoteEngineTransportWhenChecked() {
         let host = SSHHostInfo(user: "jesse", hostname: "remote.example.invalid", port: nil)
         let action = SessionLauncherAction.existingTmuxAction(
@@ -109,6 +192,22 @@ final class SessionLauncherModelTests: XCTestCase {
         )))
     }
 
+    func testExistingLocalTmuxAlwaysUsesControlModeTransport() {
+        let action = SessionLauncherAction.existingTmuxAction(
+            name: "steady-pine",
+            host: .local,
+            useRemoteEngine: true
+        )
+
+        XCTAssertEqual(action, .attachTmux(TmuxAttachmentInfo(
+            sessionName: "steady-pine",
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach,
+            transport: .tmuxControl
+        )))
+    }
+
     func testNewSSHSessionUsesRemoteEngineWhenChecked() {
         let host = SSHHostInfo(user: "jesse", hostname: "remote.example.invalid", port: nil)
         let action = SessionLauncherAction.newSessionAction(
@@ -132,4 +231,5 @@ final class SessionLauncherModelTests: XCTestCase {
 
         XCTAssertEqual(action, .createSession(.ssh(host: "remote.example.invalid", user: "jesse", port: nil)))
     }
+
 }
