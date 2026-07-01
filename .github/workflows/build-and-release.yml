@@ -89,6 +89,8 @@ jobs:
       run: make xcframework
 
     - name: Package remote engine artifacts
+      env:
+        FANTASTTY_REMOTE_ENGINE_BUILD_ROOT: ${{ runner.temp }}/fantastty-remote-engine-artifacts
       run: make remote-engine-app-artifacts
 
     - name: Setup signing certificates
