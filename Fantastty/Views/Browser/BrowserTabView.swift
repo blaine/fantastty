@@ -80,11 +80,11 @@ struct WebViewRepresentable: NSViewRepresentable {
     @ObservedObject var tab: TerminalTab
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        let webView = tab.webView ?? WKWebView()
         webView.navigationDelegate = context.coordinator
         tab.webView = webView
 
-        if let url = tab.url {
+        if webView.url == nil, let url = tab.url {
             webView.load(URLRequest(url: url))
         }
 

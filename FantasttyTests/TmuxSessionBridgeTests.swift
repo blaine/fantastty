@@ -636,6 +636,30 @@ final class TmuxSessionBridgeTests: XCTestCase {
     }
 
     @MainActor
+    func testPaneTitleUpdatesContainingWindowTabTitle() {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        let session = makeAttachedSession(workspaceID: "contract-pane-title")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 5, name: "claude", paneIDs: [], windowIndex: 0, isActive: true))
+        manager.controlClient(client, didChangeLayoutForWindowID: 5, layout: "bb62,213x55,0,0,7")
+
+        guard let tab = session.tabs.first(where: { $0.tmuxWindowID == 5 }) else {
+            return XCTFail("Expected tab for window 5")
+        }
+        XCTAssertEqual(tab.title, "claude")
+
+        manager.controlClient(client, didReceivePaneTitle: "npm test", forPaneID: 7)
+
+        XCTAssertEqual(tab.title, "npm test")
+    }
+
+    @MainActor
     func testOutputBeforeWindowAddIsBufferedAndFlushed() {
         let manager = TmuxSessionBridge()
         manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp

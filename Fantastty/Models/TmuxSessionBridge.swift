@@ -456,7 +456,14 @@ extension TmuxSessionBridge: TmuxControlClientDelegate {
     }
 
     func controlClient(_ client: TmuxControlClient, didReceivePaneTitle title: String, forPaneID paneID: Int) {
-        // Pane title handling is intentionally deferred.
+        guard !title.isEmpty,
+              let session = session(for: client),
+              let tab = tabContainingPane(paneID, in: session) else {
+            return
+        }
+        if tab.focusedSurface?.tmuxPaneID == paneID || !(tab.surfaceTree?.isSplit ?? false) {
+            tab.title = title
+        }
     }
 
     func controlClient(_ client: TmuxControlClient, didChangeState state: ConnectionState) {

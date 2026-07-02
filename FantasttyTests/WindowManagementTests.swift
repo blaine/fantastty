@@ -1,6 +1,8 @@
 import XCTest
 @testable import Fantastty
 import GhosttyKit
+import SwiftUI
+import WebKit
 
 final class MockTmuxCommandSender: TmuxCommandSending {
     var newWindowCalls = 0
@@ -292,6 +294,30 @@ final class WindowManagementTests: XCTestCase {
         XCTAssertEqual(session.tabs[1].tmuxWindowID, 5)
         XCTAssertEqual(session.tabs[1].title, "main")
         XCTAssertEqual(session.tabs[1].kind, .terminal)
+    }
+
+    @MainActor
+    func testBrowserTabReusesWebViewAcrossFocusRemounts() throws {
+        let url = try XCTUnwrap(URL(string: "about:blank"))
+        let tab = Fantastty.TerminalTab(url: url)
+
+        var firstWebView: WKWebView?
+        do {
+            let host = NSHostingView(rootView: Fantastty.BrowserTabView(tab: tab))
+            host.frame = NSRect(x: 0, y: 0, width: 640, height: 480)
+            host.layoutSubtreeIfNeeded()
+            firstWebView = tab.webView
+        }
+
+        let first = try XCTUnwrap(firstWebView)
+        first.removeFromSuperview()
+
+        let secondHost = NSHostingView(rootView: Fantastty.BrowserTabView(tab: tab))
+        secondHost.frame = NSRect(x: 0, y: 0, width: 640, height: 480)
+        secondHost.layoutSubtreeIfNeeded()
+
+        let second = try XCTUnwrap(tab.webView)
+        XCTAssertTrue(second === first)
     }
 
     @MainActor
