@@ -1311,7 +1311,7 @@ final class TmuxConnectFSMTests: XCTestCase {
         XCTAssertTrue(replay.contains(Data("visible alternate".utf8)))
     }
 
-    func testDeferredBootstrapDropsPausedStartupOutputBeforeReenablingPane() async throws {
+    func testDeferredBootstrapContinuesPausedPaneAfterCapture() async throws {
         let issuedCommands = Locked<[String]>([])
         var nextBlockID = 2
         var client: TmuxControlClient?
@@ -1386,9 +1386,9 @@ final class TmuxConnectFSMTests: XCTestCase {
 
         let commands = issuedCommands.withLock { $0 }
         XCTAssertTrue(commands.contains("capture-pane -p -e -t %1"))
-        XCTAssertTrue(commands.contains("refresh-client -A '%1:off'"))
-        XCTAssertTrue(commands.contains("refresh-client -A '%1:on'"))
-        XCTAssertFalse(commands.contains("refresh-client -A '%1:continue'"))
+        XCTAssertTrue(commands.contains("refresh-client -A '%1:continue'"))
+        XCTAssertFalse(commands.contains("refresh-client -A '%1:off'"))
+        XCTAssertFalse(commands.contains("refresh-client -A '%1:on'"))
     }
 }
 

@@ -649,12 +649,11 @@ actor TmuxControlClient {
             try await bootstrapPaneContent(for: toCapture)
         } catch {}
 
-        // Drop paused raw startup output before re-enabling live %output.
+        // Drop paused raw startup output, then resume live %output.
         let toContinue = toCapture.filter { deferredBootstrapPaneIDs.contains($0) }
         guard !toContinue.isEmpty else { return }
         deferredBootstrapPaneIDs.subtract(toContinue)
-        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "off"))
-        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "on"))
+        _ = try? await send(Self.clientPaneOutputStateCommand(paneIDs: toContinue, state: "continue"))
     }
 
     func disconnect() async {
