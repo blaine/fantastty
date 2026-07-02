@@ -6,6 +6,10 @@ let fantasttySSHConnectionArguments = [
     "-o", "KexAlgorithms=curve25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256@libssh.org"
 ]
 
+func shellQuotedCommandArgument(_ value: String) -> String {
+    "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+}
+
 // MARK: - ConnectionState
 
 /// The state of a tmux control mode connection.
@@ -52,7 +56,8 @@ struct SSHHostInfo: Codable, Hashable {
             target += "\(user)@"
         }
         target += hostname
-        parts.append(target)
+        parts.append("--")
+        parts.append(shellQuotedCommandArgument(target))
         return parts.joined(separator: " ")
     }
 }
@@ -119,25 +124,25 @@ struct TmuxAttachmentInfo: Codable, Equatable {
     /// - Parameter tmuxPath: Path to the tmux binary (default: "tmux").
     /// - Returns: The full command string.
     func controlCommand(tmuxPath: String = "tmux") -> String {
-        let tmuxArgs = "\(tmuxPath) -CC attach-session -t '\(sessionName)'"
+        let tmuxArgs = "\(tmuxPath) -CC attach-session -t \(shellQuotedCommandArgument(sessionName))"
         switch host {
         case .local:
             return tmuxArgs
         case .ssh(let info):
-            return "\(info.sshCommandPrefix) \(tmuxArgs)"
+            return "\(info.sshCommandPrefix) \(shellQuotedCommandArgument(tmuxArgs))"
         }
     }
 
     /// Generate the command to create a new tmux session before attaching.
     /// This keeps the control-mode transport on the simpler attach path.
     func createSessionCommand(tmuxPath: String = "tmux") -> String {
-        let tmuxArgs = "\(tmuxPath) has-session -t '\(sessionName)' 2>/dev/null || \(tmuxPath) new-session -d -s '\(sessionName)' -c ~"
+        let quotedSessionName = shellQuotedCommandArgument(sessionName)
+        let tmuxArgs = "\(tmuxPath) has-session -t \(quotedSessionName) 2>/dev/null || \(tmuxPath) new-session -d -s \(quotedSessionName) -c ~"
         switch host {
         case .local:
             return tmuxArgs
         case .ssh(let info):
-            // Wrap in quotes so the entire expression runs on the remote host
-            return "\(info.sshCommandPrefix) \"\(tmuxArgs)\""
+            return "\(info.sshCommandPrefix) \(shellQuotedCommandArgument(tmuxArgs))"
         }
     }
 

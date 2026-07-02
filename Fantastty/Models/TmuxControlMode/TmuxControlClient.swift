@@ -742,7 +742,7 @@ actor TmuxControlClient {
     }
 
     func renameWindow(windowID: Int, name: String) async throws {
-        _ = try await send("rename-window -t @\(windowID) '\(name)'")
+        _ = try await send("rename-window -t @\(windowID) \(shellQuotedCommandArgument(name))")
     }
 
     func splitPane(paneID: Int, horizontal: Bool) async throws {

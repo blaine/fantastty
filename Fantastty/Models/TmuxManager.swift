@@ -170,6 +170,7 @@ class TmuxManager {
         var target = ""
         if let user = host.user { target += "\(user)@" }
         target += host.hostname
+        args.append("--")
         args.append(target)
         args.append("tmux list-sessions -F '#{session_name}:#{session_created}:#{session_windows}'")
         process.arguments = args

@@ -37,7 +37,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         let info = SSHHostInfo(user: nil, hostname: "example.com", port: nil)
         XCTAssertEqual(
             info.sshCommandPrefix,
-            "ssh -t \(sshConnectionOptions) example.com"
+            "ssh -t \(sshConnectionOptions) -- 'example.com'"
         )
     }
 
@@ -45,7 +45,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         let info = SSHHostInfo(user: "alice", hostname: "example.com", port: 2222)
         XCTAssertEqual(
             info.sshCommandPrefix,
-            "ssh -t \(sshConnectionOptions) -p 2222 alice@example.com"
+            "ssh -t \(sshConnectionOptions) -p 2222 -- 'alice@example.com'"
         )
     }
 
@@ -82,7 +82,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         )
         XCTAssertEqual(
             info.controlCommand(),
-            "ssh -t \(sshConnectionOptions) -p 2222 alice@example.com tmux -CC attach-session -t 'work'"
+            "ssh -t \(sshConnectionOptions) -p 2222 -- 'alice@example.com' 'tmux -CC attach-session -t '\\''work'\\'''"
         )
     }
 
@@ -109,6 +109,30 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         XCTAssertEqual(info.controlCommand(), "tmux -CC attach-session -t 'fresh'")
     }
 
+    func testControlCommandEscapesSingleQuoteSessionName() {
+        let info = TmuxAttachmentInfo(
+            sessionName: "Jesse's work",
+            host: .local,
+            connectionState: .connecting
+        )
+
+        XCTAssertEqual(info.controlCommand(), "tmux -CC attach-session -t 'Jesse'\\''s work'")
+    }
+
+    func testRemoteControlCommandPassesQuotedTmuxCommandToSSH() {
+        let sshInfo = SSHHostInfo(user: "alice", hostname: "example.com", port: 2222)
+        let info = TmuxAttachmentInfo(
+            sessionName: "work session",
+            host: .ssh(sshInfo),
+            connectionState: .connected
+        )
+
+        XCTAssertEqual(
+            info.controlCommand(),
+            "ssh -t \(sshConnectionOptions) -p 2222 -- 'alice@example.com' 'tmux -CC attach-session -t '\\''work session'\\'''"
+        )
+    }
+
     func testCreateSessionCommandLocal() {
         let info = TmuxAttachmentInfo(
             sessionName: "fresh",
@@ -123,6 +147,20 @@ final class TmuxAttachmentInfoTests: XCTestCase {
         )
     }
 
+    func testCreateSessionCommandEscapesSingleQuoteSessionName() {
+        let info = TmuxAttachmentInfo(
+            sessionName: "Jesse's work",
+            host: .local,
+            connectionState: .connecting,
+            launchMode: .create
+        )
+
+        XCTAssertEqual(
+            info.createSessionCommand(),
+            "tmux has-session -t 'Jesse'\\''s work' 2>/dev/null || tmux new-session -d -s 'Jesse'\\''s work' -c ~"
+        )
+    }
+
     func testCreateSessionCommandRemote() {
         let sshInfo = SSHHostInfo(user: "alice", hostname: "example.com", port: 2222)
         let info = TmuxAttachmentInfo(
@@ -134,7 +172,7 @@ final class TmuxAttachmentInfoTests: XCTestCase {
 
         XCTAssertEqual(
             info.createSessionCommand(),
-            "ssh -t \(sshConnectionOptions) -p 2222 alice@example.com \"tmux has-session -t 'work' 2>/dev/null || tmux new-session -d -s 'work' -c ~\""
+            "ssh -t \(sshConnectionOptions) -p 2222 -- 'alice@example.com' 'tmux has-session -t '\\''work'\\'' 2>/dev/null || tmux new-session -d -s '\\''work'\\'' -c ~'"
         )
     }
 

@@ -958,6 +958,33 @@ final class TmuxControlTransportTests: XCTestCase {
         XCTAssertTrue(transport.stopped)
     }
 
+    func testRenameWindowEscapesTmuxCommandArgument() async throws {
+        let info = TmuxAttachmentInfo(
+            sessionName: "rename-transport-test",
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach
+        )
+
+        let transport = FakeTmuxControlTransport()
+        let client = TmuxControlClient(
+            attachmentInfo: info,
+            transportFactory: { transport }
+        )
+
+        try await client.connect()
+        try await client.renameWindow(windowID: 3, name: "Jesse's window")
+
+        XCTAssertTrue(
+            transport.writtenCommands.contains("rename-window -t @3 'Jesse'\\''s window'")
+        )
+        XCTAssertFalse(
+            transport.writtenCommands.contains("rename-window -t @3 'Jesse's window'")
+        )
+
+        await client.disconnect()
+    }
+
     func testConnectDoesNotStartSecondTransportWhenAlreadyConnected() async throws {
         let info = TmuxAttachmentInfo(
             sessionName: "transport-idempotent",
