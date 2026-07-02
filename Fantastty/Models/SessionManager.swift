@@ -750,7 +750,7 @@ class SessionManager: ObservableObject {
         // can interleave tmux-created terminal tabs at the right positions.
         var terminalCount = 0
         var browserTabs: [TerminalTab] = []
-        for (i, layout) in tabLayouts.enumerated() {
+        for layout in tabLayouts {
             switch layout.kind {
             case .terminal:
                 terminalCount += 1
