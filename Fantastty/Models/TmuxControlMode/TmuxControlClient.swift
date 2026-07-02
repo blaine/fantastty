@@ -407,6 +407,12 @@ actor TmuxControlClient {
         #if DEBUG
         recordDebugTrace("connect:start launchMode=\(attachmentInfo.launchMode.rawValue) command=\(attachmentInfo.controlCommand(tmuxPath: resolvedTmuxPath))")
         #endif
+        guard connectStage == .idle || connectStage == .disconnected else {
+            #if DEBUG
+            recordDebugTrace("connect:already-active stage=\(connectStage)")
+            #endif
+            return
+        }
         if attachmentInfo.launchMode == .create {
             try await createSessionBeforeAttaching()
         }

@@ -958,6 +958,32 @@ final class TmuxControlTransportTests: XCTestCase {
         XCTAssertTrue(transport.stopped)
     }
 
+    func testConnectDoesNotStartSecondTransportWhenAlreadyConnected() async throws {
+        let info = TmuxAttachmentInfo(
+            sessionName: "transport-idempotent",
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach
+        )
+
+        var transports: [FakeTmuxControlTransport] = []
+        let client = TmuxControlClient(
+            attachmentInfo: info,
+            transportFactory: {
+                let transport = FakeTmuxControlTransport()
+                transports.append(transport)
+                return transport
+            }
+        )
+
+        try await client.connect()
+        try await client.connect()
+
+        XCTAssertEqual(transports.count, 1)
+
+        await client.disconnect()
+    }
+
     func testTransportTerminationTransitionsClientToDisconnected() async throws {
         let info = TmuxAttachmentInfo(
             sessionName: "transport-term",
