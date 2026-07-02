@@ -131,6 +131,107 @@ final class TmuxSessionBridgeTests: XCTestCase {
     }
 
     @MainActor
+    func testRestoredWindowContinuesDeferredBootstrap() async throws {
+        let manager = TmuxSessionBridge()
+        manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
+        manager.attachedWindowBootstrapTimeoutSeconds = 0
+
+        let issuedCommands = TmuxBridgeLockedValue<[String]>([])
+        var nextBlockID = 2
+
+        func respondOK(_ transport: ScriptedTmuxControlTransport, outputLine: String? = nil) {
+            let id = nextBlockID
+            nextBlockID += 1
+            transport.emitLine("%begin \(id) \(id) 0")
+            if let outputLine {
+                transport.emitLine(outputLine)
+            }
+            transport.emitLine("%end \(id) \(id) 0")
+        }
+
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "tmux-restored-bootstrap",
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach
+        )
+        let transport = ScriptedTmuxControlTransport(
+            startHandler: { transport in
+                transport.emitLine("%begin 1 1 0")
+                transport.emitLine("%end 1 1 0")
+            },
+            writeHandler: { command, transport in
+                issuedCommands.withLock { $0.append(command) }
+
+                if command == TmuxControlClient.readyCommand() {
+                    respondOK(transport)
+                    return
+                }
+
+                if command.hasPrefix("list-windows -F ") {
+                    respondOK(transport, outputLine: "@1\tmain\tbb62,213x55,0,0,7\t0\t1")
+                    return
+                }
+
+                if command.hasPrefix("display-message -p -t %7 '#{alternate_on}'") {
+                    respondOK(transport, outputLine: "0")
+                    return
+                }
+
+                if command.hasPrefix("capture-pane -p -e -t %7") {
+                    respondOK(transport, outputLine: "restored")
+                    return
+                }
+
+                if command.hasPrefix("display-message -p -t %7 '#{cursor_x} #{cursor_y}'") {
+                    respondOK(transport, outputLine: "0 0")
+                    return
+                }
+
+                respondOK(transport)
+            }
+        )
+        let client = Fantastty.TmuxControlClient(
+            attachmentInfo: info,
+            transportFactory: { transport }
+        )
+        let session = Session(
+            title: "Restored",
+            type: .local,
+            workspaceID: "v2-restored-bootstrap"
+        )
+        session.mode = .attached(info)
+        session.controlClient = client
+
+        let restoredTab = TerminalTab(type: .local, title: "restored")
+        restoredTab.tmuxWindowID = 1
+        restoredTab.tmuxWindowIndex = 0
+        session.tabs = [restoredTab]
+        session.selectedTabID = restoredTab.id
+
+        manager.registerAttachedSession(session)
+
+        try await client.connect()
+        defer {
+            Task {
+                await client.disconnect()
+            }
+        }
+
+        let continued = await waitUntilTmuxBridgeCondition {
+            issuedCommands.withLock { commands in
+                commands.contains("refresh-client -A '%7:continue'")
+            }
+        }
+        let commands = issuedCommands.withLock { $0 }
+
+        XCTAssertTrue(continued, "Restored tmux tabs should continue deferred bootstrap panes; commands=\(commands)")
+        XCTAssertTrue(commands.contains(where: { $0.hasPrefix("capture-pane -p -e -t %7") }))
+        XCTAssertTrue(session.tabs.first === restoredTab)
+        XCTAssertEqual(session.tabs.count, 1)
+    }
+
+    @MainActor
     func testLayoutReplacesFocusedSurfaceWhenPreviouslyFocusedPaneDisappears() {
         let manager = TmuxSessionBridge()
         manager.ghosttyApp = TmuxSessionBridgeTestSupport.ghosttyApp
@@ -582,4 +683,33 @@ private extension TmuxSessionBridgeTests {
         session.controlClient = Fantastty.TmuxControlClient(attachmentInfo: info)
         return session
     }
+}
+
+private final class TmuxBridgeLockedValue<T> {
+    private let lock = NSLock()
+    private var value: T
+
+    init(_ value: T) {
+        self.value = value
+    }
+
+    func withLock<R>(_ body: (inout T) -> R) -> R {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
+    }
+}
+
+private func waitUntilTmuxBridgeCondition(
+    timeout: TimeInterval = 1.0,
+    condition: @escaping () -> Bool
+) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if condition() {
+            return true
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+    return condition()
 }

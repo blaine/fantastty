@@ -838,8 +838,8 @@ esac
 	if !strings.Contains(log, "list-windows\t-t\tmain") {
 		t.Fatalf("tmux log missing list-windows seed command: %s", log)
 	}
-	if !strings.Contains(log, "list-panes\t-a\t-t\tmain") {
-		t.Fatalf("tmux log missing list-panes seed command: %s", log)
+	if !strings.Contains(log, "list-panes\t-s\t-t\tmain") {
+		t.Fatalf("tmux log missing session-scoped list-panes seed command: %s", log)
 	}
 }
 

@@ -24,6 +24,7 @@ final class TmuxWindowController {
         windowID: Int,
         title: String,
         windowIndex: Int,
+        existingTab: TerminalTab? = nil,
         surfaceFactory: @escaping SurfaceFactory,
         paneInjectorFactory: PaneInjectorFactory? = nil
     ) {
@@ -31,9 +32,16 @@ final class TmuxWindowController {
         self.surfaceFactory = surfaceFactory
         self.paneInjectorFactory = paneInjectorFactory
 
-        self.tab = TerminalTab(type: .local, title: title)
-        self.tab.tmuxWindowID = windowID
-        self.tab.tmuxWindowIndex = windowIndex
+        if let existingTab {
+            existingTab.title = title
+            existingTab.tmuxWindowID = windowID
+            existingTab.tmuxWindowIndex = windowIndex
+            self.tab = existingTab
+        } else {
+            self.tab = TerminalTab(type: .local, title: title)
+            self.tab.tmuxWindowID = windowID
+            self.tab.tmuxWindowIndex = windowIndex
+        }
     }
 
     func applyLayout(_ layout: String) {

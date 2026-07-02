@@ -13,6 +13,7 @@ final class TmuxSessionBridge: ObservableObject {
     var tmuxWindowInitialCaptureRequester: TmuxWindowInitialCaptureRequester!
     var onWindowClosed: ((TmuxControlClient, Int) -> Void)?
     var onClientExit: ((TmuxControlClient) -> Void)?
+    var attachedWindowBootstrapTimeoutSeconds: TimeInterval = 2.0
 
     private let bindingStore = WorkspaceBindingStore()
     private var runtimeByWorkspaceID: [String: AttachedWorkspaceRuntimeV2] = [:]
@@ -239,23 +240,19 @@ private extension TmuxSessionBridge {
         }
     }
 
-    func upsertWindow(_ snapshot: AttachedWindowSnapshotV2, in session: Session, client: TmuxControlClient) {
-        if let existing = session.tabs.first(where: { $0.tmuxWindowID == snapshot.windowID }) {
-            existing.title = snapshot.title
-            existing.tmuxWindowIndex = snapshot.windowIndex
-            if snapshot.isActive {
-                activeWindowIDByWorkspaceID[session.workspaceID] = snapshot.windowID
-                withSuppressedTabSelectionSync(for: session.workspaceID) {
-                    session.selectedTabID = existing.id
-                }
-            }
-            return
-        }
-
+    func makeWindowController(
+        windowID: Int,
+        title: String,
+        windowIndex: Int,
+        session: Session,
+        client: TmuxControlClient,
+        existingTab: TerminalTab? = nil
+    ) -> TmuxWindowController {
         let controller = TmuxWindowController(
-            windowID: snapshot.windowID,
-            title: snapshot.title,
-            windowIndex: snapshot.windowIndex ?? 0,
+            windowID: windowID,
+            title: title,
+            windowIndex: windowIndex,
+            existingTab: existingTab,
             surfaceFactory: { [weak self] paneID in
                 guard let app = self?.ghosttyApp?.app else {
                     fatalError("Ghostty app not available")
@@ -290,9 +287,53 @@ private extension TmuxSessionBridge {
         // Background tabs may never render (SwiftUI doesn't render non-visible
         // tabs), so their surfaces never publish a size. Start a timeout to
         // ensure the bootstrap completes even for invisible windows.
-        controller.startBootstrapTimeout()
-        windowControllersByWorkspace[session.workspaceID, default: [:]][snapshot.windowID] = controller
-        let tab = controller.tab
+        controller.startBootstrapTimeout(seconds: attachedWindowBootstrapTimeoutSeconds)
+        return controller
+    }
+
+    @discardableResult
+    func ensureWindowController(
+        windowID: Int,
+        title: String,
+        windowIndex: Int,
+        session: Session,
+        client: TmuxControlClient,
+        existingTab: TerminalTab? = nil
+    ) -> TmuxWindowController {
+        if let controller = windowControllersByWorkspace[session.workspaceID]?[windowID] {
+            return controller
+        }
+
+        let controller = makeWindowController(
+            windowID: windowID,
+            title: title,
+            windowIndex: windowIndex,
+            session: session,
+            client: client,
+            existingTab: existingTab
+        )
+        windowControllersByWorkspace[session.workspaceID, default: [:]][windowID] = controller
+        return controller
+    }
+
+    func upsertWindow(_ snapshot: AttachedWindowSnapshotV2, in session: Session, client: TmuxControlClient) {
+        if let existing = session.tabs.first(where: { $0.tmuxWindowID == snapshot.windowID }) {
+            ensureWindowController(
+                windowID: snapshot.windowID,
+                title: snapshot.title,
+                windowIndex: snapshot.windowIndex ?? 0,
+                session: session,
+                client: client,
+                existingTab: existing
+            )
+            if snapshot.isActive {
+                activeWindowIDByWorkspaceID[session.workspaceID] = snapshot.windowID
+                withSuppressedTabSelectionSync(for: session.workspaceID) {
+                    session.selectedTabID = existing.id
+                }
+            }
+            return
+        }
 
         let window = TmuxWindow(
             windowID: snapshot.windowID,
@@ -302,6 +343,14 @@ private extension TmuxSessionBridge {
             isActive: snapshot.isActive
         )
         let insertIndex = AttachedTmuxWindowRuntime.terminalInsertIndex(for: window, tabs: session.tabs)
+        let controller = ensureWindowController(
+            windowID: snapshot.windowID,
+            title: snapshot.title,
+            windowIndex: snapshot.windowIndex ?? 0,
+            session: session,
+            client: client
+        )
+        let tab = controller.tab
         session.tabs.insert(tab, at: insertIndex)
 
         if snapshot.isActive || session.selectedTabID == nil {

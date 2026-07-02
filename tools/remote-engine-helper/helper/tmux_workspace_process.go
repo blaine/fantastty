@@ -577,7 +577,7 @@ func tmuxListSnapshotLines(socketPath string, sessionName string) ([]string, []s
 	paneOutput, err := runTmux(
 		socketPath,
 		"list-panes",
-		"-a",
+		"-s",
 		"-t", sessionName,
 		"-F", "#{window_id}\t#{pane_id}\t#{pane_active}\t#{alternate_on}\t#{cursor_x}\t#{cursor_y}\t#{scroll_region_upper}\t#{scroll_region_lower}\t#{cursor_flag}",
 	)
