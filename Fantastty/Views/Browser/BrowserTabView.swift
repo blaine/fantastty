@@ -5,6 +5,7 @@ import WebKit
 struct BrowserTabView: View {
     @ObservedObject var tab: TerminalTab
     @State private var urlText: String = ""
+    @FocusState private var isURLFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +44,7 @@ struct BrowserTabView: View {
                 TextField("Enter URL...", text: $urlText)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 13))
+                    .focused($isURLFieldFocused)
                     .onSubmit {
                         navigateTo(urlText)
                     }
@@ -61,6 +63,10 @@ struct BrowserTabView: View {
         }
         .onChange(of: tab.url) {
             urlText = tab.url?.absoluteString ?? ""
+        }
+        .onChange(of: tab.browserLocationFocusRequestID) {
+            urlText = tab.url?.absoluteString ?? ""
+            isURLFieldFocused = true
         }
     }
 

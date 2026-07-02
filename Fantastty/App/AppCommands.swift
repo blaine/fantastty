@@ -87,6 +87,34 @@ struct AppCommands: Commands {
             .keyboardShortcut("v", modifiers: .command)
         }
 
+        CommandMenu("Browser") {
+            Button("Open Location...") {
+                sessionManager.focusLocationInSelectedBrowserTab()
+            }
+            .keyboardShortcut("l", modifiers: .command)
+            .disabled(!sessionManager.canFocusLocationInSelectedBrowserTab)
+
+            Divider()
+
+            Button("Back") {
+                sessionManager.goBackInSelectedBrowserTab()
+            }
+            .keyboardShortcut("[", modifiers: .command)
+            .disabled(!sessionManager.canGoBackInSelectedBrowserTab)
+
+            Button("Forward") {
+                sessionManager.goForwardInSelectedBrowserTab()
+            }
+            .keyboardShortcut("]", modifiers: .command)
+            .disabled(!sessionManager.canGoForwardInSelectedBrowserTab)
+
+            Button("Reload Page") {
+                sessionManager.reloadSelectedBrowserTab()
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(!sessionManager.canReloadSelectedBrowserTab)
+        }
+
         // Tab navigation (top tabs within session)
         CommandGroup(after: .windowArrangement) {
             Button("Select Next Tab") {

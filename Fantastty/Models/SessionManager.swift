@@ -3,6 +3,7 @@ import GhosttyKit
 import os
 import Combine
 import AppKit
+import WebKit
 
 /// Central orchestrator for all terminal sessions.
 /// Routes libghostty notifications to the correct session/tab.
@@ -345,6 +346,27 @@ class SessionManager: ObservableObject {
     /// The currently focused surface view
     var focusedSurfaceView: Ghostty.SurfaceView? {
         return selectedTab?.focusedSurface
+    }
+
+    var selectedBrowserTab: TerminalTab? {
+        guard let tab = selectedTab, tab.kind == .browser else { return nil }
+        return tab
+    }
+
+    var canReloadSelectedBrowserTab: Bool {
+        selectedBrowserTab?.webView != nil
+    }
+
+    var canFocusLocationInSelectedBrowserTab: Bool {
+        selectedBrowserTab != nil
+    }
+
+    var canGoBackInSelectedBrowserTab: Bool {
+        selectedBrowserTab?.webView?.canGoBack ?? false
+    }
+
+    var canGoForwardInSelectedBrowserTab: Bool {
+        selectedBrowserTab?.webView?.canGoForward ?? false
     }
 
     init() {
@@ -1302,6 +1324,34 @@ class SessionManager: ObservableObject {
         } else {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @discardableResult
+    func reloadSelectedBrowserTab() -> Bool {
+        guard let webView = selectedBrowserTab?.webView else { return false }
+        webView.reload()
+        return true
+    }
+
+    @discardableResult
+    func goBackInSelectedBrowserTab() -> Bool {
+        guard let webView = selectedBrowserTab?.webView else { return false }
+        webView.goBack()
+        return true
+    }
+
+    @discardableResult
+    func goForwardInSelectedBrowserTab() -> Bool {
+        guard let webView = selectedBrowserTab?.webView else { return false }
+        webView.goForward()
+        return true
+    }
+
+    @discardableResult
+    func focusLocationInSelectedBrowserTab() -> Bool {
+        guard let tab = selectedBrowserTab else { return false }
+        tab.requestBrowserLocationFocus()
+        return true
     }
 
     // MARK: - Split Management

@@ -29,6 +29,27 @@ final class MockTmuxCommandSender: TmuxCommandSending {
     }
 }
 
+private final class BrowserCommandWebView: WKWebView {
+    private(set) var reloadCallCount = 0
+    private(set) var goBackCallCount = 0
+    private(set) var goForwardCallCount = 0
+
+    override func reload() -> WKNavigation? {
+        reloadCallCount += 1
+        return nil
+    }
+
+    override func goBack() -> WKNavigation? {
+        goBackCallCount += 1
+        return nil
+    }
+
+    override func goForward() -> WKNavigation? {
+        goForwardCallCount += 1
+        return nil
+    }
+}
+
 @MainActor
 private enum WindowManagementTestSupport {
     static let ghosttyApp = Fantastty.Ghostty.App()
@@ -318,6 +339,53 @@ final class WindowManagementTests: XCTestCase {
 
         let second = try XCTUnwrap(tab.webView)
         XCTAssertTrue(second === first)
+    }
+
+    @MainActor
+    func testBrowserNavigationCommandsRouteToSelectedBrowserTab() throws {
+        let manager = Fantastty.SessionManager()
+        let session = Session(title: "test", type: .local, workspaceID: "browser-commands")
+        let tab = Fantastty.TerminalTab(url: try XCTUnwrap(URL(string: "about:blank")))
+        let webView = BrowserCommandWebView()
+        tab.webView = webView
+        session.addTab(tab)
+        manager.sessions = [session]
+        manager.selectedSessionID = session.id
+
+        XCTAssertTrue(manager.reloadSelectedBrowserTab())
+        XCTAssertTrue(manager.goBackInSelectedBrowserTab())
+        XCTAssertTrue(manager.goForwardInSelectedBrowserTab())
+
+        XCTAssertEqual(webView.reloadCallCount, 1)
+        XCTAssertEqual(webView.goBackCallCount, 1)
+        XCTAssertEqual(webView.goForwardCallCount, 1)
+    }
+
+    @MainActor
+    func testBrowserNavigationCommandsIgnoreTerminalTabs() {
+        let manager = Fantastty.SessionManager()
+        let session = Session(title: "test", type: .local, workspaceID: "browser-terminal-ignore")
+        session.addTab(Fantastty.TerminalTab(type: .local, title: "terminal"))
+        manager.sessions = [session]
+        manager.selectedSessionID = session.id
+
+        XCTAssertFalse(manager.reloadSelectedBrowserTab())
+        XCTAssertFalse(manager.goBackInSelectedBrowserTab())
+        XCTAssertFalse(manager.goForwardInSelectedBrowserTab())
+    }
+
+    @MainActor
+    func testBrowserLocationCommandTargetsSelectedBrowserTab() throws {
+        let manager = Fantastty.SessionManager()
+        let session = Session(title: "test", type: .local, workspaceID: "browser-location")
+        let tab = Fantastty.TerminalTab(url: try XCTUnwrap(URL(string: "about:blank")))
+        session.addTab(tab)
+        manager.sessions = [session]
+        manager.selectedSessionID = session.id
+
+        XCTAssertEqual(tab.browserLocationFocusRequestID, 0)
+        XCTAssertTrue(manager.focusLocationInSelectedBrowserTab())
+        XCTAssertEqual(tab.browserLocationFocusRequestID, 1)
     }
 
     @MainActor

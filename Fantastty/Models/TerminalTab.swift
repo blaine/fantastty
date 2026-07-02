@@ -27,6 +27,8 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
     /// The current URL for browser tabs. Nil for terminal tabs.
     @Published var url: URL?
 
+    @Published var browserLocationFocusRequestID = 0
+
     /// The WKWebView instance for browser tabs. Nil for terminal tabs.
     var webView: WKWebView?
 
@@ -102,5 +104,10 @@ class TerminalTab: ObservableObject, Identifiable, Hashable {
         DispatchQueue.main.async { [weak self] in
             self?.thumbnailRefreshes.send(())
         }
+    }
+
+    func requestBrowserLocationFocus() {
+        guard kind == .browser else { return }
+        browserLocationFocusRequestID += 1
     }
 }
