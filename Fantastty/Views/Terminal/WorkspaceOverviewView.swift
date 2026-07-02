@@ -38,26 +38,26 @@ struct WorkspaceOverviewView: View {
 /// A single tile in the workspace overview grid.
 struct OverviewTileView: View {
     @ObservedObject var tab: TerminalTab
+    @EnvironmentObject var sessionManager: SessionManager
     let onSelect: () -> Void
 
     @State private var isHovered = false
-    @State private var snapshot: NSImage?
+    @StateObject private var snapshotStore = ThumbnailSnapshotStore()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Thumbnail
             ZStack {
-                if let snapshot = snapshot {
+                if let snapshot = snapshotStore.image {
                     Image(nsImage: snapshot)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else {
-                    Color.black.opacity(0.4)
-                        .overlay {
-                            Image(systemName: tab.iconName)
-                                .font(.largeTitle)
-                                .foregroundStyle(.tertiary)
-                        }
+                    ThumbnailPlaceholderView(
+                        style: ThumbnailPlaceholderStyle.forTab(tab),
+                        cornerRadius: 0,
+                        symbolFont: .largeTitle
+                    )
                 }
             }
             .aspectRatio(16 / 10, contentMode: .fit)
@@ -87,26 +87,22 @@ struct OverviewTileView: View {
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
         .onHover { isHovered = $0 }
-        .onAppear { captureSnapshot() }
+        .onAppear {
+            guard !sessionManager.areThumbnailRefreshesSuspended else { return }
+            captureSnapshot()
+        }
+        .onChange(of: sessionManager.areThumbnailRefreshesSuspended) { _, isSuspended in
+            guard !isSuspended else { return }
+            captureSnapshot()
+        }
         .onReceive(tab.thumbnailRefreshes.debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
+            guard !sessionManager.areThumbnailRefreshesSuspended else { return }
             captureSnapshot()
         }
     }
 
     private func captureSnapshot() {
-        switch tab.kind {
-        case .terminal:
-            guard let image = TerminalThumbnailRenderer.thumbnailImage(
-                for: tab.surfaceTree?.root,
-                targetSize: NSSize(width: 320, height: 200)
-            ) else { return }
-            snapshot = image
-        case .browser:
-            guard let webView = tab.webView else { return }
-            webView.takeSnapshot(with: nil) { image, _ in
-                if let image = image { snapshot = image }
-            }
-        }
+        snapshotStore.refresh(tab: tab, targetSize: NSSize(width: 320, height: 200))
     }
 
 }

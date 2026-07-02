@@ -3,6 +3,41 @@ import WebKit
 import GhosttyKit
 import AppKit
 
+enum ThumbnailPlaceholderStyle: Equatable {
+    case loading
+    case symbol(String)
+
+    static func forTab(_ tab: TerminalTab) -> ThumbnailPlaceholderStyle {
+        switch tab.kind {
+        case .terminal:
+            return .loading
+        case .browser:
+            return .symbol(tab.iconName)
+        }
+    }
+}
+
+final class ThumbnailRefreshGate {
+    private var isInFlight = false
+    private var hasPendingRefresh = false
+
+    func begin() -> Bool {
+        guard !isInFlight else {
+            hasPendingRefresh = true
+            return false
+        }
+        isInFlight = true
+        return true
+    }
+
+    func finish() -> Bool {
+        isInFlight = false
+        let shouldRunPendingRefresh = hasPendingRefresh
+        hasPendingRefresh = false
+        return shouldRunPendingRefresh
+    }
+}
+
 enum TerminalThumbnailRenderer {
     static func contentRect(for node: SplitTree<Ghostty.SurfaceView>.Node?) -> CGRect? {
         let frames = leafSurfaces(in: node).map(visibleFrame(of:))
@@ -76,6 +111,82 @@ enum TerminalThumbnailRenderer {
         }
 
         return surface.frame.isEmpty ? bounds : surface.frame
+    }
+}
+
+final class ThumbnailSnapshotStore: ObservableObject {
+    @Published private(set) var image: NSImage?
+
+    private let refreshGate = ThumbnailRefreshGate()
+
+    func refresh(tab: TerminalTab, targetSize: NSSize) {
+        guard refreshGate.begin() else { return }
+
+        switch tab.kind {
+        case .terminal:
+            if let image = TerminalThumbnailRenderer.thumbnailImage(
+                for: tab.surfaceTree?.root,
+                targetSize: targetSize
+            ) {
+                self.image = image
+            }
+            finishRefresh(tab: tab, targetSize: targetSize)
+
+        case .browser:
+            guard let webView = tab.webView else {
+                finishRefresh(tab: tab, targetSize: targetSize)
+                return
+            }
+            let config = WKSnapshotConfiguration()
+            webView.takeSnapshot(with: config) { [weak self, weak tab] image, _ in
+                DispatchQueue.main.async {
+                    guard let self, let tab else { return }
+                    if let image {
+                        self.image = image
+                    }
+                    self.finishRefresh(tab: tab, targetSize: targetSize)
+                }
+            }
+        }
+    }
+
+    private func finishRefresh(tab: TerminalTab, targetSize: NSSize) {
+        if refreshGate.finish() {
+            refresh(tab: tab, targetSize: targetSize)
+        }
+    }
+}
+
+struct ThumbnailPlaceholderView: View {
+    let style: ThumbnailPlaceholderStyle
+    let cornerRadius: CGFloat
+    let symbolFont: Font
+
+    var body: some View {
+        Rectangle()
+            .fill(backgroundColor)
+            .aspectRatio(16/10, contentMode: .fit)
+            .cornerRadius(cornerRadius)
+            .overlay {
+                switch style {
+                case .loading:
+                    ProgressView()
+                        .scaleEffect(0.5)
+                case .symbol(let name):
+                    Image(systemName: name)
+                        .font(symbolFont)
+                        .foregroundStyle(.secondary)
+                }
+            }
+    }
+
+    private var backgroundColor: Color {
+        switch style {
+        case .loading:
+            return Color.black.opacity(0.3)
+        case .symbol:
+            return Color(nsColor: .controlBackgroundColor)
+        }
     }
 }
 
@@ -161,14 +272,14 @@ struct TabThumbnailView: View {
     let onSelect: () -> Void
     let onClose: () -> Void
 
-    @State private var thumbnail: NSImage?
+    @StateObject private var snapshotStore = ThumbnailSnapshotStore()
     @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Thumbnail image
             ZStack {
-                if let thumbnail = thumbnail {
+                if let thumbnail = snapshotStore.image {
                     Image(nsImage: thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -176,14 +287,11 @@ struct TabThumbnailView: View {
                         .background(Color.black)
                         .cornerRadius(4)
                 } else {
-                    Rectangle()
-                        .fill(Color.black.opacity(0.3))
-                        .aspectRatio(16/10, contentMode: .fit)
-                        .cornerRadius(4)
-                        .overlay {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                        }
+                    ThumbnailPlaceholderView(
+                        style: ThumbnailPlaceholderStyle.forTab(tab),
+                        cornerRadius: 4,
+                        symbolFont: .title2
+                    )
                 }
 
                 // Hover overlay with close button
@@ -244,26 +352,7 @@ struct TabThumbnailView: View {
     }
 
     private func updateThumbnail() {
-        switch tab.kind {
-        case .terminal:
-            guard let image = TerminalThumbnailRenderer.thumbnailImage(
-                for: tab.surfaceTree?.root,
-                targetSize: TabThumbnailPanel.thumbnailRenderSize
-            ) else {
-                return
-            }
-            DispatchQueue.main.async {
-                self.thumbnail = image
-            }
-        case .browser:
-            guard let webView = tab.webView else { return }
-            let config = WKSnapshotConfiguration()
-            webView.takeSnapshot(with: config) { image, _ in
-                if let image = image {
-                    self.thumbnail = image
-                }
-            }
-        }
+        snapshotStore.refresh(tab: tab, targetSize: TabThumbnailPanel.thumbnailRenderSize)
     }
 
 }

@@ -6,14 +6,14 @@ import GhosttyKit
 /// (TabThumbnailView uses Timer.publish which doesn't fire reliably in List rows.)
 struct SidebarThumbnailView: View {
     @ObservedObject var tab: TerminalTab
+    @EnvironmentObject var sessionManager: SessionManager
     let isSelected: Bool
     let isSessionActive: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
 
     @State private var isHovered = false
-    @State private var terminalSnapshot: NSImage?
-    @State private var browserSnapshot: NSImage?
+    @StateObject private var snapshotStore = ThumbnailSnapshotStore()
 
     /// A tab reads as selected in the sidebar only while its session is the active one.
     /// Each session remembers its own selected tab, so without this an inactive session
@@ -68,9 +68,16 @@ struct SidebarThumbnailView: View {
         .onHover { hovering in
             isHovered = hovering
         }
-        .onAppear { updateThumbnail() }
+        .onAppear {
+            guard !sessionManager.areThumbnailRefreshesSuspended else { return }
+            updateThumbnail()
+        }
+        .onChange(of: sessionManager.areThumbnailRefreshesSuspended) { _, isSuspended in
+            guard !isSuspended else { return }
+            updateThumbnail()
+        }
         .onReceive(tab.thumbnailRefreshes.debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
-            guard isSessionActive else { return }
+            guard isSessionActive && !sessionManager.areThumbnailRefreshesSuspended else { return }
             updateThumbnail()
         }
     }
@@ -79,7 +86,7 @@ struct SidebarThumbnailView: View {
     private var thumbnailImage: some View {
         switch tab.kind {
         case .terminal:
-            if let image = terminalSnapshot {
+            if let image = snapshotStore.image {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -87,60 +94,31 @@ struct SidebarThumbnailView: View {
                     .background(Color.black)
                     .cornerRadius(4)
             } else {
-                terminalPlaceholder
+                placeholder
             }
         case .browser:
-            if let snapshot = browserSnapshot {
+            if let snapshot = snapshotStore.image {
                 Image(nsImage: snapshot)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .cornerRadius(4)
             } else {
-                Rectangle()
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .aspectRatio(16/10, contentMode: .fit)
-                    .cornerRadius(4)
-                    .overlay {
-                        Image(systemName: "globe")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
+                placeholder
             }
         }
     }
 
-    private var terminalPlaceholder: some View {
-        Rectangle()
-            .fill(Color.black.opacity(0.3))
-            .aspectRatio(16/10, contentMode: .fit)
-            .cornerRadius(4)
-            .overlay {
-                ProgressView()
-                    .scaleEffect(0.5)
-            }
-    }
-
-    private func captureBrowserSnapshot() {
-        guard tab.kind == .browser, let webView = tab.webView else { return }
-        let config = WKSnapshotConfiguration()
-        webView.takeSnapshot(with: config) { image, _ in
-            if let image = image {
-                self.browserSnapshot = image
-            }
-        }
+    private var placeholder: some View {
+        ThumbnailPlaceholderView(
+            style: ThumbnailPlaceholderStyle.forTab(tab),
+            cornerRadius: 4,
+            symbolFont: .title2
+        )
     }
 
     private func updateThumbnail() {
-        switch tab.kind {
-        case .terminal:
-            terminalSnapshot = TerminalThumbnailRenderer.thumbnailImage(
-                for: tab.surfaceTree?.root,
-                targetSize: TabThumbnailPanel.thumbnailRenderSize
-            )
-        case .browser:
-            captureBrowserSnapshot()
-        }
+        snapshotStore.refresh(tab: tab, targetSize: TabThumbnailPanel.thumbnailRenderSize)
     }
 
 }

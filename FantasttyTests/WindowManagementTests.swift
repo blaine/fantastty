@@ -388,6 +388,26 @@ final class WindowManagementTests: XCTestCase {
         XCTAssertEqual(tab.browserLocationFocusRequestID, 1)
     }
 
+    func testThumbnailPlaceholderUsesStaticIconForBrowserTabs() throws {
+        let browserTab = Fantastty.TerminalTab(url: try XCTUnwrap(URL(string: "https://example.com")))
+        let terminalTab = Fantastty.TerminalTab(type: .local, title: "terminal")
+
+        XCTAssertEqual(Fantastty.ThumbnailPlaceholderStyle.forTab(browserTab), .symbol("globe"))
+        XCTAssertEqual(Fantastty.ThumbnailPlaceholderStyle.forTab(terminalTab), .loading)
+    }
+
+    func testThumbnailRefreshGateCoalescesRequestsWhileInFlight() {
+        let gate = Fantastty.ThumbnailRefreshGate()
+
+        XCTAssertTrue(gate.begin())
+        XCTAssertFalse(gate.begin())
+        XCTAssertFalse(gate.begin())
+        XCTAssertTrue(gate.finish())
+
+        XCTAssertTrue(gate.begin())
+        XCTAssertFalse(gate.finish())
+    }
+
     @MainActor
     func testAttachedWindowAddOrdersByWindowIndexAndSelectsActiveWindow() throws {
         let manager = Fantastty.SessionManager()
