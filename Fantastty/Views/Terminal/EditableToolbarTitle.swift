@@ -56,6 +56,9 @@ struct EditableToolbarTitle: NSViewRepresentable {
         func controlTextDidEndEditing(_ obj: Notification) {
             if let textField = obj.object as? NSTextField {
                 parent.text = textField.stringValue
+                // updateNSView skips invalidation when the binding already matches
+                // the field's own text, so re-measure the edited text here.
+                textField.invalidateIntrinsicContentSize()
             }
         }
     }
