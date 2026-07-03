@@ -101,13 +101,15 @@ struct SessionLauncherSheet: View {
     }
 
     private var detailPane: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            connectionSection
-            sessionSection
-            Spacer()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                connectionSection
+                sessionSection
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -189,7 +191,7 @@ struct SessionLauncherSheet: View {
                 }
                 .tag(row.id)
             }
-            .frame(minHeight: 100)
+            .frame(minHeight: 100, idealHeight: 220)
 
             if !isLoading && discoveryError == nil && rows.count == 1 {
                 Text("No existing sessions found at this location.")
