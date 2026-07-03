@@ -106,6 +106,15 @@ struct TmuxAttachmentInfo: Codable, Equatable {
     var launchMode: TmuxAttachmentLaunchMode
     var transport: TmuxAttachmentTransport
 
+    var displayTitle: String {
+        switch host {
+        case .local:
+            return sessionName
+        case .ssh(let info):
+            return "\(sessionName)@\(info.hostname)"
+        }
+    }
+
     init(
         sessionName: String,
         host: TmuxHost,

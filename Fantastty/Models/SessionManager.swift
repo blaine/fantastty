@@ -463,14 +463,37 @@ class SessionManager: ObservableObject {
 
     // MARK: - Workspace Name Generation
 
+    private static let generatedWorkspaceNameAdjectives = [
+        "swift", "bold", "calm", "keen", "warm", "bright", "quick",
+        "fresh", "sharp", "steady", "clear", "deep", "light", "golden",
+        "silver", "amber", "coral", "jade", "sage", "iron"
+    ]
+
+    private static let generatedWorkspaceNameNouns = [
+        "falcon", "harbor", "maple", "spark", "wave", "cedar", "ridge",
+        "brook", "mesa", "dusk", "pine", "reef", "cove", "peak", "vale",
+        "moss", "flint", "glade", "drift", "helm"
+    ]
+
     private static func generateWorkspaceName() -> String {
-        let adjectives = ["swift", "bold", "calm", "keen", "warm", "bright", "quick",
-                          "fresh", "sharp", "steady", "clear", "deep", "light", "golden",
-                          "silver", "amber", "coral", "jade", "sage", "iron"]
-        let nouns = ["falcon", "harbor", "maple", "spark", "wave", "cedar", "ridge",
-                     "brook", "mesa", "dusk", "pine", "reef", "cove", "peak", "vale",
-                     "moss", "flint", "glade", "drift", "helm"]
-        return "\(adjectives.randomElement()!)-\(nouns.randomElement()!)"
+        "\(generatedWorkspaceNameAdjectives.randomElement()!)-\(generatedWorkspaceNameNouns.randomElement()!)"
+    }
+
+    private static func defaultWorkspaceName(for attachment: TmuxAttachmentInfo) -> String {
+        switch attachment.host {
+        case .local:
+            return generateWorkspaceName()
+        case .ssh:
+            return attachment.displayTitle
+        }
+    }
+
+    private static func isGeneratedWorkspaceName(_ name: String) -> Bool {
+        let parts = name.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return false }
+
+        return generatedWorkspaceNameAdjectives.contains(String(parts[0]))
+            && generatedWorkspaceNameNouns.contains(String(parts[1]))
     }
 
     // MARK: - Layout Persistence
@@ -650,6 +673,30 @@ class SessionManager: ObservableObject {
         return persisted
     }
 
+    private func persistAttachedWorkspaceMetadata(for info: TmuxAttachmentInfo, workspaceID: String) {
+        let metadataStore = sessionMetadataStore
+        var meta = metadataStore.getOrCreate(forKey: workspaceID)
+        if meta.name.isEmpty || shouldReplaceGeneratedWorkspaceName(meta.name, for: info) {
+            metadataStore.update(forKey: workspaceID, name: Self.defaultWorkspaceName(for: info))
+            meta = metadataStore.getOrCreate(forKey: workspaceID)
+        }
+        meta.attachment = persistedAttachmentInfo(from: info)
+        metadataStore.update(meta)
+    }
+
+    private func repairRestoredWorkspaceNameIfNeeded(for info: TmuxAttachmentInfo, workspaceID: String) {
+        guard var meta = sessionMetadataStore.metadata[workspaceID] else { return }
+        guard shouldReplaceGeneratedWorkspaceName(meta.name, for: info) else { return }
+
+        meta.name = info.displayTitle
+        sessionMetadataStore.update(meta)
+    }
+
+    private func shouldReplaceGeneratedWorkspaceName(_ name: String, for info: TmuxAttachmentInfo) -> Bool {
+        guard case .ssh = info.host else { return false }
+        return Self.isGeneratedWorkspaceName(name)
+    }
+
     private func restorePersistedAttachmentSession(
         attachment: TmuxAttachmentInfo,
         workspaceID: String,
@@ -657,6 +704,8 @@ class SessionManager: ObservableObject {
         selectedTabIndex: Int? = nil,
         autoReconnect: Bool = true
     ) {
+        repairRestoredWorkspaceNameIfNeeded(for: attachment, workspaceID: workspaceID)
+
         if attachment.transport == .remoteEngine,
            case .ssh(let host) = attachment.host {
             restoreRemoteEngineSession(
@@ -716,7 +765,7 @@ class SessionManager: ObservableObject {
         var info = persistedAttachmentInfo(from: attachment)
         info.transport = .remoteEngine
         let session = Session(
-            title: info.sessionName,
+            title: info.displayTitle,
             type: .ssh(host: host.hostname, user: host.user, port: host.port),
             workspaceID: workspaceID,
             metadataStore: sessionMetadataStore
@@ -981,14 +1030,7 @@ class SessionManager: ObservableObject {
             session.backingState = .missingAttachedBacking(reason: "tmux unavailable")
         }
 
-        let metadataStore = sessionMetadataStore
-        var meta = metadataStore.getOrCreate(forKey: workspaceID)
-        if meta.name.isEmpty {
-            metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
-            meta = metadataStore.getOrCreate(forKey: workspaceID)
-        }
-        meta.attachment = persistedAttachmentInfo(from: info)
-        metadataStore.update(meta)
+        persistAttachedWorkspaceMetadata(for: info, workspaceID: workspaceID)
 
         Self.logger.info("Created attached session \(session.id) type=\(type.displayName)")
         return session
@@ -1899,7 +1941,7 @@ class SessionManager: ObservableObject {
             transport: .remoteEngine
         )
         let session = Session(
-            title: info.sessionName,
+            title: info.displayTitle,
             type: .ssh(host: host.hostname, user: host.user, port: host.port),
             workspaceID: workspaceID,
             metadataStore: sessionMetadataStore
@@ -1911,14 +1953,7 @@ class SessionManager: ObservableObject {
         selectedSessionID = session.id
         startRemoteEngineClient(session, host: host)
 
-        let metadataStore = sessionMetadataStore
-        var meta = metadataStore.getOrCreate(forKey: workspaceID)
-        if meta.name.isEmpty {
-            metadataStore.update(forKey: workspaceID, name: Self.generateWorkspaceName())
-            meta = metadataStore.getOrCreate(forKey: workspaceID)
-        }
-        meta.attachment = persistedAttachmentInfo(from: info)
-        metadataStore.update(meta)
+        persistAttachedWorkspaceMetadata(for: info, workspaceID: workspaceID)
 
         Self.logger.info("Created remote engine session \(session.id) host=\(host.displayName)")
         return session
@@ -2169,7 +2204,7 @@ class SessionManager: ObservableObject {
                 return .ssh(host: sshInfo.hostname, user: sshInfo.user, port: sshInfo.port)
             }
         }()
-        let session = Session(title: info.sessionName, type: sessionType, workspaceID: wsID, metadataStore: sessionMetadataStore)
+        let session = Session(title: info.displayTitle, type: sessionType, workspaceID: wsID, metadataStore: sessionMetadataStore)
         session.mode = .attached(info)
 
         if info.transport == .tmuxControl {
@@ -2196,14 +2231,7 @@ class SessionManager: ObservableObject {
 
         // Persist metadata so the session survives across restarts even if
         // layout.json is lost or corrupt.
-        let metadataStore = sessionMetadataStore
-        var meta = metadataStore.getOrCreate(forKey: session.workspaceID)
-        if meta.name.isEmpty {
-            metadataStore.update(forKey: session.workspaceID, name: Self.generateWorkspaceName())
-            meta = metadataStore.getOrCreate(forKey: session.workspaceID)
-        }
-        meta.attachment = persistedAttachmentInfo(from: info)
-        metadataStore.update(meta)
+        persistAttachedWorkspaceMetadata(for: info, workspaceID: session.workspaceID)
     }
 
 }

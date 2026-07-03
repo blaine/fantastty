@@ -57,6 +57,51 @@ private enum WindowManagementTestSupport {
 
 final class WindowManagementTests: XCTestCase {
     @MainActor
+    func testRemoteAttachedSessionDefaultTitleUsesSessionAtHost() {
+        let manager = Fantastty.SessionManager()
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "claude",
+            host: .ssh(Fantastty.SSHHostInfo(user: "me", hostname: "host.example.com", port: 2222)),
+            connectionState: .disconnected(reason: nil)
+        )
+
+        let session = manager.makeAttachedSession(info: info, workspaceID: "remote-title")
+
+        XCTAssertEqual(session.title, "claude@host.example.com")
+    }
+
+    @MainActor
+    func testLocalAttachedSessionDefaultTitleUsesSessionName() {
+        let manager = Fantastty.SessionManager()
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "claude",
+            host: .local,
+            connectionState: .disconnected(reason: nil)
+        )
+
+        let session = manager.makeAttachedSession(info: info, workspaceID: "local-title")
+
+        XCTAssertEqual(session.title, "claude")
+    }
+
+    @MainActor
+    func testRemoteAttachMetadataNameUsesSessionAtHost() throws {
+        let manager = Fantastty.SessionManager()
+        manager.attachedSessionReconnectStarter = { _ in }
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "claude",
+            host: .ssh(Fantastty.SSHHostInfo(user: "me", hostname: "host.example.com", port: 2222)),
+            connectionState: .disconnected(reason: nil)
+        )
+
+        manager.attachToTmuxSession(info: info)
+
+        let session = try XCTUnwrap(manager.sessions.first)
+        XCTAssertEqual(session.title, "claude@host.example.com")
+        XCTAssertEqual(session.name, "claude@host.example.com")
+    }
+
+    @MainActor
     func testDefaultTestSessionManagerDoesNotWriteAttachedMetadataToSharedStore() {
         let workspaceID = "test-isolated-\(UUID().uuidString.prefix(8).lowercased())"
         Fantastty.SessionMetadataStore.shared.remove(forKey: workspaceID)

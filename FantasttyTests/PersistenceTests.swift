@@ -773,6 +773,35 @@ final class PersistenceTests: XCTestCase {
     }
 
     @MainActor
+    func testRestoreTmuxSessionsReplacesGeneratedRemoteWorkspaceNameWithSessionAtHost() throws {
+        Fantastty.SessionManager.layoutURLOverride = tempFileURL()
+        let workspaceID = "remote-generated-name"
+        let metadataStore = SessionMetadataStore(fileURL: tempFileURL())
+        let host = Fantastty.SSHHostInfo(user: "me", hostname: "host.example.com", port: 2222)
+        var meta = metadataStore.getOrCreate(forKey: workspaceID)
+        meta.name = "steady-pine"
+        meta.attachment = Fantastty.TmuxAttachmentInfo(
+            sessionName: "claude",
+            host: .ssh(host),
+            connectionState: .disconnected(reason: nil)
+        )
+        metadataStore.update(meta)
+
+        let manager = Fantastty.SessionManager()
+        manager.sessionMetadataStore = metadataStore
+        manager.persistentSessionsEnabled = true
+        manager.tmuxAvailabilityProvider = { true }
+        manager.liveTmuxWorkspaceProvider = { [:] }
+        manager.attachedSessionReconnectStarter = { _ in }
+
+        XCTAssertTrue(manager.restoreTmuxSessions())
+
+        let restored = try XCTUnwrap(manager.sessions.first)
+        XCTAssertEqual(restored.title, "claude@host.example.com")
+        XCTAssertEqual(metadataStore.metadata[workspaceID]?.name, "claude@host.example.com")
+    }
+
+    @MainActor
     func testRestoreTmuxSessionsSkipsTrashedMetadataWorkspaces() throws {
         Fantastty.SessionManager.layoutURLOverride = tempFileURL()
         let workspaceID = "trashed-placeholder-\(UUID().uuidString.prefix(8).lowercased())"
