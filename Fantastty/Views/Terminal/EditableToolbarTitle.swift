@@ -30,6 +30,7 @@ struct EditableToolbarTitle: NSViewRepresentable {
     func updateNSView(_ nsView: ToolbarTextField, context: Context) {
         if nsView.currentEditor() == nil && nsView.stringValue != text {
             nsView.stringValue = text
+            nsView.invalidateIntrinsicContentSize()
         }
     }
 
