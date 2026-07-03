@@ -64,6 +64,38 @@ final class TmuxControlClientTests: XCTestCase {
         client.delegate = delegate
     }
 
+    // MARK: - Pane child writes
+
+    func testPaneChildWriteDropsTerminalCapabilityReports() {
+        let data = Data(
+            (
+                "\u{1b}P>|ghostty 1.3.2-HEAD-+5d0a82b\u{1b}\\"
+                + "\u{1b}[?62;22;52c"
+                + "\u{1b}[?2026;2$y"
+                + "\u{1b}[?62;22;52c"
+                + "\u{1b}P1+r696E646E=5C455B343A25703125646D\u{1b}\\"
+                + "\u{1b}]11;rgb:0000/0000/0000\u{1b}\\"
+            ).utf8
+        )
+
+        XCTAssertNil(Ghostty.App.forwardablePaneChildWriteData(from: data))
+    }
+
+    func testPaneChildWritePreservesOrdinaryPaneInput() {
+        let data = Data("hello\u{1b}[A".utf8)
+
+        XCTAssertEqual(Ghostty.App.forwardablePaneChildWriteData(from: data), data)
+    }
+
+    func testPaneChildWriteStripsCapabilityReportsFromMixedBytes() {
+        let data = Data("before\u{1b}[?62;22;52cafter".utf8)
+
+        XCTAssertEqual(
+            Ghostty.App.forwardablePaneChildWriteData(from: data),
+            Data("beforeafter".utf8)
+        )
+    }
+
     // MARK: - Event dispatch
 
     func testWindowAddNotifiesDelegate() async {

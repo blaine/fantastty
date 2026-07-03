@@ -351,16 +351,195 @@ extension Ghostty {
         }
 
         /// The terminal wrote bytes toward its child process. For tmux-attached
-        /// surfaces (whose child is a silent /dev/null sink), forward those bytes
-        /// — mouse reports, query responses, etc. — on to the tmux pane so they
-        /// reach the program running there.
+        /// surfaces (whose child is a silent /dev/null sink), forward user-input
+        /// side effects such as mouse reports to the tmux pane so they reach the
+        /// program running there.
         static func childWrite(_ userdata: UnsafeMutableRawPointer?, data: UnsafePointer<CChar>?, len: UInt) {
             guard let data, len > 0 else { return }
             let surfaceView = self.surfaceUserdata(from: userdata)
             guard let paneID = surfaceView.tmuxPaneID,
                   let client = surfaceView.tmuxControlClient else { return }
             let bytes = Data(bytes: data, count: Int(len))
-            Task { await client.sendKeys(paneID: paneID, data: bytes) }
+            guard let forwardableBytes = forwardablePaneChildWriteData(from: bytes) else { return }
+            Task { await client.sendKeys(paneID: paneID, data: forwardableBytes) }
+        }
+
+        static func forwardablePaneChildWriteData(from data: Data) -> Data? {
+            guard !data.isEmpty else { return nil }
+
+            let bytes = [UInt8](data)
+            var output: [UInt8] = []
+            output.reserveCapacity(bytes.count)
+
+            var index = 0
+            var filteredReport = false
+            while index < bytes.count {
+                if let end = terminalCapabilityReportEnd(in: bytes, from: index) {
+                    filteredReport = true
+                    index = end
+                    continue
+                }
+
+                output.append(bytes[index])
+                index += 1
+            }
+
+            guard !output.isEmpty else { return nil }
+            return filteredReport ? Data(output) : data
+        }
+
+        private static func terminalCapabilityReportEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            guard index + 2 < bytes.count, bytes[index] == 0x1B else { return nil }
+
+            switch bytes[index + 1] {
+            case 0x50:
+                return dcsCapabilityReportEnd(in: bytes, from: index)
+            case 0x5B:
+                return csiCapabilityReportEnd(in: bytes, from: index)
+            case 0x5D:
+                return oscCapabilityReportEnd(in: bytes, from: index)
+            default:
+                return nil
+            }
+        }
+
+        private static func dcsCapabilityReportEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            let xtversionPrefix: [UInt8] = [0x1B, 0x50, 0x3E, 0x7C]
+            let xtgettcapPrefix: [UInt8] = [0x1B, 0x50, 0x31, 0x2B, 0x72]
+            guard matchesPrefix(xtversionPrefix, in: bytes, at: index)
+                    || matchesPrefix(xtgettcapPrefix, in: bytes, at: index) else {
+                return nil
+            }
+
+            return stringTerminatorEnd(in: bytes, from: index + 2)
+        }
+
+        private static func csiCapabilityReportEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            csiDeviceAttributesReportEnd(in: bytes, from: index)
+                ?? csiModeReportEnd(in: bytes, from: index)
+        }
+
+        private static func csiDeviceAttributesReportEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            guard index + 3 < bytes.count,
+                  bytes[index] == 0x1B,
+                  bytes[index + 1] == 0x5B,
+                  bytes[index + 2] == 0x3F || bytes[index + 2] == 0x3E else {
+                return nil
+            }
+
+            var index = index + 3
+            var sawDigit = false
+            while index < bytes.count {
+                let byte = bytes[index]
+                if isDigit(byte) {
+                    sawDigit = true
+                    index += 1
+                    continue
+                }
+
+                if byte == 0x3B {
+                    index += 1
+                    continue
+                }
+
+                if byte == 0x63, sawDigit {
+                    return index + 1
+                }
+
+                return nil
+            }
+
+            return nil
+        }
+
+        private static func csiModeReportEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            guard index + 6 < bytes.count,
+                  bytes[index] == 0x1B,
+                  bytes[index + 1] == 0x5B else {
+                return nil
+            }
+
+            var index = index + 2
+            if bytes[index] == 0x3F {
+                index += 1
+            }
+
+            guard consumeDigits(in: bytes, index: &index),
+                  index < bytes.count,
+                  bytes[index] == 0x3B else {
+                return nil
+            }
+
+            index += 1
+            guard index + 2 < bytes.count,
+                  bytes[index] >= 0x30,
+                  bytes[index] <= 0x34,
+                  bytes[index + 1] == 0x24,
+                  bytes[index + 2] == 0x79 else {
+                return nil
+            }
+
+            return index + 3
+        }
+
+        private static func oscCapabilityReportEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            let foregroundColorPrefix: [UInt8] = [0x1B, 0x5D, 0x31, 0x30, 0x3B]
+            let backgroundColorPrefix: [UInt8] = [0x1B, 0x5D, 0x31, 0x31, 0x3B]
+            guard matchesPrefix(foregroundColorPrefix, in: bytes, at: index)
+                    || matchesPrefix(backgroundColorPrefix, in: bytes, at: index) else {
+                return nil
+            }
+
+            return oscTerminatorEnd(in: bytes, from: index + 5)
+        }
+
+        private static func stringTerminatorEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            var index = index
+            while index + 1 < bytes.count {
+                if bytes[index] == 0x1B, bytes[index + 1] == 0x5C {
+                    return index + 2
+                }
+                index += 1
+            }
+
+            return nil
+        }
+
+        private static func oscTerminatorEnd(in bytes: [UInt8], from index: Int) -> Int? {
+            var index = index
+            while index < bytes.count {
+                if bytes[index] == 0x07 {
+                    return index + 1
+                }
+
+                if index + 1 < bytes.count,
+                   bytes[index] == 0x1B,
+                   bytes[index + 1] == 0x5C {
+                    return index + 2
+                }
+
+                index += 1
+            }
+
+            return nil
+        }
+
+        private static func consumeDigits(in bytes: [UInt8], index: inout Int) -> Bool {
+            let start = index
+            while index < bytes.count, isDigit(bytes[index]) {
+                index += 1
+            }
+
+            return index > start
+        }
+
+        private static func isDigit(_ byte: UInt8) -> Bool {
+            byte >= 0x30 && byte <= 0x39
+        }
+
+        private static func matchesPrefix(_ prefix: [UInt8], in bytes: [UInt8], at index: Int) -> Bool {
+            guard index + prefix.count <= bytes.count else { return false }
+            return bytes[index..<index + prefix.count].elementsEqual(prefix)
         }
 
         static func readClipboard(_ userdata: UnsafeMutableRawPointer?, location: ghostty_clipboard_e, state: UnsafeMutableRawPointer?) -> Bool {
