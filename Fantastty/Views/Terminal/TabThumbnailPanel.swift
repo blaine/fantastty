@@ -242,7 +242,30 @@ struct TabThumbnailPanel: View {
                                 }
                             }
                         )
+                        .onDrag {
+                            SessionTabDropDelegate.itemProvider(for: tab)
+                        }
+                        .onDrop(
+                            of: SessionTabDropDelegate.supportedTypes,
+                            delegate: SessionTabDropDelegate(
+                                session: session,
+                                targetTabID: tab.id,
+                                sessionManager: sessionManager
+                            )
+                        )
                     }
+
+                    Color.clear
+                        .frame(height: 24)
+                        .contentShape(Rectangle())
+                        .onDrop(
+                            of: SessionTabDropDelegate.supportedTypes,
+                            delegate: SessionTabDropDelegate(
+                                session: session,
+                                targetTabID: nil,
+                                sessionManager: sessionManager
+                            )
+                        )
                 }
                 .padding(8)
                 .background {

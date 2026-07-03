@@ -8,6 +8,7 @@ final class MockTmuxCommandSender: TmuxCommandSending {
     var newWindowCalls = 0
     var killedWindowIDs: [Int] = []
     var renamedWindows: [(windowID: Int, name: String)] = []
+    var movedWindows: [(windowID: Int, targetWindowID: Int, placement: TmuxWindowMovePlacement)] = []
     var splitPaneCalls: [(paneID: Int, horizontal: Bool)] = []
     var killedPaneIDs: [Int] = []
 
@@ -20,6 +21,9 @@ final class MockTmuxCommandSender: TmuxCommandSending {
     }
     func renameWindow(windowID: Int, name: String) async throws {
         renamedWindows.append((windowID, name))
+    }
+    func moveWindow(windowID: Int, relativeTo targetWindowID: Int, placement: TmuxWindowMovePlacement) async throws {
+        movedWindows.append((windowID, targetWindowID, placement))
     }
     func splitPane(paneID: Int, horizontal: Bool) async throws {
         splitPaneCalls.append((paneID, horizontal))
@@ -500,6 +504,39 @@ final class WindowManagementTests: XCTestCase {
         XCTAssertEqual(session.tabs[1].tmuxWindowID, 10)
         XCTAssertEqual(session.tabs[2].tmuxWindowID, 11)
         XCTAssertEqual(session.selectedTabID, session.tabs[1].id)
+    }
+
+    @MainActor
+    func testMoveTabReordersSessionTabsAndPlansTmuxMove() {
+        let manager = Fantastty.SessionManager()
+        let info = Fantastty.TmuxAttachmentInfo(
+            sessionName: "move-tabs-test",
+            host: Fantastty.TmuxHost.local,
+            connectionState: Fantastty.ConnectionState.connected
+        )
+        let session = manager.makeAttachedSession(info: info, workspaceID: "move-tabs-test")
+        let first = Fantastty.TerminalTab(type: .local, title: "first")
+        first.tmuxWindowID = 10
+        first.tmuxWindowIndex = 0
+        let second = Fantastty.TerminalTab(type: .local, title: "second")
+        second.tmuxWindowID = 20
+        second.tmuxWindowIndex = 1
+        let third = Fantastty.TerminalTab(type: .local, title: "third")
+        third.tmuxWindowID = 30
+        third.tmuxWindowIndex = 2
+        session.tabs = [first, second, third]
+        session.selectedTabID = second.id
+        manager.sessions = [session]
+
+        let moveRequest = manager.moveTab(id: third.id, before: first.id, in: session)
+
+        XCTAssertEqual(session.tabs.map(\.id), [third.id, first.id, second.id])
+        XCTAssertEqual(session.tabs.map(\.tmuxWindowIndex), [0, 1, 2])
+        XCTAssertEqual(session.selectedTabID, second.id)
+        XCTAssertEqual(
+            moveRequest,
+            Fantastty.TmuxWindowMoveRequest(windowID: 30, targetWindowID: 10, placement: .before)
+        )
     }
 
     @MainActor

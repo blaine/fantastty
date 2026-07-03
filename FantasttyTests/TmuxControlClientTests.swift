@@ -1017,6 +1017,31 @@ final class TmuxControlTransportTests: XCTestCase {
         await client.disconnect()
     }
 
+    func testMoveWindowSendsRelativeMoveAndRenumbers() async throws {
+        let info = TmuxAttachmentInfo(
+            sessionName: "move-transport-test",
+            host: .local,
+            connectionState: .disconnected(reason: nil),
+            launchMode: .attach
+        )
+
+        let transport = FakeTmuxControlTransport()
+        let client = TmuxControlClient(
+            attachmentInfo: info,
+            transportFactory: { transport }
+        )
+
+        try await client.connect()
+        try await client.moveWindow(windowID: 30, relativeTo: 10, placement: .before)
+
+        guard let moveIndex = transport.writtenCommands.firstIndex(of: "move-window -b -s @30 -t @10") else {
+            return XCTFail("Expected move-window command")
+        }
+        XCTAssertEqual(transport.writtenCommands[moveIndex + 1], "move-window -r")
+
+        await client.disconnect()
+    }
+
     func testConnectDoesNotStartSecondTransportWhenAlreadyConnected() async throws {
         let info = TmuxAttachmentInfo(
             sessionName: "transport-idempotent",

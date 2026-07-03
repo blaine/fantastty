@@ -541,6 +541,28 @@ final class TmuxSessionBridgeTests: XCTestCase {
     }
 
     @MainActor
+    func testWindowAddUpdatesExistingTabIndexOrder() {
+        let manager = TmuxSessionBridge()
+        let session = makeAttachedSession(workspaceID: "contract-reorder")
+        manager.registerAttachedSession(session)
+
+        guard let client = session.controlClient else {
+            return XCTFail("Expected control client")
+        }
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 10, name: "first", paneIDs: [], windowIndex: 0, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 20, name: "second", paneIDs: [], windowIndex: 1, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 30, name: "third", paneIDs: [], windowIndex: 2, isActive: false))
+
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 30, name: "third", paneIDs: [], windowIndex: 0, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 10, name: "first", paneIDs: [], windowIndex: 1, isActive: false))
+        manager.controlClient(client, didAddWindow: Fantastty.TmuxWindow(windowID: 20, name: "second", paneIDs: [], windowIndex: 2, isActive: false))
+
+        XCTAssertEqual(session.tabs.map { $0.tmuxWindowID }, [30, 10, 20])
+        XCTAssertEqual(session.tabs.map { $0.tmuxWindowIndex }, [0, 1, 2])
+    }
+
+    @MainActor
     func testWindowCloseRemovesTabAndSelectsAdjacent() {
         let manager = TmuxSessionBridge()
         let session = makeAttachedSession(workspaceID: "contract-close")

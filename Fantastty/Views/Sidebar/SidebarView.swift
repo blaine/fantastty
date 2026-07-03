@@ -232,7 +232,30 @@ private struct SidebarTabThumbnails: View {
                     }
                 }
             )
+            .onDrag {
+                SessionTabDropDelegate.itemProvider(for: tab)
+            }
+            .onDrop(
+                of: SessionTabDropDelegate.supportedTypes,
+                delegate: SessionTabDropDelegate(
+                    session: session,
+                    targetTabID: tab.id,
+                    sessionManager: sessionManager
+                )
+            )
             .padding(.leading, 20)
         }
+
+        Color.clear
+            .frame(height: 20)
+            .contentShape(Rectangle())
+            .onDrop(
+                of: SessionTabDropDelegate.supportedTypes,
+                delegate: SessionTabDropDelegate(
+                    session: session,
+                    targetTabID: nil,
+                    sessionManager: sessionManager
+                )
+            )
     }
 }

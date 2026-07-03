@@ -6,6 +6,7 @@ import XCTest
 private final class RouterMockSender: Fantastty.TmuxCommandSending {
     var newWindowCalls = 0
     var killedWindowIDs: [Int] = []
+    var movedWindows: [(windowID: Int, targetWindowID: Int, placement: TmuxWindowMovePlacement)] = []
     var splitPaneCalls: [(paneID: Int, horizontal: Bool)] = []
     var killedPaneIDs: [Int] = []
 
@@ -17,6 +18,9 @@ private final class RouterMockSender: Fantastty.TmuxCommandSending {
         killedWindowIDs.append(windowID)
     }
     func renameWindow(windowID: Int, name: String) async throws {}
+    func moveWindow(windowID: Int, relativeTo targetWindowID: Int, placement: TmuxWindowMovePlacement) async throws {
+        movedWindows.append((windowID, targetWindowID, placement))
+    }
     func splitPane(paneID: Int, horizontal: Bool) async throws {
         splitPaneCalls.append((paneID, horizontal))
     }
@@ -98,6 +102,22 @@ final class TerminalLifecycleRouterTests: XCTestCase {
         await router.requestNewTab(in: session)
 
         XCTAssertEqual(sender.newWindowCalls, 1)
+    }
+
+    @MainActor
+    func testMoveTerminalTabSendsMoveWindow() async {
+        let (session, sender) = makeSession()
+        let tab = makeTerminalTab(tmuxWindowID: 30)
+        let target = makeTerminalTab(tmuxWindowID: 10)
+        session.tabs = [target, tab]
+
+        let router = TerminalLifecycleRouter(commandSender: sender)
+        await router.moveTerminalTab(tab, relativeTo: target, placement: .before, in: session)
+
+        XCTAssertEqual(sender.movedWindows.count, 1)
+        XCTAssertEqual(sender.movedWindows[0].windowID, 30)
+        XCTAssertEqual(sender.movedWindows[0].targetWindowID, 10)
+        XCTAssertEqual(sender.movedWindows[0].placement, .before)
     }
 
     @MainActor

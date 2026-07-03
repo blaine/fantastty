@@ -26,6 +26,22 @@ final class TerminalLifecycleRouter {
         _ = try? await commandSender.newWindow()
     }
 
+    func moveTerminalTab(
+        _ tab: TerminalTab,
+        relativeTo target: TerminalTab,
+        placement: TmuxWindowMovePlacement,
+        in session: Session
+    ) async {
+        guard tab.kind == .terminal,
+              target.kind == .terminal,
+              let windowID = tab.tmuxWindowID,
+              let targetWindowID = target.tmuxWindowID,
+              isConnected(session) else {
+            return
+        }
+        try? await commandSender.moveWindow(windowID: windowID, relativeTo: targetWindowID, placement: placement)
+    }
+
     func requestSplit(paneID: Int, horizontal: Bool, in session: Session) async {
         guard isConnected(session) else { return }
         try? await commandSender.splitPane(paneID: paneID, horizontal: horizontal)

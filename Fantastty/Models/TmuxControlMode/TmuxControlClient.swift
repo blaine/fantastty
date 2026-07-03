@@ -56,12 +56,33 @@ protocol TmuxControlClientDelegate: AnyObject {
 
 // MARK: - TmuxCommandSending
 
+enum TmuxWindowMovePlacement: Equatable, Sendable {
+    case before
+    case after
+
+    var tmuxFlag: String {
+        switch self {
+        case .before:
+            return "-b"
+        case .after:
+            return "-a"
+        }
+    }
+}
+
+struct TmuxWindowMoveRequest: Equatable, Sendable {
+    let windowID: Int
+    let targetWindowID: Int
+    let placement: TmuxWindowMovePlacement
+}
+
 /// Protocol for sending commands to a tmux session.
 /// Allows testing SessionManager without a real TmuxControlClient.
 protocol TmuxCommandSending: AnyObject {
     func newWindow() async throws -> String
     func killWindow(windowID: Int) async throws
     func renameWindow(windowID: Int, name: String) async throws
+    func moveWindow(windowID: Int, relativeTo targetWindowID: Int, placement: TmuxWindowMovePlacement) async throws
     func splitPane(paneID: Int, horizontal: Bool) async throws
     func killPane(paneID: Int) async throws
 }
@@ -743,6 +764,11 @@ actor TmuxControlClient {
 
     func renameWindow(windowID: Int, name: String) async throws {
         _ = try await send("rename-window -t @\(windowID) \(shellQuotedCommandArgument(name))")
+    }
+
+    func moveWindow(windowID: Int, relativeTo targetWindowID: Int, placement: TmuxWindowMovePlacement) async throws {
+        _ = try await send("move-window \(placement.tmuxFlag) -s @\(windowID) -t @\(targetWindowID)")
+        _ = try await send("move-window -r")
     }
 
     func splitPane(paneID: Int, horizontal: Bool) async throws {

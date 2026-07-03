@@ -1284,6 +1284,92 @@ class SessionManager: ObservableObject {
         return tab
     }
 
+    /// Move a tab before another tab in the same session, or to the end when targetID is nil.
+    @discardableResult
+    func moveTab(id tabID: UUID, before targetID: UUID?, in session: Session) -> TmuxWindowMoveRequest? {
+        guard targetID != tabID,
+              let sourceIndex = session.tabs.firstIndex(where: { $0.id == tabID }) else {
+            return nil
+        }
+
+        let movingTab = session.tabs[sourceIndex]
+        let originalIDs = session.tabs.map(\.id)
+        var tabs = session.tabs
+        tabs.remove(at: sourceIndex)
+
+        let destinationIndex: Int
+        if let targetID,
+           let targetIndex = tabs.firstIndex(where: { $0.id == targetID }) {
+            destinationIndex = targetIndex
+        } else {
+            destinationIndex = tabs.endIndex
+        }
+
+        tabs.insert(movingTab, at: destinationIndex)
+        guard tabs.map(\.id) != originalIDs else { return nil }
+
+        session.tabs = tabs
+        let moveRequest = Self.tmuxWindowMoveRequest(for: movingTab, in: tabs)
+        if moveRequest != nil {
+            Self.updateOptimisticTmuxWindowIndices(in: tabs)
+        }
+        if let moveRequest,
+           let router = lifecycleRouterByWorkspaceID[session.workspaceID],
+           let targetTab = tabs.first(where: { $0.tmuxWindowID == moveRequest.targetWindowID }) {
+            Task {
+                await router.moveTerminalTab(
+                    movingTab,
+                    relativeTo: targetTab,
+                    placement: moveRequest.placement,
+                    in: session
+                )
+            }
+        }
+
+        return moveRequest
+    }
+
+    private static func tmuxWindowMoveRequest(
+        for movingTab: TerminalTab,
+        in tabs: [TerminalTab]
+    ) -> TmuxWindowMoveRequest? {
+        guard movingTab.kind == .terminal,
+              let windowID = movingTab.tmuxWindowID,
+              let movedIndex = tabs.firstIndex(where: { $0.id == movingTab.id }) else {
+            return nil
+        }
+
+        for tab in tabs.dropFirst(movedIndex + 1) where tab.kind == .terminal {
+            guard let targetWindowID = tab.tmuxWindowID else { continue }
+            return TmuxWindowMoveRequest(
+                windowID: windowID,
+                targetWindowID: targetWindowID,
+                placement: .before
+            )
+        }
+
+        for tab in tabs.prefix(movedIndex).reversed() where tab.kind == .terminal {
+            guard let targetWindowID = tab.tmuxWindowID else { continue }
+            return TmuxWindowMoveRequest(
+                windowID: windowID,
+                targetWindowID: targetWindowID,
+                placement: .after
+            )
+        }
+
+        return nil
+    }
+
+    private static func updateOptimisticTmuxWindowIndices(in tabs: [TerminalTab]) {
+        let terminalTabs = tabs.filter { $0.kind == .terminal && $0.tmuxWindowID != nil }
+        guard !terminalTabs.isEmpty else { return }
+
+        let baseIndex = terminalTabs.compactMap(\.tmuxWindowIndex).min() ?? 0
+        for (offset, tab) in terminalTabs.enumerated() {
+            tab.tmuxWindowIndex = baseIndex + offset
+        }
+    }
+
     /// Close a tab within its session. If last tab, closes the session.
     /// For terminal tabs in attached tmux sessions, sends kill-window through the
     /// lifecycle router. The actual tab removal happens when tmux confirms via

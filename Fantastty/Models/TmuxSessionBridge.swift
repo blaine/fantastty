@@ -318,6 +318,8 @@ private extension TmuxSessionBridge {
 
     func upsertWindow(_ snapshot: AttachedWindowSnapshotV2, in session: Session, client: TmuxControlClient) {
         if let existing = session.tabs.first(where: { $0.tmuxWindowID == snapshot.windowID }) {
+            existing.title = snapshot.title
+            existing.tmuxWindowIndex = snapshot.windowIndex
             ensureWindowController(
                 windowID: snapshot.windowID,
                 title: snapshot.title,
@@ -326,6 +328,7 @@ private extension TmuxSessionBridge {
                 client: client,
                 existingTab: existing
             )
+            reorderTerminalTabsByTmuxIndex(in: session)
             if snapshot.isActive {
                 activeWindowIDByWorkspaceID[session.workspaceID] = snapshot.windowID
                 withSuppressedTabSelectionSync(for: session.workspaceID) {
@@ -363,6 +366,29 @@ private extension TmuxSessionBridge {
                 session.selectedTabID = tab.id
             }
         }
+    }
+
+    private func reorderTerminalTabsByTmuxIndex(in session: Session) {
+        let terminalTabs = session.tabs.filter { $0.kind == .terminal && $0.tmuxWindowID != nil }
+        guard terminalTabs.count > 1 else { return }
+
+        let originalOffsets = Dictionary(uniqueKeysWithValues: terminalTabs.enumerated().map { ($1.id, $0) })
+        var sortedTerminals = terminalTabs.sorted {
+            let leftIndex = $0.tmuxWindowIndex ?? Int.max
+            let rightIndex = $1.tmuxWindowIndex ?? Int.max
+            if leftIndex != rightIndex {
+                return leftIndex < rightIndex
+            }
+            return (originalOffsets[$0.id] ?? 0) < (originalOffsets[$1.id] ?? 0)
+        }
+
+        let reorderedTabs = session.tabs.map { tab in
+            guard tab.kind == .terminal && tab.tmuxWindowID != nil else { return tab }
+            return sortedTerminals.removeFirst()
+        }
+
+        guard reorderedTabs.map(\.id) != session.tabs.map(\.id) else { return }
+        session.tabs = reorderedTabs
     }
 
     func applyLayout(

@@ -1,4 +1,45 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+struct SessionTabDropDelegate: DropDelegate {
+    static let supportedTypes: [UTType] = [.plainText]
+
+    let session: Session
+    let targetTabID: UUID?
+    let sessionManager: SessionManager
+
+    static func itemProvider(for tab: TerminalTab) -> NSItemProvider {
+        NSItemProvider(object: tab.id.uuidString as NSString)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let provider = info.itemProviders(for: Self.supportedTypes).first else {
+            return false
+        }
+
+        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
+            guard let tabID = Self.tabID(from: item) else { return }
+            DispatchQueue.main.async {
+                sessionManager.moveTab(id: tabID, before: targetTabID, in: session)
+            }
+        }
+        return true
+    }
+
+    private static func tabID(from item: NSSecureCoding?) -> UUID? {
+        if let data = item as? Data,
+           let string = String(data: data, encoding: .utf8) {
+            return UUID(uuidString: string)
+        }
+        if let string = item as? String {
+            return UUID(uuidString: string)
+        }
+        if let string = item as? NSString {
+            return UUID(uuidString: string as String)
+        }
+        return nil
+    }
+}
 
 /// Tab bar displayed at the top of the detail view, showing tabs within a session.
 struct TabBarView: View {
@@ -19,7 +60,30 @@ struct TabBarView: View {
                             sessionManager.closeTab(id: tab.id)
                         }
                     )
+                    .onDrag {
+                        SessionTabDropDelegate.itemProvider(for: tab)
+                    }
+                    .onDrop(
+                        of: SessionTabDropDelegate.supportedTypes,
+                        delegate: SessionTabDropDelegate(
+                            session: session,
+                            targetTabID: tab.id,
+                            sessionManager: sessionManager
+                        )
+                    )
                 }
+
+                Color.clear
+                    .frame(width: 24, height: 36)
+                    .contentShape(Rectangle())
+                    .onDrop(
+                        of: SessionTabDropDelegate.supportedTypes,
+                        delegate: SessionTabDropDelegate(
+                            session: session,
+                            targetTabID: nil,
+                            sessionManager: sessionManager
+                        )
+                    )
 
                 // New tab menu
                 Menu {
