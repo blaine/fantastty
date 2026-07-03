@@ -35,7 +35,7 @@ struct SessionLauncherSheet: View {
             Divider()
             footer
         }
-        .frame(width: 760, height: 520)
+        .frame(minWidth: 600, idealWidth: 760, maxWidth: .infinity, minHeight: 440, idealHeight: 480, maxHeight: .infinity)
         .onAppear {
             selectedRowID = request.focus == .existingSessions ? firstExistingRowID ?? "new-session" : "new-session"
             refreshDiscovery()
@@ -189,7 +189,7 @@ struct SessionLauncherSheet: View {
                 }
                 .tag(row.id)
             }
-            .frame(minHeight: 160)
+            .frame(minHeight: 100)
 
             if !isLoading && discoveryError == nil && rows.count == 1 {
                 Text("No existing sessions found at this location.")
