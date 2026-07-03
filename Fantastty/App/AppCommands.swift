@@ -28,26 +28,6 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
 
-            Button("New Local Workspace") {
-                sessionManager.createSession()
-            }
-
-            Button("New SSH Workspace...") {
-                sessionManager.showSessionLauncher(.ssh())
-            }
-            .keyboardShortcut("k", modifiers: [.command, .shift])
-
-            Button("New Sprite Workspace...") {
-                sessionManager.showSessionLauncher(.sprite())
-            }
-            .keyboardShortcut("k", modifiers: [.command, .option])
-
-            Divider()
-
-            Button("Attach to tmux Session...") {
-                sessionManager.showSessionLauncher(.local(focus: .existingSessions))
-            }
-
             Divider()
 
             Button("Split Right") {
