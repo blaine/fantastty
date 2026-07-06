@@ -22,7 +22,6 @@ struct EditableToolbarTitle: NSViewRepresentable {
         textField.cell?.truncatesLastVisibleLine = true
         textField.cell?.sendsActionOnEndEditing = true
         textField.stringValue = text
-        textField.sizeToFit()
         textField.setContentHuggingPriority(.defaultLow, for: .horizontal)
         return textField
     }
@@ -32,6 +31,15 @@ struct EditableToolbarTitle: NSViewRepresentable {
             nsView.stringValue = text
             nsView.invalidateIntrinsicContentSize()
         }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ToolbarTextField, context: Context) -> CGSize? {
+        let intrinsic = nsView.intrinsicContentSize
+        var width = intrinsic.width
+        if let proposedWidth = proposal.width {
+            width = min(width, proposedWidth)
+        }
+        return CGSize(width: width, height: intrinsic.height)
     }
 
     func makeCoordinator() -> Coordinator {
@@ -55,6 +63,17 @@ struct EditableToolbarTitle: NSViewRepresentable {
 
 /// NSTextField subclass that strips the toolbar item border when placed in a toolbar.
 class ToolbarTextField: NSTextField {
+    /// Editable text fields report no intrinsic width (AppKit expects constraints
+    /// to size them), which leaves the title stuck at whatever width the toolbar
+    /// first assigned. Measure the cell so the title sizes to its text.
+    override var intrinsicContentSize: NSSize {
+        guard let cell else { return super.intrinsicContentSize }
+        let bounds = NSRect(x: 0, y: 0, width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        let size = cell.cellSize(forBounds: bounds)
+        // Small margin so the truncating cell doesn't clip the last glyph.
+        return NSSize(width: ceil(size.width) + 4, height: ceil(size.height))
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         DispatchQueue.main.async { [weak self] in
