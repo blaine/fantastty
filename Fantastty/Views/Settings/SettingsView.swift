@@ -47,7 +47,7 @@ struct SettingsView: View {
                 .navigationTitle((selection ?? .appearance).title)
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(width: 760, height: 560)
+        .frame(minWidth: 640, idealWidth: 760, maxWidth: .infinity, minHeight: 440, idealHeight: 480, maxHeight: .infinity)
     }
 
     @ViewBuilder
