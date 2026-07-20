@@ -1740,6 +1740,18 @@ extension Ghostty {
             var key_ev = event.ghosttyKeyEvent(action, translationMods: translationEvent?.modifierFlags)
             key_ev.composing = composing
 
+            // A composing keystroke (IME preedit in progress) only affects the
+            // preedit and must never be transmitted to a tmux pane. Ghostty core
+            // drops these when composing==true, but the pane-routing paths below
+            // bypass ghostty_surface_key, so we must drop them here too. The
+            // committed text arrives separately via the insertText accumulator
+            // with composing==false and is still sent. Without this, IME input
+            // (e.g. Vietnamese Telex) sends each composing keystroke raw AND the
+            // committed character, producing duplicate characters.
+            if composing, hasPaneInputRoute {
+                return true
+            }
+
             // For text, we only encode UTF8 if we don't have a single control
             // character. Control characters are encoded by Ghostty itself.
             // Without this, `ctrl+enter` does the wrong thing.
@@ -2428,7 +2440,14 @@ extension Ghostty.SurfaceView: NSTextInputClient {
                 return
             }
 
+            // While a preedit is active, special keys (arrows, Home/End, etc.) that
+            // AppKit routes here belong to the IME composition, not the terminal.
+            // Ghostty core suppresses these when composing; the pane path must too,
+            // otherwise we'd emit an escape sequence to tmux mid-composition. Once
+            // the IME commits (via insertText -> unmarkText) hasMarkedText() is false
+            // again and the key is forwarded normally.
             if let paneID = tmuxPaneID,
+               !hasMarkedText(),
                let current = NSApp.currentEvent,
                current.type == .keyDown,
                shouldRoutePaneInput(bindingFlags: nil, event: current),
